@@ -76,8 +76,8 @@ function renderCardPool() {
         <span class="stat-atk">${card.atk}⚔</span>
         <span class="stat-hp">${card.hp}♥</span>
       </div>`;
-      const kws = KW_SHORT.filter(([k]) => card[k]).map(([,l]) =>
-        `<span class="kw-badge" style="background:${KW_COLORS[KW_SHORT.find(([kk])=>kk===KW_SHORT.find(([,ll])=>ll===l)?.[0])?.[0]] || "#555"};color:#fff">${l}</span>`
+      const kws = KW_SHORT.filter(([k]) => card[k]).map(([k, l]) =>
+        `<span class="kw-badge" style="background:${KW_COLORS[k]};color:#fff">${l}</span>`
       ).join("");
       if (kws) statsHtml += `<div class="kw-badges" style="margin-top:2px">${kws}</div>`;
     } else if (card.type === "weapon") {
@@ -246,6 +246,9 @@ function renderGame() {
   renderHand(p1);
   renderLog(log);
 
+  // Your-turn highlight on player tray
+  document.getElementById("tray-player").classList.toggle("your-turn", !!is_player_turn && !winner);
+
   // End turn button
   const etBtn = document.getElementById("btn-end-turn");
   etBtn.disabled = !is_player_turn || !!winner;
@@ -283,7 +286,8 @@ function renderHero(elId, player, isOpp) {
     if (selected?.type === "hero_weapon") cls += " selected";
   }
 
-  if (selected && isOpp && isValidHeroTarget(isOpp)) cls += " valid-target";
+  if (selected && isValidHeroTarget(isOpp)) cls += " valid-target";
+  if (player.hp <= 10) cls += " low-hp";
 
   let armorBadge = player.armor > 0
     ? `<div class="armor-badge">${player.armor}</div>` : "";
@@ -294,6 +298,7 @@ function renderHero(elId, player, isOpp) {
   el.innerHTML = `
     ${armorBadge}${weaponBadge}
     <div class="hero-icon">${icon}</div>
+    <div class="hero-class-name">${player.hero_class}</div>
     <div class="hero-hp-bar"><div class="hero-hp-fill" style="width:${hpPct}%"></div></div>
     <div class="hero-hp-text">${Math.max(0, player.hp)} HP</div>
   `;
@@ -311,6 +316,19 @@ function isValidHeroTarget(isOpp) {
   if (selected.type === "board")        actionType = "attack";
   if (selected.type === "hero_power")   actionType = "hero_power";
   if (selected.type === "hero_weapon")  actionType = "hero_attack";
+
+  // Attacks and hero-attacks always target the opponent's hero
+  if ((actionType === "attack" || actionType === "hero_attack") && !isOpp) return false;
+  // Damage spells target the opponent's hero
+  if (actionType === "play") {
+    const card = CARD_DB[gameState.p1.hand[selected.idx]];
+    if (card?.effect === "damage" && !isOpp) return false;
+  }
+  // Priest heals own hero; Mage's Fireblast targets the opponent's hero
+  if (actionType === "hero_power") {
+    if (gameState.p1.hero_class === "Priest" &&  isOpp) return false;
+    if (gameState.p1.hero_class === "Mage"   && !isOpp) return false;
+  }
 
   return lm.some(([a, i, t]) =>
     a === actionType &&
@@ -330,6 +348,19 @@ function isValidMinionTarget(boardIdx, isOpp) {
   if (selected.type === "hero_power")  actionType = "hero_power";
   if (selected.type === "hero_weapon") actionType = "hero_attack";
   if (!actionType) return false;
+
+  // Attacks and hero-attacks always target the opponent's board
+  if ((actionType === "attack" || actionType === "hero_attack") && !isOpp) return false;
+  if (actionType === "play") {
+    const card = CARD_DB[gameState.p1.hand[selected.idx]];
+    if (card?.effect === "buff"   &&  isOpp) return false; // buff targets own board
+    if (card?.effect === "damage" && !isOpp) return false; // damage targets opp board
+  }
+  // Priest heals own board; Mage's Fireblast targets the opponent's board
+  if (actionType === "hero_power") {
+    if (gameState.p1.hero_class === "Priest" &&  isOpp) return false;
+    if (gameState.p1.hero_class === "Mage"   && !isOpp) return false;
+  }
 
   return lm.some(([a, i, t]) =>
     a === actionType &&
@@ -411,8 +442,7 @@ function renderBoard(elId, player, isOpp) {
 
     // Targeting highlight
     if (selected) {
-      const valid = isValidMinionTarget(idx,
-        isOpp && (selected.type !== "hand" || (CARD_DB[player.hand?.[selected.idx]]?.effect !== "buff")));
+      const valid = isValidMinionTarget(idx, isOpp);
       if (valid) cls += " valid-target";
       else if (isOpp) cls += " invalid-target";
     }
@@ -454,7 +484,7 @@ function renderHand(p1) {
 
     let extra = "";
     if (card.type === "minion" || card.type === "weapon") {
-      const atkVal = card.type === "weapon" ? card.atk : card.atk;
+      const atkVal = card.atk;
       const hpVal  = card.type === "weapon" ? card.durability : card.hp;
       extra = `<div class="stat-badge atk">${atkVal}</div>
                <div class="stat-badge hp">${hpVal}</div>`;

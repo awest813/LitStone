@@ -429,10 +429,21 @@ body {
 .hero-panel.valid-target  { border-color: var(--col-gold);   box-shadow: 0 0 20px rgba(245,197,24,.55); cursor: pointer; }
 .hero-panel.selected      { border-color: var(--col-gold);   box-shadow: 0 0 24px rgba(245,197,24,.7); }
 
-.hero-icon     { font-size: 30px; line-height: 1; }
-.hero-hp-bar   { width: 72px; height: 6px; background: #333; border-radius: 3px; margin-top: 4px; overflow: hidden; }
-.hero-hp-fill  { height: 100%; background: linear-gradient(90deg, #27ae60, #2ecc71); border-radius: 3px; transition: width .4s; }
-.hero-hp-text  { font-size: 10px; color: var(--col-text); margin-top: 2px; }
+.hero-icon       { font-size: 30px; line-height: 1; }
+.hero-class-name { font-size: 8px; color: var(--col-text-dim); letter-spacing: .06em; margin-bottom: 1px; text-transform: uppercase; }
+.hero-hp-bar     { width: 72px; height: 6px; background: #333; border-radius: 3px; margin-top: 2px; overflow: hidden; }
+.hero-hp-fill    { height: 100%; background: linear-gradient(90deg, #27ae60, #2ecc71); border-radius: 3px; transition: width .4s; }
+.hero-hp-text    { font-size: 10px; color: var(--col-text); margin-top: 2px; }
+
+/* Low-HP warning: pulse the HP bar red */
+.hero-panel.low-hp .hero-hp-fill {
+  background: linear-gradient(90deg, #c0392b, #e74c3c);
+  animation: hpPulse 1.4s ease-in-out infinite;
+}
+@keyframes hpPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .55; }
+}
 
 .armor-badge {
   position: absolute; top: -4px; right: -4px;
@@ -507,6 +518,17 @@ body {
   flex-shrink: 0;
 }
 .deck-panel .deck-n { font-size: 20px; font-weight: 700; color: var(--col-text); }
+
+/* Your-turn glow on player tray */
+.tray-player.your-turn {
+  border-top: 1px solid rgba(46,204,113,.55);
+  box-shadow: 0 -3px 18px rgba(46,204,113,.18);
+  animation: turnGlow 2.2s ease-in-out infinite;
+}
+@keyframes turnGlow {
+  0%, 100% { box-shadow: 0 -3px 12px rgba(46,204,113,.12); }
+  50%       { box-shadow: 0 -3px 24px rgba(46,204,113,.32); }
+}
 
 /* End turn / resign */
 .end-turn-area { display: flex; flex-direction: column; gap: 6px; margin-left: auto; }
