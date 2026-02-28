@@ -1,5 +1,5 @@
 /* ============================================================
-   TinyStone — Frontend Game Logic (game.js)
+   LitStone — Frontend Game Logic (game.js)
    All UI rendering, selection state, and server communication.
    ============================================================ */
 
@@ -14,9 +14,12 @@ let selected  = null;        // { type: "hand"|"board"|"hero_power"|"hero_weapon
 let draftDeck = [];
 let selectedClass = null;
 
+// Animation state tracking
+let prevBoards = null;       // snapshot of boards before last action
+
 const KW_COLORS = {
-  taunt: "#e74c3c", divine_shield: "#f1c40f", charge: "#2ecc71",
-  poisonous: "#9b59b6", battlecry: "#3498db", deathrattle: "#566573",
+  taunt: "#c0392b", divine_shield: "#d4a800", charge: "#00a878",
+  poisonous: "#8e44ad", battlecry: "#2371b5", deathrattle: "#404e5c",
 };
 const KW_SHORT = [
   ["taunt","TAUNT"], ["divine_shield","SHIELD"], ["charge","CHARGE"],
@@ -28,6 +31,11 @@ const CARD_EMOJIS = {
   IN:"🔍", CV:"🌊", BS:"✨", AX:"🪓",
 };
 
+// Hero class accent colors
+const HERO_COLORS = {
+  Mage: "#2980b9", Warrior: "#c0392b", Priest: "#d4820a",
+};
+
 // ---------------------------------------------------------------------------
 // Screen helpers
 // ---------------------------------------------------------------------------
@@ -36,7 +44,6 @@ function showScreen(id) {
     s.classList.toggle("active", s.id === id);
     s.style.display = s.id === id ? "" : "none";
   });
-  // Force the game screen into its grid layout
   if (id === "screen-game") {
     document.getElementById("screen-game").style.display = "grid";
   }
@@ -154,6 +161,7 @@ async function startGame() {
     CARD_DB    = data.card_db;
     gameState  = data;
     selected   = null;
+    prevBoards = null;
     showScreen("screen-game");
     renderGame();
   } catch (err) {
@@ -202,7 +210,7 @@ function buildTooltipHtml(name, card) {
 
 function positionTooltip(el, x, y) {
   const W = window.innerWidth, H = window.innerHeight;
-  const TW = 180, TH = 200;
+  const TW = 190, TH = 200;
   let tx = x + 16, ty = y;
   if (tx + TW > W - 10) tx = x - TW - 10;
   if (ty + TH > H - 10) ty = H - TH - 10;
@@ -229,6 +237,70 @@ function hideTooltip(id) {
 }
 
 // ---------------------------------------------------------------------------
+// ANIMATION HELPERS
+// ---------------------------------------------------------------------------
+
+/** Snapshot both boards for diff-based animation */
+function snapshotBoards() {
+  if (!gameState) return null;
+  return {
+    p1: gameState.p1.board.map(m => ({ name: m.name, hp: m.hp })),
+    p2: gameState.p2.board.map(m => ({ name: m.name, hp: m.hp })),
+  };
+}
+
+/**
+ * After rendering, apply animations by comparing old vs new board state.
+ * @param {object} prev - snapshotBoards() result taken before the action
+ */
+function applyPostRenderAnimations(prev) {
+  if (!prev || !gameState) return;
+
+  const pairs = [
+    { prev: prev.p1, curr: gameState.p1.board, elId: "board-player" },
+    { prev: prev.p2, curr: gameState.p2.board, elId: "board-opp" },
+  ];
+
+  pairs.forEach(({ prev: prevBoard, curr: currBoard, elId }) => {
+    const boardEl = document.getElementById(elId);
+    const cards   = boardEl ? Array.from(boardEl.querySelectorAll(".minion-card")) : [];
+
+    currBoard.forEach((minion, idx) => {
+      const card = cards[idx];
+      if (!card) return;
+
+      // Was this minion on the previous board?
+      const prevMinion = prevBoard.find(m => m.name === minion.name);
+
+      if (!prevMinion) {
+        // New summon — play pop-in animation
+        card.classList.add("summon-anim");
+        card.addEventListener("animationend", () => card.classList.remove("summon-anim"), { once: true });
+      } else if (minion.hp < prevMinion.hp) {
+        // Took damage — flash red
+        card.classList.add("damage-flash");
+        card.addEventListener("animationend", () => card.classList.remove("damage-flash"), { once: true });
+      }
+    });
+  });
+}
+
+/** Flash a hero panel briefly (damage taken) */
+function flashHero(elId) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.classList.add("hero-flash");
+  el.addEventListener("animationend", () => el.classList.remove("hero-flash"), { once: true });
+}
+
+/** Detect hero HP changes and flash accordingly */
+function applyHeroAnimations(prev) {
+  if (!prev || !gameState) return;
+  if (gameState.p1.hp < prev.p1) flashHero("hero-player");
+  if (gameState.p2.hp < prev.p2) flashHero("hero-opp");
+}
+
+// ---------------------------------------------------------------------------
 // GAME RENDERING
 // ---------------------------------------------------------------------------
 
@@ -250,10 +322,9 @@ function renderGame() {
   renderHand(p1);
   renderLog(log);
 
-  // Your-turn highlight on player tray
+  // Your-turn highlight
   document.getElementById("tray-player").classList.toggle("your-turn", !!is_player_turn && !winner);
 
-  // End turn button
   const etBtn = document.getElementById("btn-end-turn");
   etBtn.disabled = !is_player_turn || !!winner;
   etBtn.textContent = is_player_turn ? "End Turn" : "Waiting…";
@@ -279,11 +350,10 @@ function renderHero(elId, player, isOpp) {
   const hpPct = Math.max(0, Math.min(100, (player.hp / 30) * 100));
   const icons = { Mage: "🔮", Warrior: "⚔️", Priest: "✨" };
   const icon  = icons[player.hero_class] || "?";
+  const accentColor = HERO_COLORS[player.hero_class] || "#2e4a66";
 
   let cls = "hero-panel";
-
   if (!isOpp) {
-    // Can the hero attack?
     const canAtk = player.weapon && player.hero_can_attack;
     if (canAtk && !selected) cls += " attackable";
     if (selected?.type === "hero_weapon") cls += " selected";
@@ -292,12 +362,23 @@ function renderHero(elId, player, isOpp) {
   if (selected && isValidHeroTarget(isOpp)) cls += " valid-target";
   if (player.hp <= 10) cls += " low-hp";
 
-  let armorBadge = player.armor > 0
+  let armorBadge  = player.armor > 0
     ? `<div class="armor-badge">${player.armor}</div>` : "";
   let weaponBadge = player.weapon
     ? `<div class="weapon-badge">${player.weapon.atk}⚔ ${player.weapon.durability}🛡</div>` : "";
 
-  el.className = cls;
+  el.className    = cls;
+  el.dataset.class = player.hero_class;
+
+  // Accent glow via inline border color
+  if (selected && isValidHeroTarget(isOpp)) {
+    el.style.borderColor = "";
+  } else if (!isOpp && selected?.type === "hero_weapon") {
+    el.style.borderColor = "";
+  } else {
+    el.style.borderColor = accentColor;
+  }
+
   el.innerHTML = `
     ${armorBadge}${weaponBadge}
     <div class="hero-icon">${icon}</div>
@@ -320,14 +401,11 @@ function isValidHeroTarget(isOpp) {
   if (selected.type === "hero_power")   actionType = "hero_power";
   if (selected.type === "hero_weapon")  actionType = "hero_attack";
 
-  // Attacks and hero-attacks always target the opponent's hero
   if ((actionType === "attack" || actionType === "hero_attack") && !isOpp) return false;
-  // Damage spells target the opponent's hero
   if (actionType === "play") {
     const card = CARD_DB[gameState.p1.hand[selected.idx]];
     if (card?.effect === "damage" && !isOpp) return false;
   }
-  // Priest heals own hero; Mage's Fireblast targets the opponent's hero
   if (actionType === "hero_power") {
     if (gameState.p1.hero_class === "Priest" &&  isOpp) return false;
     if (gameState.p1.hero_class === "Mage"   && !isOpp) return false;
@@ -352,14 +430,12 @@ function isValidMinionTarget(boardIdx, isOpp) {
   if (selected.type === "hero_weapon") actionType = "hero_attack";
   if (!actionType) return false;
 
-  // Attacks and hero-attacks always target the opponent's board
   if ((actionType === "attack" || actionType === "hero_attack") && !isOpp) return false;
   if (actionType === "play") {
     const card = CARD_DB[gameState.p1.hand[selected.idx]];
-    if (card?.effect === "buff"   &&  isOpp) return false; // buff targets own board
-    if (card?.effect === "damage" && !isOpp) return false; // damage targets opp board
+    if (card?.effect === "buff"   &&  isOpp) return false;
+    if (card?.effect === "damage" && !isOpp) return false;
   }
-  // Priest heals own board; Mage's Fireblast targets the opponent's board
   if (actionType === "hero_power") {
     if (gameState.p1.hero_class === "Priest" &&  isOpp) return false;
     if (gameState.p1.hero_class === "Mage"   && !isOpp) return false;
@@ -375,7 +451,6 @@ function isValidMinionTarget(boardIdx, isOpp) {
 /* ---- Mana gems ---- */
 function renderHeroMana(trayId, player) {
   const tray = document.getElementById(trayId);
-  // Find or create mana bar inside tray
   let manaEl = tray.querySelector(".mana-bar");
   if (!manaEl) {
     manaEl = document.createElement("div");
@@ -394,8 +469,8 @@ function renderHeroMana(trayId, player) {
 function renderHeroPower(elId, player, isOpp) {
   const el = document.getElementById(elId);
   const canUse = !player.hero_power_used && player.mana >= 2;
-  const icons = { Mage: "🔥", Warrior: "🛡️", Priest: "💚" };
-  const icon  = icons[player.hero_class] || "⚡";
+  const icons  = { Mage: "🔥", Warrior: "🛡️", Priest: "💚" };
+  const icon   = icons[player.hero_class] || "⚡";
 
   let cls = "hero-power-panel";
   if (!canUse) cls += " used";
@@ -437,13 +512,12 @@ function renderBoard(elId, player, isOpp) {
     const icon = CARD_EMOJIS[card.icon] || card.icon || "?";
 
     let cls = "minion-card";
-    if (!isOpp && minion.can_attack && !selected)           cls += " can-attack";
-    if (!isOpp && selected?.type === "board" && selected.idx === idx) cls += " selected";
-    if (minion.taunt)                                        cls += " taunt";
-    if (minion.divine_shield)                                cls += " divine-shield";
-    if (!minion.can_attack && !isOpp)                        cls += " exhausted";
+    if (!isOpp && minion.can_attack && !selected)                      cls += " can-attack";
+    if (!isOpp && selected?.type === "board" && selected.idx === idx)  cls += " selected";
+    if (minion.taunt)                                                   cls += " taunt";
+    if (minion.divine_shield)                                           cls += " divine-shield";
+    if (!minion.can_attack && !isOpp)                                   cls += " exhausted";
 
-    // Targeting highlight
     if (selected) {
       const valid = isValidMinionTarget(idx, isOpp);
       if (valid) cls += " valid-target";
@@ -471,10 +545,13 @@ function renderBoard(elId, player, isOpp) {
   });
 }
 
-/* ---- Player hand ---- */
+/* ---- Player hand — with card fan effect ---- */
 function renderHand(p1) {
   const el = document.getElementById("hand-player");
   el.innerHTML = "";
+
+  const total  = p1.hand.length;
+  const midIdx = (total - 1) / 2;
 
   p1.hand.forEach((name, idx) => {
     const card       = CARD_DB[name] || {};
@@ -482,7 +559,7 @@ function renderHand(p1) {
     const icon       = CARD_EMOJIS[card.icon] || card.icon || "?";
 
     let cls = `hand-card hand-card--${card.type}`;
-    if (!affordable)                                   cls += " unaffordable";
+    if (!affordable)                                       cls += " unaffordable";
     if (selected?.type === "hand" && selected.idx === idx) cls += " selected";
 
     let extra = "";
@@ -501,6 +578,14 @@ function renderHand(p1) {
 
     const div = document.createElement("div");
     div.className = cls;
+
+    // Fan rotation: cards spread outward from center
+    const rot = total > 1 ? (idx - midIdx) * 3.5 : 0;
+    div.style.setProperty("--card-rot", `${rot}deg`);
+    // Slight arc: outer cards lift down a bit
+    const lift = total > 1 ? Math.abs(idx - midIdx) * 4 : 0;
+    div.style.marginBottom = `${lift}px`;
+
     div.innerHTML = `
       <div class="gem-cost">${card.cost}</div>
       <div class="minion-art">${icon}</div>
@@ -520,8 +605,9 @@ function renderHand(p1) {
 /* ---- Combat log ---- */
 function renderLog(entries) {
   const el = document.getElementById("log-entries");
+  const wasAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30;
   el.innerHTML = "";
-  entries.slice(-40).forEach(msg => {
+  entries.slice(-50).forEach(msg => {
     const div = document.createElement("div");
     let cls = "log-entry";
     if (msg.includes("attacks") || msg.includes("damage") || msg.includes("FATIGUE") || msg.includes("destroys")) cls += " log-dmg";
@@ -535,7 +621,7 @@ function renderLog(entries) {
     div.textContent = msg;
     el.appendChild(div);
   });
-  el.scrollTop = el.scrollHeight;
+  if (wasAtBottom) el.scrollTop = el.scrollHeight;
 }
 
 // ---------------------------------------------------------------------------
@@ -566,7 +652,7 @@ function getLegalMoves() {
 // ---------------------------------------------------------------------------
 function handleHandClick(idx, p1, name, card, affordable) {
   if (!gameState.is_player_turn || gameState.winner) return;
-  if (!affordable) { spawnFloat("Not enough mana!", "var(--col-mana)"); return; }
+  if (!affordable) { spawnFloat("Not enough mana!", "var(--col-mana-bright)"); return; }
 
   if (selected?.type === "hand" && selected.idx === idx) {
     clearSelection();
@@ -574,7 +660,6 @@ function handleHandClick(idx, p1, name, card, affordable) {
   }
   clearSelection();
 
-  // Cards that need no target: minions (placed automatically), buffs need friend target
   if (card.type === "minion") {
     if (p1.board.length >= 7) { spawnFloat("Board is full!", "var(--col-red)"); return; }
     sendAction("play", idx, null);
@@ -589,7 +674,6 @@ function handleHandClick(idx, p1, name, card, affordable) {
       sendAction("play", idx, null);
       return;
     }
-    // Needs a target
     selected = { type: "hand", idx };
     renderGame();
   }
@@ -598,10 +682,8 @@ function handleHandClick(idx, p1, name, card, affordable) {
 function handleMinionClick(idx, isOpp, player, minion) {
   if (!gameState.is_player_turn || gameState.winner) return;
 
-  // If we have a selection waiting for a target
   if (selected) {
     const targetValid = isValidMinionTarget(idx, isOpp);
-
     if (!targetValid) { spawnFloat("Invalid target!", "var(--col-red)"); return; }
 
     let action;
@@ -613,7 +695,6 @@ function handleMinionClick(idx, isOpp, player, minion) {
     return;
   }
 
-  // Select own minion to attack
   if (!isOpp && minion.can_attack) {
     selected = { type: "board", idx };
     renderGame();
@@ -635,7 +716,6 @@ function handleHeroClick(isOpp, player) {
     return;
   }
 
-  // Select own hero for weapon attack
   if (!isOpp && player.weapon && player.hero_can_attack) {
     selected = { type: "hero_weapon" };
     renderGame();
@@ -644,14 +724,12 @@ function handleHeroClick(isOpp, player) {
 
 function handleHeroPowerClick(player, canUse) {
   if (!gameState.is_player_turn || gameState.winner) return;
-  if (!canUse) { spawnFloat("Already used / not enough mana!", "var(--col-purple)"); return; }
+  if (!canUse) { spawnFloat("Already used / not enough mana!", "var(--col-purple-bright)"); return; }
 
   if (selected?.type === "hero_power") { clearSelection(); return; }
   clearSelection();
 
-  // Warrior: no target
   if (player.hero_class === "Warrior") { sendAction("hero_power", null, null); return; }
-  // Priest heals friendly — still needs selection
   selected = { type: "hero_power" };
   renderGame();
 }
@@ -668,6 +746,13 @@ async function sendAction(action, idx, target) {
   const etBtn = document.getElementById("btn-end-turn");
   etBtn.disabled = true;
 
+  // Snapshot board + hero HP state before action for diff-based animations
+  const prevSnap = snapshotBoards();
+  const prevHeroHp = {
+    p1: gameState.p1.hp,
+    p2: gameState.p2.hp,
+  };
+
   try {
     const res = await fetch("/api/action", {
       method: "POST",
@@ -678,9 +763,12 @@ async function sendAction(action, idx, target) {
     if (data.error) {
       spawnFloat(data.error, "var(--col-red)");
     } else {
-      CARD_DB    = data.card_db || CARD_DB;
-      gameState  = data;
+      CARD_DB   = data.card_db || CARD_DB;
+      gameState = data;
       renderGame();
+      // Apply diff-based animations after DOM is updated
+      applyPostRenderAnimations(prevSnap);
+      applyHeroAnimations(prevHeroHp);
       if (data.winner) return;
     }
   } catch (err) {
@@ -697,6 +785,10 @@ async function endTurn() {
   etBtn.disabled = true;
   etBtn.textContent = "AI thinking…";
 
+  // Snapshot state before AI takes its turn
+  const prevSnap   = snapshotBoards();
+  const prevHeroHp = { p1: gameState.p1.hp, p2: gameState.p2.hp };
+
   try {
     const res  = await fetch("/api/action", {
       method: "POST",
@@ -707,6 +799,8 @@ async function endTurn() {
     CARD_DB   = data.card_db || CARD_DB;
     gameState = data;
     renderGame();
+    applyPostRenderAnimations(prevSnap);
+    applyHeroAnimations(prevHeroHp);
   } catch (err) {
     spawnFloat("Network error!", "var(--col-red)");
     etBtn.textContent = "End Turn";
@@ -730,15 +824,24 @@ function returnToMenu() {
 // ---------------------------------------------------------------------------
 // FLOATING TEXT FX
 // ---------------------------------------------------------------------------
-function spawnFloat(text, color, x, y) {
+function spawnFloat(text, color, el) {
   const layer = document.getElementById("fx-layer");
   const div   = document.createElement("div");
   div.className   = "float-text";
   div.textContent = text;
   div.style.color = color;
-  div.style.left  = (x ?? window.innerWidth  / 2) + "px";
-  div.style.top   = (y ?? window.innerHeight / 2 - 40) + "px";
-  div.style.transform = "translateX(-50%)";
+
+  if (el) {
+    // Position relative to a specific element
+    const rect = el.getBoundingClientRect();
+    const layerRect = layer.getBoundingClientRect();
+    div.style.left = (rect.left + rect.width / 2 - layerRect.left) + "px";
+    div.style.top  = (rect.top  - layerRect.top  - 10) + "px";
+  } else {
+    div.style.left = (window.innerWidth  / 2) + "px";
+    div.style.top  = (window.innerHeight / 2 - 60) + "px";
+  }
+
   layer.appendChild(div);
   div.addEventListener("animationend", () => div.remove());
 }
@@ -747,7 +850,6 @@ function spawnFloat(text, color, x, y) {
 // BOOT
 // ---------------------------------------------------------------------------
 (async function init() {
-  // Pre-fetch card database so the deck builder works before any game is started
   try {
     const res  = await fetch("/api/cards");
     const data = await res.json();
