@@ -65,12 +65,24 @@ def new_game():
     player_cls = data.get("hero_class", "Mage")
     deck       = data.get("deck", [])
 
+    # Sanitise inputs
+    if player_cls not in HERO_CLASSES:
+        player_cls = "Mage"
+
+    valid_cards = set(CARD_DB.keys())
+    deck_valid  = (
+        isinstance(deck, list) and
+        len(deck) == 15 and
+        all(c in valid_cards for c in deck) and
+        all(deck.count(c) <= 2 for c in deck)
+    )
+
     GAME_LOG.clear()
     log_action("--- NEW GAME STARTED ---")
 
     ai_class = random.choice(HERO_CLASSES)
     gs = GAME_STATE
-    gs["p1"] = create_player("Player", player_cls, deck if len(deck) == 15 else None)
+    gs["p1"] = create_player("Player", player_cls, deck if deck_valid else None)
     gs["p2"] = create_player("AI", ai_class)
 
     # Deal opening hands
