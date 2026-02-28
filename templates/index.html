@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TinyStone</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<!-- =====================  SCREEN: HERO SELECT  ========================== -->
+<div id="screen-menu" class="screen active">
+  <div class="menu-bg-overlay"></div>
+  <h1 class="game-title">TinyStone</h1>
+  <p class="menu-subtitle">Choose Your Class</p>
+  <div class="hero-grid">
+
+    <div class="hero-card" data-class="Mage" onclick="selectClass('Mage')">
+      <div class="hero-glow mage-glow"></div>
+      <div class="hero-emblem">🔮</div>
+      <h2>Mage</h2>
+      <div class="hero-power-badge">
+        <span class="badge-cost">2</span>
+        <span class="badge-text">Fireblast<br><em>Deal 1 dmg to any target</em></span>
+      </div>
+      <div class="hero-flavour">Masters of arcane fire, capable of precise strikes against any foe.</div>
+    </div>
+
+    <div class="hero-card" data-class="Warrior" onclick="selectClass('Warrior')">
+      <div class="hero-glow warrior-glow"></div>
+      <div class="hero-emblem">⚔️</div>
+      <h2>Warrior</h2>
+      <div class="hero-power-badge">
+        <span class="badge-cost">2</span>
+        <span class="badge-text">Armor Up!<br><em>Gain 2 Armor</em></span>
+      </div>
+      <div class="hero-flavour">Hardened veterans who forge impenetrable defences under fire.</div>
+    </div>
+
+    <div class="hero-card" data-class="Priest" onclick="selectClass('Priest')">
+      <div class="hero-glow priest-glow"></div>
+      <div class="hero-emblem">✨</div>
+      <h2>Priest</h2>
+      <div class="hero-power-badge">
+        <span class="badge-cost">2</span>
+        <span class="badge-text">Lesser Heal<br><em>Restore 2 HP to a friendly</em></span>
+      </div>
+      <div class="hero-flavour">Wielders of holy light, sustaining allies through any ordeal.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- =====================  SCREEN: DECK BUILDER  ========================= -->
+<div id="screen-deck" class="screen">
+  <h2 class="deck-title" id="deck-title">Build Your Deck</h2>
+  <p class="deck-subtitle">Click cards to add · Maximum 2 copies · 15 cards total</p>
+
+  <div class="deck-layout">
+    <!-- Card pool grid -->
+    <div class="card-pool" id="card-pool"></div>
+
+    <!-- Sidebar -->
+    <div class="deck-sidebar">
+      <div class="deck-count-box">
+        <span id="deck-count">0</span><span class="deck-count-sep">/</span><span>15</span>
+        <div class="deck-progress-bar"><div id="deck-progress" class="deck-progress-fill"></div></div>
+      </div>
+      <ul class="deck-list" id="deck-list"></ul>
+      <button class="btn btn-primary" id="btn-start-ai" disabled onclick="startGame()">
+        ⚔️ Play vs AI
+      </button>
+      <button class="btn btn-back" onclick="goBack()">← Back</button>
+    </div>
+  </div>
+
+  <!-- Card tooltip (shared) -->
+  <div id="card-tooltip" class="card-tooltip hidden"></div>
+</div>
+
+<!-- =====================  SCREEN: GAME  ================================= -->
+<div id="screen-game" class="screen">
+
+  <!-- Opponent tray -->
+  <div class="tray tray-opp" id="tray-opp">
+    <div class="hero-panel" id="hero-opp"></div>
+    <div class="hero-power-panel" id="hp-opp"></div>
+    <div class="deck-panel" id="deck-opp"></div>
+    <div class="hand-opp" id="hand-opp"></div>
+  </div>
+
+  <!-- Boards -->
+  <div class="boards">
+    <div class="board board-opp" id="board-opp"></div>
+    <div class="board-divider"></div>
+    <div class="board board-player" id="board-player"></div>
+  </div>
+
+  <!-- Player tray -->
+  <div class="tray tray-player" id="tray-player">
+    <div class="hero-panel" id="hero-player"></div>
+    <div class="hero-power-panel" id="hp-player"></div>
+    <div class="deck-panel" id="deck-player"></div>
+    <div class="end-turn-area">
+      <button class="btn btn-end-turn" id="btn-end-turn" onclick="endTurn()">End Turn</button>
+      <button class="btn btn-resign" onclick="resign()">Resign</button>
+    </div>
+  </div>
+
+  <!-- Player hand -->
+  <div class="hand-player" id="hand-player"></div>
+
+  <!-- Combat log -->
+  <div class="combat-log" id="combat-log">
+    <div class="log-title">Combat Log</div>
+    <div class="log-entries" id="log-entries"></div>
+  </div>
+
+  <!-- Floating effects container -->
+  <div id="fx-layer" class="fx-layer"></div>
+
+  <!-- Selection indicator -->
+  <div id="selection-info" class="selection-info hidden"></div>
+
+  <!-- Winner overlay -->
+  <div id="winner-overlay" class="winner-overlay hidden">
+    <div class="winner-box">
+      <div class="winner-crown">👑</div>
+      <h2 id="winner-text">Victory!</h2>
+      <button class="btn btn-primary" onclick="returnToMenu()">Return to Menu</button>
+    </div>
+  </div>
+
+  <!-- Card tooltip (game) -->
+  <div id="game-tooltip" class="card-tooltip hidden"></div>
+</div>
+
+<script src="/static/game.js"></script>
+</body>
+</html>
