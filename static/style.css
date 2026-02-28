@@ -314,7 +314,7 @@ body {
   overflow: hidden;
   position: relative;
 }
-#screen-game.active { display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: 1fr 220px; }
+#screen-game.active { display: grid; grid-template-rows: auto 1fr auto auto; grid-template-columns: 1fr 220px; }
 
 /* Trays */
 .tray {
@@ -380,7 +380,7 @@ body {
 
 /* Combat log */
 .combat-log {
-  grid-column: 2; grid-row: 1 / 5;
+  grid-column: 2; grid-row: 1 / 6;
   background: rgba(10,20,35,.9);
   border-left: 2px solid var(--col-border);
   display: flex;
@@ -450,6 +450,15 @@ body {
   font-size: 9px; font-weight: 700;
   padding: 2px 5px;
   border: 1.5px solid #f1c40f;
+  white-space: nowrap;
+}
+.opp-mana-badge {
+  position: absolute; bottom: -4px; right: -4px;
+  background: var(--col-mana); color: #fff;
+  border-radius: 6px;
+  font-size: 9px; font-weight: 700;
+  padding: 2px 5px;
+  border: 1.5px solid #5dade2;
   white-space: nowrap;
 }
 

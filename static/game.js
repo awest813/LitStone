@@ -76,8 +76,8 @@ function renderCardPool() {
         <span class="stat-atk">${card.atk}⚔</span>
         <span class="stat-hp">${card.hp}♥</span>
       </div>`;
-      const kws = KW_SHORT.filter(([k]) => card[k]).map(([,l]) =>
-        `<span class="kw-badge" style="background:${KW_COLORS[KW_SHORT.find(([kk])=>kk===KW_SHORT.find(([,ll])=>ll===l)?.[0])?.[0]] || "#555"};color:#fff">${l}</span>`
+      const kws = KW_SHORT.filter(([k]) => card[k]).map(([k, l]) =>
+        `<span class="kw-badge" style="background:${KW_COLORS[k]};color:#fff">${l}</span>`
       ).join("");
       if (kws) statsHtml += `<div class="kw-badges" style="margin-top:2px">${kws}</div>`;
     } else if (card.type === "weapon") {
@@ -235,7 +235,6 @@ function renderGame() {
   renderHero("hero-opp",    p2, true);
   renderHero("hero-player", p1, false);
   renderHeroMana("tray-player", p1);
-  renderHeroMana("tray-opp", p2);
   renderHeroPower("hp-opp",    p2, true);
   renderHeroPower("hp-player", p1, false);
   renderDeckPanel("deck-opp",    p2);
@@ -283,16 +282,19 @@ function renderHero(elId, player, isOpp) {
     if (selected?.type === "hero_weapon") cls += " selected";
   }
 
-  if (selected && isOpp && isValidHeroTarget(isOpp)) cls += " valid-target";
+  if (selected && isValidHeroTarget(isOpp)) cls += " valid-target";
 
   let armorBadge = player.armor > 0
     ? `<div class="armor-badge">${player.armor}</div>` : "";
   let weaponBadge = player.weapon
     ? `<div class="weapon-badge">${player.weapon.atk}⚔ ${player.weapon.durability}🛡</div>` : "";
 
+  const manaBadge = isOpp
+    ? `<div class="opp-mana-badge">${player.mana}/${player.max_mana} 💧</div>` : "";
+
   el.className = cls;
   el.innerHTML = `
-    ${armorBadge}${weaponBadge}
+    ${armorBadge}${weaponBadge}${manaBadge}
     <div class="hero-icon">${icon}</div>
     <div class="hero-hp-bar"><div class="hero-hp-fill" style="width:${hpPct}%"></div></div>
     <div class="hero-hp-text">${Math.max(0, player.hp)} HP</div>
@@ -301,25 +303,7 @@ function renderHero(elId, player, isOpp) {
   el.onclick = () => handleHeroClick(isOpp, player);
 }
 
-function isValidHeroTarget(isOpp) {
-  if (!selected) return false;
-  const lm = getLegalMoves();
-  if (!lm) return false;
-
-  let actionType = null;
-  if (selected.type === "hand")         actionType = "play";
-  if (selected.type === "board")        actionType = "attack";
-  if (selected.type === "hero_power")   actionType = "hero_power";
-  if (selected.type === "hero_weapon")  actionType = "hero_attack";
-
-  return lm.some(([a, i, t]) =>
-    a === actionType &&
-    (selected.idx === undefined || i === selected.idx) &&
-    t === "hero"
-  );
-}
-
-function isValidMinionTarget(boardIdx, isOpp) {
+function isValidHeroTarget(isOppHero) {
   if (!selected) return false;
   const lm = getLegalMoves();
   if (!lm) return false;
@@ -330,6 +314,63 @@ function isValidMinionTarget(boardIdx, isOpp) {
   if (selected.type === "hero_power")  actionType = "hero_power";
   if (selected.type === "hero_weapon") actionType = "hero_attack";
   if (!actionType) return false;
+
+  const cls       = gameState?.p1?.hero_class;
+  const selCard   = selected.type === "hand" ? CARD_DB[gameState?.p1?.hand?.[selected.idx]] : null;
+
+  if (isOppHero) {
+    // Opp hero cannot be healed or targeted by Priest HP
+    if (selected.type === "hero_power" && cls === "Priest") return false;
+    // Buff spells never target the hero
+    if (selCard?.effect === "buff" || selCard?.effect === "heal" || selCard?.effect === "draw" || selCard?.effect === "damage_all") return false;
+  } else {
+    // Friendly hero: only Priest HP can target it
+    if (selected.type !== "hero_power" || cls !== "Priest") return false;
+  }
+
+  return lm.some(([a, i, t]) =>
+    a === actionType &&
+    (selected.idx === undefined || i === selected.idx) &&
+    t === "hero"
+  );
+}
+
+function isValidMinionTarget(boardIdx, isOppBoard) {
+  if (!selected) return false;
+  const lm = getLegalMoves();
+  if (!lm) return false;
+
+  let actionType = null;
+  if (selected.type === "hand")        actionType = "play";
+  if (selected.type === "board")       actionType = "attack";
+  if (selected.type === "hero_power")  actionType = "hero_power";
+  if (selected.type === "hero_weapon") actionType = "hero_attack";
+  if (!actionType) return false;
+
+  const cls     = gameState?.p1?.hero_class;
+  const selCard = selected.type === "hand" ? CARD_DB[gameState?.p1?.hand?.[selected.idx]] : null;
+
+  if (isOppBoard) {
+    // Opp board: valid for attacks, hero-weapon, and damage spells only
+    if (selected.type === "board" || selected.type === "hero_weapon") {
+      // always opp targets for attacks
+    } else if (selCard?.effect === "damage") {
+      // damage spell targets opp
+    } else if (selected.type === "hero_power" && cls === "Mage") {
+      // Mage fireblast targets opp
+    } else {
+      return false; // buff / heal / draw / Priest HP never targets opp minions
+    }
+  } else {
+    // Player board: valid for buff spells and Priest hero power only
+    if (selCard?.effect === "buff") {
+      // buff spell targets friendlies
+    } else if (selected.type === "hero_power" && cls === "Priest") {
+      // Priest HP targets friendlies
+    } else {
+      return false;
+    }
+  }
 
   return lm.some(([a, i, t]) =>
     a === actionType &&
@@ -411,10 +452,8 @@ function renderBoard(elId, player, isOpp) {
 
     // Targeting highlight
     if (selected) {
-      const valid = isValidMinionTarget(idx,
-        isOpp && (selected.type !== "hand" || (CARD_DB[player.hand?.[selected.idx]]?.effect !== "buff")));
-      if (valid) cls += " valid-target";
-      else if (isOpp) cls += " invalid-target";
+      if (isValidMinionTarget(idx, isOpp)) cls += " valid-target";
+      else if (isOpp && selected)          cls += " invalid-target";
     }
 
     const kws = KW_SHORT.filter(([k]) => minion[k]).map(([k, l]) =>
@@ -567,10 +606,7 @@ function handleMinionClick(idx, isOpp, player, minion) {
 
   // If we have a selection waiting for a target
   if (selected) {
-    const targetValid = isValidMinionTarget(idx,
-      isOpp && !(selected.type === "hand" && CARD_DB[gameState.p1.hand[selected.idx]]?.effect === "buff"));
-
-    if (!targetValid) { spawnFloat("Invalid target!", "var(--col-red)"); return; }
+    if (!isValidMinionTarget(idx, isOpp)) { spawnFloat("Invalid target!", "var(--col-red)"); return; }
 
     let action;
     if (selected.type === "hand")        action = ["play",       selected.idx, idx];
