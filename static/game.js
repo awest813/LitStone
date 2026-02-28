@@ -144,17 +144,21 @@ function updateDeckSidebar() {
 
 async function startGame() {
   if (draftDeck.length !== 15) return;
-  const res  = await fetch("/api/new_game", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ hero_class: selectedClass, deck: draftDeck }),
-  });
-  const data = await res.json();
-  CARD_DB    = data.card_db;
-  gameState  = data;
-  selected   = null;
-  showScreen("screen-game");
-  renderGame();
+  try {
+    const res  = await fetch("/api/new_game", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ hero_class: selectedClass, deck: draftDeck }),
+    });
+    const data = await res.json();
+    CARD_DB    = data.card_db;
+    gameState  = data;
+    selected   = null;
+    showScreen("screen-game");
+    renderGame();
+  } catch (err) {
+    alert("Failed to start game. Please check your connection and try again.");
+  }
 }
 
 function goBack() {
@@ -277,7 +281,6 @@ function renderHero(elId, player, isOpp) {
   const icon  = icons[player.hero_class] || "?";
 
   let cls = "hero-panel";
-  const lm = getLegalMoves();
 
   if (!isOpp) {
     // Can the hero attack?
@@ -597,8 +600,7 @@ function handleMinionClick(idx, isOpp, player, minion) {
 
   // If we have a selection waiting for a target
   if (selected) {
-    const targetValid = isValidMinionTarget(idx,
-      isOpp && !(selected.type === "hand" && CARD_DB[gameState.p1.hand[selected.idx]]?.effect === "buff"));
+    const targetValid = isValidMinionTarget(idx, isOpp);
 
     if (!targetValid) { spawnFloat("Invalid target!", "var(--col-red)"); return; }
 
@@ -707,6 +709,7 @@ async function endTurn() {
     renderGame();
   } catch (err) {
     spawnFloat("Network error!", "var(--col-red)");
+    etBtn.textContent = "End Turn";
     etBtn.disabled = false;
   }
 }
