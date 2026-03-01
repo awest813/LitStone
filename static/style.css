@@ -50,22 +50,57 @@ body {
   user-select: none;
 }
 
-/* Decorative starfield on body */
+/* Decorative starfield — layer 1 (twinkling slowly) */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(1px 1px at 15%  8%, rgba(255,255,255,.25) 0, transparent 0),
-    radial-gradient(1px 1px at 42% 17%, rgba(255,255,255,.18) 0, transparent 0),
-    radial-gradient(1px 1px at 73%  5%, rgba(255,255,255,.22) 0, transparent 0),
-    radial-gradient(1px 1px at 88% 22%, rgba(255,255,255,.16) 0, transparent 0),
-    radial-gradient(1px 1px at 28% 91%, rgba(255,255,255,.20) 0, transparent 0),
-    radial-gradient(1px 1px at 60% 78%, rgba(255,255,255,.14) 0, transparent 0),
-    radial-gradient(1px 1px at  5% 55%, rgba(255,255,255,.18) 0, transparent 0),
-    radial-gradient(1px 1px at 95% 65%, rgba(255,255,255,.20) 0, transparent 0);
+    radial-gradient(1px 1px at 15%  8%, rgba(255,255,255,.30) 0, transparent 0),
+    radial-gradient(1px 1px at 42% 17%, rgba(255,255,255,.22) 0, transparent 0),
+    radial-gradient(1px 1px at 73%  5%, rgba(255,255,255,.26) 0, transparent 0),
+    radial-gradient(1px 1px at 88% 22%, rgba(255,255,255,.20) 0, transparent 0),
+    radial-gradient(1px 1px at 28% 91%, rgba(255,255,255,.24) 0, transparent 0),
+    radial-gradient(1px 1px at 60% 78%, rgba(255,255,255,.18) 0, transparent 0),
+    radial-gradient(1px 1px at  5% 55%, rgba(255,255,255,.22) 0, transparent 0),
+    radial-gradient(1px 1px at 95% 65%, rgba(255,255,255,.24) 0, transparent 0),
+    radial-gradient(2px 2px at 50% 35%, rgba(255,255,255,.12) 0, transparent 0),
+    radial-gradient(1px 1px at 33% 60%, rgba(255,255,255,.18) 0, transparent 0);
   pointer-events: none;
   z-index: 0;
+  animation: starTwinkle1 7.3s ease-in-out infinite;
+}
+
+/* Decorative starfield — layer 2 (offset positions, different timing) */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(1px 1px at 22% 33%, rgba(255,255,255,.22) 0, transparent 0),
+    radial-gradient(1px 1px at 55% 62%, rgba(255,255,255,.18) 0, transparent 0),
+    radial-gradient(2px 2px at 80% 12%, rgba(255,255,255,.14) 0, transparent 0),
+    radial-gradient(1px 1px at 10% 80%, rgba(255,255,255,.20) 0, transparent 0),
+    radial-gradient(1px 1px at 38% 44%, rgba(255,255,255,.16) 0, transparent 0),
+    radial-gradient(1px 1px at 67% 30%, rgba(255,255,255,.20) 0, transparent 0),
+    radial-gradient(1px 1px at 92% 85%, rgba(255,255,255,.24) 0, transparent 0),
+    radial-gradient(2px 2px at 48% 90%, rgba(255,255,255,.12) 0, transparent 0),
+    radial-gradient(1px 1px at 77% 55%, rgba(255,255,255,.18) 0, transparent 0),
+    radial-gradient(1px 1px at  3% 20%, rgba(255,255,255,.22) 0, transparent 0);
+  pointer-events: none;
+  z-index: 0;
+  animation: starTwinkle2 5.8s ease-in-out infinite;
+}
+
+@keyframes starTwinkle1 {
+  0%, 100% { opacity: 1; }
+  45%       { opacity: .35; }
+}
+
+@keyframes starTwinkle2 {
+  0%, 100% { opacity: .55; }
+  30%       { opacity: 1; }
+  70%       { opacity: .18; }
 }
 
 .screen { display: none; width: 100vw; height: 100vh; position: relative; }
@@ -509,10 +544,16 @@ body::before {
 /* Center divider — glowing sword line */
 .board-divider {
   height: 2px;
-  background: linear-gradient(90deg, transparent 0%, var(--col-border-bright) 30%, var(--col-gold-dim) 50%, var(--col-border-bright) 70%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, var(--col-border-bright) 25%, var(--col-gold) 50%, var(--col-border-bright) 75%, transparent 100%);
   margin: 4px 0;
   position: relative;
-  box-shadow: 0 0 8px rgba(232,160,32,.15);
+  box-shadow: 0 0 12px rgba(232,160,32,.25), 0 0 24px rgba(232,160,32,.08);
+  animation: dividerGlow 3s ease-in-out infinite;
+}
+
+@keyframes dividerGlow {
+  0%, 100% { box-shadow: 0 0 8px  rgba(232,160,32,.20), 0 0 20px rgba(232,160,32,.06); opacity: .9; }
+  50%       { box-shadow: 0 0 18px rgba(232,160,32,.45), 0 0 40px rgba(232,160,32,.15); opacity: 1; }
 }
 
 /* Hand (player) */
@@ -623,9 +664,21 @@ body::before {
 }
 
 /* Class-specific hero background (set via JS data-class attribute) */
-.hero-panel[data-class="Mage"]    { background: linear-gradient(160deg, #0a1e3c, #102a56); border-color: #1e4a80; }
-.hero-panel[data-class="Warrior"] { background: linear-gradient(160deg, #3c0a0a, #561010); border-color: #802020; }
-.hero-panel[data-class="Priest"]  { background: linear-gradient(160deg, #3c2000, #563000); border-color: #805020; }
+.hero-panel[data-class="Mage"]    {
+  background: radial-gradient(circle at 40% 35%, #0e2e5c, #071526);
+  border-color: #2060a8;
+  box-shadow: 0 0 20px rgba(35,113,181,.25), inset 0 1px 0 rgba(100,180,255,.08);
+}
+.hero-panel[data-class="Warrior"] {
+  background: radial-gradient(circle at 40% 35%, #5a0e0e, #230505);
+  border-color: #a02020;
+  box-shadow: 0 0 20px rgba(192,57,43,.25), inset 0 1px 0 rgba(255,120,100,.08);
+}
+.hero-panel[data-class="Priest"]  {
+  background: radial-gradient(circle at 40% 35%, #5a3000, #231200);
+  border-color: #a06020;
+  box-shadow: 0 0 20px rgba(212,130,10,.25), inset 0 1px 0 rgba(255,200,100,.08);
+}
 
 .hero-panel.attackable   { border-color: var(--col-green);  box-shadow: 0 0 18px rgba(0,184,148,.5); cursor: pointer; }
 .hero-panel.valid-target { border-color: var(--col-gold);   box-shadow: 0 0 22px rgba(232,160,32,.6); cursor: pointer; animation: targetPulse 1.2s ease-in-out infinite; }
@@ -707,14 +760,18 @@ body::before {
   border-radius: 50%;
   background: radial-gradient(circle at 35% 35%, #0a1a2e, #060f1e);
   border: 1px solid #1a3050;
-  transition: background .2s, box-shadow .2s, transform .15s;
+  transition: background .25s, box-shadow .25s, transform .2s;
+}
+
+.mana-gem.empty {
+  opacity: .2;
 }
 
 .mana-gem.filled {
-  background: radial-gradient(circle at 35% 35%, var(--col-mana-bright), var(--col-mana));
-  border-color: rgba(255,255,255,.25);
-  box-shadow: 0 0 6px rgba(74,158,221,.8), inset 0 1px 0 rgba(255,255,255,.25);
-  transform: scale(1.05);
+  background: radial-gradient(circle at 30% 30%, #7ec8f8, var(--col-mana-bright), var(--col-mana));
+  border-color: rgba(255,255,255,.35);
+  box-shadow: 0 0 7px rgba(74,158,221,.9), 0 0 14px rgba(74,158,221,.3), inset 0 1px 0 rgba(255,255,255,.35);
+  transform: scale(1.1);
 }
 
 /* Hero power button */
@@ -732,6 +789,23 @@ body::before {
   line-height: 1.2;
   position: relative;
   overflow: hidden;
+}
+
+/* Class-specific hero power colours (player only) */
+.hero-power-panel[data-class="Mage"] {
+  background: radial-gradient(circle at 40% 35%, #1a5a9a, #0a2848);
+  border-color: #2a7ad4;
+  color: #c0e0ff;
+}
+.hero-power-panel[data-class="Warrior"] {
+  background: radial-gradient(circle at 40% 35%, #8a1010, #3a0808);
+  border-color: #c02020;
+  color: #ffc0c0;
+}
+.hero-power-panel[data-class="Priest"] {
+  background: radial-gradient(circle at 40% 35%, #8a5000, #3a2000);
+  border-color: #c07820;
+  color: #ffe0a0;
 }
 
 .hero-power-panel::after {
@@ -1119,10 +1193,11 @@ body::before {
   border-radius: 24px;
   padding: 44px 68px;
   text-align: center;
-  box-shadow: 0 0 80px rgba(232,160,32,.35), 0 30px 80px rgba(0,0,0,.8);
+  box-shadow: 0 0 80px rgba(232,160,32,.4), 0 30px 80px rgba(0,0,0,.8), 0 0 120px rgba(232,160,32,.15);
   animation: winPop .45s cubic-bezier(.175,.885,.32,1.275);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  isolation: isolate;
 }
 
 .winner-box::before {
@@ -1161,3 +1236,283 @@ body::before {
   .hero-grid { gap: 16px; }
   .hero-card { width: 180px; }
 }
+
+/* ============================================================
+   NEW: TURN BANNER
+   ============================================================ */
+.turn-banner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(.5);
+  font-family: 'Cinzel', serif;
+  font-size: clamp(22px, 3.5vw, 42px);
+  font-weight: 900;
+  padding: 14px 52px;
+  border-radius: 14px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  pointer-events: none;
+  z-index: 800;
+  opacity: 0;
+  white-space: nowrap;
+}
+
+.turn-banner.active {
+  animation: turnBannerPop .55s cubic-bezier(.175,.885,.32,1.275) forwards,
+             turnBannerFade .8s ease-out 1.4s forwards;
+}
+
+.turn-banner--player {
+  background: linear-gradient(160deg, rgba(0,100,65,.95), rgba(0,160,110,.85));
+  border: 2px solid var(--col-green);
+  color: #e0fff5;
+  box-shadow: 0 0 60px rgba(0,184,148,.5), 0 24px 50px rgba(0,0,0,.85);
+  text-shadow: 0 0 20px rgba(0,255,170,.5);
+}
+
+.turn-banner--enemy {
+  background: linear-gradient(160deg, rgba(120,15,15,.95), rgba(180,30,30,.85));
+  border: 2px solid #c0392b;
+  color: #ffe0e0;
+  box-shadow: 0 0 60px rgba(192,57,43,.5), 0 24px 50px rgba(0,0,0,.85);
+  text-shadow: 0 0 20px rgba(255,80,80,.5);
+}
+
+@keyframes turnBannerPop {
+  0%   { transform: translate(-50%, -50%) scale(.4); opacity: 0; }
+  65%  { transform: translate(-50%, -50%) scale(1.06); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1);    opacity: 1; }
+}
+
+@keyframes turnBannerFade {
+  0%   { transform: translate(-50%, -50%) scale(1);    opacity: 1; }
+  100% { transform: translate(-50%, -62%) scale(.92);  opacity: 0; }
+}
+
+/* ============================================================
+   NEW: AI THINKING BAR
+   ============================================================ */
+.ai-thinking-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  overflow: hidden;
+  z-index: 950;
+  pointer-events: none;
+}
+
+.ai-thinking-bar::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -60%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, var(--col-gold-bright), var(--col-gold), transparent);
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity .3s;
+}
+
+.ai-thinking-bar.active::after {
+  opacity: 1;
+  animation: aiBarSweep 1.4s ease-in-out infinite;
+}
+
+@keyframes aiBarSweep {
+  0%   { left: -60%; }
+  100% { left: 110%; }
+}
+
+/* ============================================================
+   NEW: SHAKE (invalid action feedback)
+   ============================================================ */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  18%       { transform: translateX(-5px) rotate(-.5deg); }
+  36%       { transform: translateX(5px)  rotate(.5deg); }
+  54%       { transform: translateX(-4px); }
+  72%       { transform: translateX(4px); }
+  90%       { transform: translateX(-2px); }
+}
+.shake { animation: shake .35s ease-in-out; }
+
+/* ============================================================
+   NEW: BUFF / HEAL GLOW on minion cards
+   ============================================================ */
+@keyframes buffGlowAnim {
+  0%   { box-shadow: 0 0 22px rgba(0,220,150,.9); }
+  60%  { box-shadow: 0 0 40px rgba(0,255,160,1);  }
+  100% { box-shadow: 0 0  0px rgba(0,220,150,0);  }
+}
+.buff-glow { animation: buffGlowAnim .8s ease-out forwards; }
+
+/* ============================================================
+   NEW: TURN COUNTER BADGE
+   ============================================================ */
+.turn-counter-badge {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  color: var(--col-text-dim);
+  letter-spacing: .06em;
+  border: 1px solid var(--col-border);
+  border-radius: 4px;
+  padding: 2px 7px;
+  background: rgba(0,0,0,.3);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   NEW: IMPROVED COMBAT LOG  (icons via content)
+   ============================================================ */
+.log-entry::before {
+  margin-right: 4px;
+  font-size: 9px;
+  opacity: .7;
+}
+.log-dmg::before   { content: '💥'; }
+.log-heal::before  { content: '💚'; }
+.log-play::before  { content: '🃏'; }
+.log-armor::before { content: '🛡️'; }
+.log-draw::before  { content: '📖'; }
+.log-block::before { content: '✨'; }
+.log-system::before { content: ''; }
+
+/* ============================================================
+   NEW: HAND SIZE INDICATOR
+   ============================================================ */
+.hand-size-badge {
+  position: absolute;
+  right: 10px;
+  top: 6px;
+  font-size: 10px;
+  color: var(--col-text-dim);
+  font-family: 'Cinzel', serif;
+  letter-spacing: .04em;
+}
+
+/* ============================================================
+   NEW: IMPROVED POOL CARD hover shimmer
+   ============================================================ */
+.pool-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg,
+    rgba(255,255,255,.0) 30%,
+    rgba(255,255,255,.08) 50%,
+    rgba(255,255,255,.0) 70%
+  );
+  opacity: 0;
+  transition: opacity .2s;
+}
+.pool-card:hover:not(.pool-card--full)::before { opacity: 1; }
+
+/* ============================================================
+   NEW: IMPROVED MINION CARD hover shimmer
+   ============================================================ */
+.minion-card.can-attack::before,
+.hand-card::before {
+  background: linear-gradient(135deg,
+    rgba(255,255,255,.0) 25%,
+    rgba(255,255,255,.1) 50%,
+    rgba(255,255,255,.0) 75%
+  );
+  transition: opacity .15s;
+}
+
+/* ============================================================
+   NEW: WINNER OVERLAY — extra rays
+   ============================================================ */
+.winner-box::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(
+    from 0deg,
+    rgba(232,160,32,0) 0deg,
+    rgba(232,160,32,.06) 15deg,
+    rgba(232,160,32,0) 30deg,
+    rgba(232,160,32,.04) 45deg,
+    rgba(232,160,32,0) 60deg,
+    rgba(232,160,32,.06) 75deg,
+    rgba(232,160,32,0) 90deg,
+    rgba(232,160,32,.04) 105deg,
+    rgba(232,160,32,0) 120deg,
+    rgba(232,160,32,.06) 135deg,
+    rgba(232,160,32,0) 150deg,
+    rgba(232,160,32,.04) 165deg,
+    rgba(232,160,32,0) 180deg,
+    rgba(232,160,32,.06) 195deg,
+    rgba(232,160,32,0) 210deg,
+    rgba(232,160,32,.04) 225deg,
+    rgba(232,160,32,0) 240deg,
+    rgba(232,160,32,.06) 255deg,
+    rgba(232,160,32,0) 270deg,
+    rgba(232,160,32,.04) 285deg,
+    rgba(232,160,32,0) 300deg,
+    rgba(232,160,32,.06) 315deg,
+    rgba(232,160,32,0) 330deg,
+    rgba(232,160,32,.04) 345deg,
+    rgba(232,160,32,0) 360deg
+  );
+  pointer-events: none;
+  animation: winRaysRotate 8s linear infinite;
+  border-radius: 24px;
+  z-index: -1;
+}
+
+@keyframes winRaysRotate {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ============================================================
+   NEW: FLOAT TEXT size variants
+   ============================================================ */
+.float-text.big  { font-size: 34px; }
+.float-text.small { font-size: 18px; }
+.float-text.heal { color: var(--col-heal); }
+.float-text.block { color: var(--col-gold); font-size: 20px; }
+
+/* ============================================================
+   NEW: BOARD ZONES — deeper atmosphere
+   ============================================================ */
+.board-opp {
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(200,40,40,.09) 0, transparent 60%),
+    radial-gradient(ellipse at 50% 100%, rgba(120,20,20,.12) 0, transparent 50%),
+    rgba(16,6,6,.35);
+  border: 1px solid rgba(200,40,40,.14);
+}
+
+.board-player {
+  background:
+    radial-gradient(ellipse at 50% 70%, rgba(40,100,220,.09) 0, transparent 60%),
+    radial-gradient(ellipse at 50%  0%, rgba(20,50,120,.12) 0, transparent 50%),
+    rgba(6,10,22,.35);
+  border: 1px solid rgba(40,100,220,.14);
+}
+
+/* ============================================================
+   NEW: EMPTY BOARD hint text
+   ============================================================ */
+.board-empty-hint {
+  font-size: 11px;
+  color: rgba(255,255,255,.12);
+  font-style: italic;
+  letter-spacing: .05em;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ============================================================
+   NEW: OPPONENT HAND card back design
+   ============================================================ */
+.hand-opp-card {
+  transition: transform .12s;
+}
+.hand-opp-card:nth-child(odd)  { transform: rotate(-2deg); }
+.hand-opp-card:nth-child(even) { transform: rotate(2deg); }
