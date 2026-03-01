@@ -84,6 +84,12 @@
 <!-- =====================  SCREEN: GAME  ================================= -->
 <div id="screen-game" class="screen">
 
+  <!-- AI thinking progress bar (top of screen) -->
+  <div id="ai-thinking-bar" class="ai-thinking-bar"></div>
+
+  <!-- Turn banner (centre-screen flash) -->
+  <div id="turn-banner" class="turn-banner"></div>
+
   <!-- Opponent tray -->
   <div class="tray tray-opp" id="tray-opp">
     <div class="hero-panel" id="hero-opp"></div>
@@ -105,6 +111,7 @@
     <div class="hero-power-panel" id="hp-player"></div>
     <div class="deck-panel" id="deck-player"></div>
     <div class="end-turn-area">
+      <span id="turn-counter" class="turn-counter-badge"></span>
       <button class="btn btn-end-turn" id="btn-end-turn" onclick="endTurn()">End Turn</button>
       <button class="btn btn-resign" onclick="resign()">Resign</button>
     </div>

@@ -17,6 +17,11 @@ let selectedClass = null;
 // Animation state tracking
 let prevBoards = null;       // snapshot of boards before last action
 
+// UI state
+let isActing          = false; // prevents double-submit during server round-trips
+let prevIsPlayerTurn  = null;  // tracks turn transitions for banner
+let turnNumber        = 0;     // client-side turn counter
+
 const KW_COLORS = {
   taunt: "#c0392b", divine_shield: "#d4a800", charge: "#00a878",
   poisonous: "#8e44ad", battlecry: "#2371b5", deathrattle: "#404e5c",
@@ -158,11 +163,15 @@ async function startGame() {
       body: JSON.stringify({ hero_class: selectedClass, deck: draftDeck }),
     });
     const data = await res.json();
-    CARD_DB    = data.card_db;
-    gameState  = data;
-    selected   = null;
-    prevBoards = null;
+    CARD_DB          = data.card_db;
+    gameState        = data;
+    selected         = null;
+    prevBoards       = null;
+    prevIsPlayerTurn = null;
+    turnNumber       = 1;
+    isActing         = false;
     showScreen("screen-game");
+    showTurnBanner(true);
     renderGame();
   } catch (err) {
     alert("Failed to start game. Please check your connection and try again.");
@@ -186,6 +195,18 @@ function spellDesc(card, short = false) {
   return "";
 }
 
+function battlecryDesc(bc) {
+  if (!bc) return "";
+  if (bc.effect === "heal_hero") return `Battlecry: Restore ${bc.val} HP to your hero.`;
+  return "";
+}
+
+function deathrattleDesc(dr) {
+  if (!dr) return "";
+  if (dr.effect === "dmg_hero") return `Deathrattle: Deal ${dr.val} damage to the enemy hero.`;
+  return "";
+}
+
 function buildTooltipHtml(name, card) {
   const isMinion = card.type === "minion";
   const isWeapon = card.type === "weapon";
@@ -200,11 +221,18 @@ function buildTooltipHtml(name, card) {
     `<div class="tooltip-kw" style="color:${KW_COLORS[k]}">${l}</div>`
   ).join("");
 
+  const bcText = battlecryDesc(card.battlecry);
+  const drText = deathrattleDesc(card.deathrattle);
+  const abilities = [bcText, drText].filter(Boolean).map(t =>
+    `<div class="tooltip-desc" style="margin-top:4px">${t}</div>`
+  ).join("");
+
   return `
     <div class="tooltip-name">${name}</div>
     <div class="tooltip-type">${card.type.toUpperCase()} · ${card.cost} Mana</div>
     ${stats}
     ${kws}
+    ${abilities}
   `;
 }
 
@@ -237,6 +265,28 @@ function hideTooltip(id) {
 }
 
 // ---------------------------------------------------------------------------
+// TURN BANNER & AI INDICATOR
+// ---------------------------------------------------------------------------
+
+function showTurnBanner(isPlayerTurn) {
+  const banner = document.getElementById("turn-banner");
+  if (!banner) return;
+  // Reset: remove active so re-triggering re-plays the animation
+  banner.className = `turn-banner turn-banner--${isPlayerTurn ? "player" : "enemy"}`;
+  banner.textContent = isPlayerTurn ? "YOUR TURN" : "ENEMY TURN";
+  // Force reflow so animation restarts cleanly
+  void banner.offsetWidth;
+  banner.classList.add("active");
+}
+
+function setAiThinking(active) {
+  const bar = document.getElementById("ai-thinking-bar");
+  if (bar) bar.classList.toggle("active", active);
+  const etBtn = document.getElementById("btn-end-turn");
+  if (etBtn && active) etBtn.textContent = "AI thinking…";
+}
+
+// ---------------------------------------------------------------------------
 // ANIMATION HELPERS
 // ---------------------------------------------------------------------------
 
@@ -244,13 +294,14 @@ function hideTooltip(id) {
 function snapshotBoards() {
   if (!gameState) return null;
   return {
-    p1: gameState.p1.board.map(m => ({ name: m.name, hp: m.hp })),
-    p2: gameState.p2.board.map(m => ({ name: m.name, hp: m.hp })),
+    p1: gameState.p1.board.map(m => ({ name: m.name, hp: m.hp, atk: m.atk })),
+    p2: gameState.p2.board.map(m => ({ name: m.name, hp: m.hp, atk: m.atk })),
   };
 }
 
 /**
  * After rendering, apply animations by comparing old vs new board state.
+ * Also spawns anchored floating numbers for damage, heals, and buffs.
  * @param {object} prev - snapshotBoards() result taken before the action
  */
 function applyPostRenderAnimations(prev) {
@@ -269,17 +320,25 @@ function applyPostRenderAnimations(prev) {
       const card = cards[idx];
       if (!card) return;
 
-      // Was this minion on the previous board?
       const prevMinion = prevBoard.find(m => m.name === minion.name);
 
       if (!prevMinion) {
-        // New summon — play pop-in animation
         card.classList.add("summon-anim");
         card.addEventListener("animationend", () => card.classList.remove("summon-anim"), { once: true });
       } else if (minion.hp < prevMinion.hp) {
-        // Took damage — flash red
+        const dmg = prevMinion.hp - minion.hp;
         card.classList.add("damage-flash");
         card.addEventListener("animationend", () => card.classList.remove("damage-flash"), { once: true });
+        spawnFloat(`-${dmg}`, "var(--col-dmg)", card, "big");
+      } else if (minion.hp > prevMinion.hp) {
+        const heal = minion.hp - prevMinion.hp;
+        card.classList.add("buff-glow");
+        card.addEventListener("animationend", () => card.classList.remove("buff-glow"), { once: true });
+        spawnFloat(`+${heal}♥`, "var(--col-heal)", card, "normal");
+      } else if (minion.atk > prevMinion.atk) {
+        card.classList.add("buff-glow");
+        card.addEventListener("animationend", () => card.classList.remove("buff-glow"), { once: true });
+        spawnFloat(`+ATK`, "var(--col-gold)", card, "small");
       }
     });
   });
@@ -293,11 +352,25 @@ function flashHero(elId) {
   el.addEventListener("animationend", () => el.classList.remove("hero-flash"), { once: true });
 }
 
-/** Detect hero HP changes and flash accordingly */
+/** Detect hero HP changes and flash accordingly, spawning anchored floats */
 function applyHeroAnimations(prev) {
   if (!prev || !gameState) return;
-  if (gameState.p1.hp < prev.p1) flashHero("hero-player");
-  if (gameState.p2.hp < prev.p2) flashHero("hero-opp");
+  if (gameState.p1.hp < prev.p1) {
+    const dmg = prev.p1 - gameState.p1.hp;
+    flashHero("hero-player");
+    spawnFloat(`-${dmg}`, "var(--col-dmg)", document.getElementById("hero-player"), "big");
+  } else if (gameState.p1.hp > prev.p1) {
+    const heal = gameState.p1.hp - prev.p1;
+    spawnFloat(`+${heal}♥`, "var(--col-heal)", document.getElementById("hero-player"), "normal");
+  }
+  if (gameState.p2.hp < prev.p2) {
+    const dmg = prev.p2 - gameState.p2.hp;
+    flashHero("hero-opp");
+    spawnFloat(`-${dmg}`, "var(--col-dmg)", document.getElementById("hero-opp"), "big");
+  } else if (gameState.p2.hp > prev.p2) {
+    const heal = gameState.p2.hp - prev.p2;
+    spawnFloat(`+${heal}♥`, "var(--col-heal)", document.getElementById("hero-opp"), "normal");
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -329,13 +402,24 @@ function renderGame() {
   etBtn.disabled = !is_player_turn || !!winner;
   etBtn.textContent = is_player_turn ? "End Turn" : "Waiting…";
 
+  // Turn banner: fire only when turn ownership changes
+  if (!winner && prevIsPlayerTurn !== null && prevIsPlayerTurn !== is_player_turn) {
+    if (is_player_turn) turnNumber++;
+    showTurnBanner(is_player_turn);
+  }
+  prevIsPlayerTurn = is_player_turn;
+
+  // Turn counter badge
+  const tcBadge = document.getElementById("turn-counter");
+  if (tcBadge) tcBadge.textContent = turnNumber > 0 ? `Turn ${turnNumber}` : "";
+
   // Winner overlay
   const overlay = document.getElementById("winner-overlay");
   if (winner) {
     overlay.classList.remove("hidden");
     document.getElementById("winner-text").textContent =
-      winner === "DRAW" ? "It's a Draw!" :
-      winner === "Player" ? "Victory!" : "Defeat!";
+      winner === "DRAW"   ? "It's a Draw!" :
+      winner === "Player" ? "Victory!"      : "Defeat!";
   } else {
     overlay.classList.add("hidden");
   }
@@ -478,6 +562,7 @@ function renderHeroPower(elId, player, isOpp) {
 
   const labels = { Mage: "Fireblast", Warrior: "Armor Up", Priest: "Heal" };
   el.className = cls;
+  el.dataset.class = player.hero_class;
   el.innerHTML = `<div class="hp-icon">${icon}</div><div class="hp-cost">${labels[player.hero_class]}<br>2 Mana</div>`;
 
   if (!isOpp) {
@@ -506,6 +591,13 @@ function renderOppHand(p2) {
 function renderBoard(elId, player, isOpp) {
   const el = document.getElementById(elId);
   el.innerHTML = "";
+
+  if (player.board.length === 0) {
+    const hint = document.createElement("div");
+    hint.className = "board-empty-hint";
+    hint.textContent = isOpp ? "No minions" : "Play minions here";
+    el.appendChild(hint);
+  }
 
   player.board.forEach((minion, idx) => {
     const card = CARD_DB[minion.name] || {};
@@ -549,6 +641,14 @@ function renderBoard(elId, player, isOpp) {
 function renderHand(p1) {
   const el = document.getElementById("hand-player");
   el.innerHTML = "";
+
+  // Hand size badge
+  if (p1.hand.length > 0) {
+    const badge = document.createElement("div");
+    badge.className = "hand-size-badge";
+    badge.textContent = `${p1.hand.length}/10`;
+    el.appendChild(badge);
+  }
 
   const total  = p1.hand.length;
   const midIdx = (total - 1) / 2;
@@ -607,16 +707,26 @@ function renderLog(entries) {
   const el = document.getElementById("log-entries");
   const wasAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30;
   el.innerHTML = "";
-  entries.slice(-50).forEach(msg => {
+  entries.slice(-60).forEach(msg => {
     const div = document.createElement("div");
     let cls = "log-entry";
-    if (msg.includes("attacks") || msg.includes("damage") || msg.includes("FATIGUE") || msg.includes("destroys")) cls += " log-dmg";
-    else if (msg.includes("heal") || msg.includes("Heal") || msg.includes("Restores")) cls += " log-heal";
-    else if (msg.includes("plays")) cls += " log-play";
-    else if (msg.includes("Armor") || msg.includes("Equipped")) cls += " log-armor";
-    else if (msg.includes("draws") || msg.includes("Draw")) cls += " log-draw";
-    else if (msg.includes("blocks") || msg.includes("Shield")) cls += " log-block";
-    else if (msg.includes("---") || msg.includes("===")) cls += " log-system";
+    const m = msg.toLowerCase();
+    if (m.includes("damage") || m.includes("attacks") || m.includes("fatigue") ||
+        m.includes("destroys") || m.includes("dmg") || m.includes("d.rattle")) {
+      cls += " log-dmg";
+    } else if (m.includes("heal") || m.includes("restores") || m.includes("b.cry")) {
+      cls += " log-heal";
+    } else if (m.includes("plays")) {
+      cls += " log-play";
+    } else if (m.includes("armor") || m.includes("equipped")) {
+      cls += " log-armor";
+    } else if (m.includes("draws") || m.includes("draw")) {
+      cls += " log-draw";
+    } else if (m.includes("blocks") || m.includes("shield") || m.includes("blocked")) {
+      cls += " log-block";
+    } else if (m.includes("---") || m.includes("===") || m.includes("turn")) {
+      cls += " log-system";
+    }
     div.className = cls;
     div.textContent = msg;
     el.appendChild(div);
@@ -652,7 +762,14 @@ function getLegalMoves() {
 // ---------------------------------------------------------------------------
 function handleHandClick(idx, p1, name, card, affordable) {
   if (!gameState.is_player_turn || gameState.winner) return;
-  if (!affordable) { spawnFloat("Not enough mana!", "var(--col-mana-bright)"); return; }
+  if (!affordable) {
+    const handEl = document.getElementById("hand-player");
+    const cards  = handEl ? handEl.querySelectorAll(".hand-card") : [];
+    const anchorEl = cards[idx] || null;
+    spawnFloat("Not enough mana!", "var(--col-mana-bright)", anchorEl, "small");
+    shakeElement(cards[idx]);
+    return;
+  }
 
   if (selected?.type === "hand" && selected.idx === idx) {
     clearSelection();
@@ -661,7 +778,7 @@ function handleHandClick(idx, p1, name, card, affordable) {
   clearSelection();
 
   if (card.type === "minion") {
-    if (p1.board.length >= 7) { spawnFloat("Board is full!", "var(--col-red)"); return; }
+    if (p1.board.length >= 7) { spawnFloat("Board is full!", "var(--col-red)", null, "normal"); return; }
     sendAction("play", idx, null);
     return;
   }
@@ -679,12 +796,27 @@ function handleHandClick(idx, p1, name, card, affordable) {
   }
 }
 
+function shakeElement(el) {
+  if (!el) return;
+  el.classList.remove("shake");
+  void el.offsetWidth;
+  el.classList.add("shake");
+  el.addEventListener("animationend", () => el.classList.remove("shake"), { once: true });
+}
+
 function handleMinionClick(idx, isOpp, player, minion) {
   if (!gameState.is_player_turn || gameState.winner) return;
 
   if (selected) {
     const targetValid = isValidMinionTarget(idx, isOpp);
-    if (!targetValid) { spawnFloat("Invalid target!", "var(--col-red)"); return; }
+    if (!targetValid) {
+      spawnFloat("Invalid target!", "var(--col-red)", null, "normal");
+      // Shake the clicked element
+      const boardEl = document.getElementById(isOpp ? "board-opp" : "board-player");
+      const cards   = boardEl ? boardEl.querySelectorAll(".minion-card") : [];
+      shakeElement(cards[idx]);
+      return;
+    }
 
     let action;
     if (selected.type === "hand")        action = ["play",       selected.idx, idx];
@@ -705,7 +837,11 @@ function handleHeroClick(isOpp, player) {
   if (!gameState.is_player_turn || gameState.winner) return;
 
   if (selected) {
-    if (!isValidHeroTarget(isOpp)) { spawnFloat("Invalid target!", "var(--col-red)"); return; }
+    if (!isValidHeroTarget(isOpp)) {
+      spawnFloat("Invalid target!", "var(--col-red)", null, "normal");
+      shakeElement(document.getElementById(isOpp ? "hero-opp" : "hero-player"));
+      return;
+    }
 
     let action;
     if (selected.type === "hand")        action = ["play",       selected.idx, "hero"];
@@ -724,7 +860,7 @@ function handleHeroClick(isOpp, player) {
 
 function handleHeroPowerClick(player, canUse) {
   if (!gameState.is_player_turn || gameState.winner) return;
-  if (!canUse) { spawnFloat("Already used / not enough mana!", "var(--col-purple-bright)"); return; }
+  if (!canUse) { spawnFloat("Already used!", "var(--col-purple-bright)", null, "small"); return; }
 
   if (selected?.type === "hero_power") { clearSelection(); return; }
   clearSelection();
@@ -742,16 +878,14 @@ document.addEventListener("contextmenu", e => { e.preventDefault(); clearSelecti
 // API CALLS
 // ---------------------------------------------------------------------------
 async function sendAction(action, idx, target) {
-  if (!gameState?.is_player_turn) return;
+  if (isActing || !gameState?.is_player_turn) return;
+  isActing = true;
+
   const etBtn = document.getElementById("btn-end-turn");
   etBtn.disabled = true;
 
-  // Snapshot board + hero HP state before action for diff-based animations
-  const prevSnap = snapshotBoards();
-  const prevHeroHp = {
-    p1: gameState.p1.hp,
-    p2: gameState.p2.hp,
-  };
+  const prevSnap   = snapshotBoards();
+  const prevHeroHp = { p1: gameState.p1.hp, p2: gameState.p2.hp };
 
   try {
     const res = await fetch("/api/action", {
@@ -761,31 +895,31 @@ async function sendAction(action, idx, target) {
     });
     const data = await res.json();
     if (data.error) {
-      spawnFloat(data.error, "var(--col-red)");
+      spawnFloat(data.error, "var(--col-red)", null, "normal");
     } else {
       CARD_DB   = data.card_db || CARD_DB;
       gameState = data;
       renderGame();
-      // Apply diff-based animations after DOM is updated
       applyPostRenderAnimations(prevSnap);
       applyHeroAnimations(prevHeroHp);
-      if (data.winner) return;
     }
   } catch (err) {
-    spawnFloat("Network error!", "var(--col-red)");
+    spawnFloat("Network error!", "var(--col-red)", null, "normal");
   } finally {
-    if (gameState?.is_player_turn) etBtn.disabled = false;
+    isActing = false;
+    if (gameState?.is_player_turn && !gameState?.winner) etBtn.disabled = false;
   }
 }
 
 async function endTurn() {
-  if (!gameState?.is_player_turn) return;
+  if (isActing || !gameState?.is_player_turn) return;
+  isActing = true;
   clearSelection();
+
   const etBtn = document.getElementById("btn-end-turn");
   etBtn.disabled = true;
-  etBtn.textContent = "AI thinking…";
+  setAiThinking(true);
 
-  // Snapshot state before AI takes its turn
   const prevSnap   = snapshotBoards();
   const prevHeroHp = { p1: gameState.p1.hp, p2: gameState.p2.hp };
 
@@ -798,45 +932,67 @@ async function endTurn() {
     const data = await res.json();
     CARD_DB   = data.card_db || CARD_DB;
     gameState = data;
+    setAiThinking(false);
     renderGame();
     applyPostRenderAnimations(prevSnap);
     applyHeroAnimations(prevHeroHp);
   } catch (err) {
-    spawnFloat("Network error!", "var(--col-red)");
+    spawnFloat("Network error!", "var(--col-red)", null, "normal");
+    setAiThinking(false);
     etBtn.textContent = "End Turn";
     etBtn.disabled = false;
+  } finally {
+    isActing = false;
   }
 }
 
 function resign() {
   if (!confirm("Resign and return to menu?")) return;
-  gameState = null;
-  selected  = null;
+  resetGameState();
   showScreen("screen-menu");
 }
 
 function returnToMenu() {
-  gameState = null;
-  selected  = null;
+  resetGameState();
   showScreen("screen-menu");
+}
+
+function resetGameState() {
+  gameState        = null;
+  selected         = null;
+  prevBoards       = null;
+  prevIsPlayerTurn = null;
+  turnNumber       = 0;
+  isActing         = false;
+  setAiThinking(false);
 }
 
 // ---------------------------------------------------------------------------
 // FLOATING TEXT FX
 // ---------------------------------------------------------------------------
-function spawnFloat(text, color, el) {
+/**
+ * Spawn a floating text FX.
+ * @param {string} text   - Text to display
+ * @param {string} color  - CSS color string
+ * @param {Element|null} el - Anchor element (null = screen centre)
+ * @param {"big"|"normal"|"small"|"block"} size - Visual size variant
+ */
+function spawnFloat(text, color, el, size = "normal") {
   const layer = document.getElementById("fx-layer");
-  const div   = document.createElement("div");
-  div.className   = "float-text";
+  if (!layer) return;
+  const div = document.createElement("div");
+  div.className   = `float-text${size !== "normal" ? " " + size : ""}`;
   div.textContent = text;
   div.style.color = color;
 
   if (el) {
-    // Position relative to a specific element
-    const rect = el.getBoundingClientRect();
+    const rect      = el.getBoundingClientRect();
     const layerRect = layer.getBoundingClientRect();
-    div.style.left = (rect.left + rect.width / 2 - layerRect.left) + "px";
-    div.style.top  = (rect.top  - layerRect.top  - 10) + "px";
+    const cx = rect.left + rect.width  / 2 - layerRect.left;
+    const cy = rect.top  + rect.height / 4 - layerRect.top;
+    // Add small random horizontal jitter so multiple floats don't stack exactly
+    div.style.left = (cx + (Math.random() - .5) * 20) + "px";
+    div.style.top  = cy + "px";
   } else {
     div.style.left = (window.innerWidth  / 2) + "px";
     div.style.top  = (window.innerHeight / 2 - 60) + "px";
