@@ -1,5 +1,5 @@
 """
-game_logic.py — Pure Python game logic for TinyStone.
+game_logic.py — Pure Python game logic for LitStone.
 No Tkinter/GUI dependencies. All emoji replaced with text codes
 so log entries render safely in any environment.
 """
@@ -247,6 +247,8 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
                         notify("damage", opp, i, card["val"])
 
             elif card["effect"] == "buff":
+                if target is None or not (0 <= target < len(player["board"])):
+                    return
                 tm = player["board"][target]
                 tm["atk"]    += card["val"][0]
                 tm["hp"]     += card["val"][1]

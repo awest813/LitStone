@@ -14,9 +14,6 @@ let selected  = null;        // { type: "hand"|"board"|"hero_power"|"hero_weapon
 let draftDeck = [];
 let selectedClass = null;
 
-// Animation state tracking
-let prevBoards = null;       // snapshot of boards before last action
-
 // UI state
 let isActing          = false; // prevents double-submit during server round-trips
 let prevIsPlayerTurn  = null;  // tracks turn transitions for banner
@@ -33,7 +30,7 @@ const KW_SHORT = [
 const CARD_EMOJIS = {
   PE:"🪚", GD:"🛡️", RD:"🪓", KN:"⚔️", PA:"🏰", DR:"🐉",
   SP:"🕷️", CL:"📖", BM:"💣", ZP:"⚡", BL:"💥", MD:"💚",
-  IN:"🔍", CV:"🌊", BS:"✨", AX:"🪓",
+  IN:"🔍", CV:"🌊", BS:"✨", AX:"⚒️",
 };
 
 // Hero class accent colors
@@ -166,7 +163,6 @@ async function startGame() {
     CARD_DB          = data.card_db;
     gameState        = data;
     selected         = null;
-    prevBoards       = null;
     prevIsPlayerTurn = null;
     turnNumber       = 1;
     isActing         = false;
@@ -238,7 +234,8 @@ function buildTooltipHtml(name, card) {
 
 function positionTooltip(el, x, y) {
   const W = window.innerWidth, H = window.innerHeight;
-  const TW = 190, TH = 200;
+  const TW = el.offsetWidth  || 190;
+  const TH = el.offsetHeight || 200;
   let tx = x + 16, ty = y;
   if (tx + TW > W - 10) tx = x - TW - 10;
   if (ty + TH > H - 10) ty = H - TH - 10;
@@ -325,20 +322,27 @@ function applyPostRenderAnimations(prev) {
       if (!prevMinion) {
         card.classList.add("summon-anim");
         card.addEventListener("animationend", () => card.classList.remove("summon-anim"), { once: true });
-      } else if (minion.hp < prevMinion.hp) {
-        const dmg = prevMinion.hp - minion.hp;
-        card.classList.add("damage-flash");
-        card.addEventListener("animationend", () => card.classList.remove("damage-flash"), { once: true });
-        spawnFloat(`-${dmg}`, "var(--col-dmg)", card, "big");
-      } else if (minion.hp > prevMinion.hp) {
-        const heal = minion.hp - prevMinion.hp;
-        card.classList.add("buff-glow");
-        card.addEventListener("animationend", () => card.classList.remove("buff-glow"), { once: true });
-        spawnFloat(`+${heal}♥`, "var(--col-heal)", card, "normal");
-      } else if (minion.atk > prevMinion.atk) {
-        card.classList.add("buff-glow");
-        card.addEventListener("animationend", () => card.classList.remove("buff-glow"), { once: true });
-        spawnFloat(`+ATK`, "var(--col-gold)", card, "small");
+      } else {
+        if (minion.hp < prevMinion.hp) {
+          const dmg = prevMinion.hp - minion.hp;
+          card.classList.add("damage-flash");
+          card.addEventListener("animationend", () => card.classList.remove("damage-flash"), { once: true });
+          spawnFloat(`-${dmg}`, "var(--col-dmg)", card, "big");
+        } else if (minion.hp > prevMinion.hp) {
+          const heal = minion.hp - prevMinion.hp;
+          card.classList.add("buff-glow");
+          card.addEventListener("animationend", () => card.classList.remove("buff-glow"), { once: true });
+          spawnFloat(`+${heal}♥`, "var(--col-heal)", card, "normal");
+        }
+        // ATK changes are checked independently so both ATK and HP floats show
+        // (e.g. Blessing gives +2/+2 — both changes should be visible)
+        if (minion.atk > prevMinion.atk) {
+          if (minion.hp >= prevMinion.hp) {
+            card.classList.add("buff-glow");
+            card.addEventListener("animationend", () => card.classList.remove("buff-glow"), { once: true });
+          }
+          spawnFloat(`+ATK`, "var(--col-gold)", card, "small");
+        }
       }
     });
   });
@@ -860,7 +864,11 @@ function handleHeroClick(isOpp, player) {
 
 function handleHeroPowerClick(player, canUse) {
   if (!gameState.is_player_turn || gameState.winner) return;
-  if (!canUse) { spawnFloat("Already used!", "var(--col-purple-bright)", null, "small"); return; }
+  if (!canUse) {
+    const msg = player.hero_power_used ? "Already used!" : "Not enough mana!";
+    spawnFloat(msg, "var(--col-purple-bright)", null, "small");
+    return;
+  }
 
   if (selected?.type === "hero_power") { clearSelection(); return; }
   clearSelection();
@@ -930,10 +938,17 @@ async function endTurn() {
       body: JSON.stringify({ action: "end_turn", idx: null, target: null }),
     });
     const data = await res.json();
+    // Guard: player may have resigned while the AI was thinking
+    if (gameState === null) return;
     CARD_DB   = data.card_db || CARD_DB;
     gameState = data;
     setAiThinking(false);
+    // The server processes the entire AI turn synchronously, so the client
+    // never sees is_player_turn=false. Increment turn counter first so
+    // renderGame() picks it up for the badge, then fire the banner.
+    if (!gameState.winner) turnNumber++;
     renderGame();
+    if (!gameState.winner) showTurnBanner(true);
     applyPostRenderAnimations(prevSnap);
     applyHeroAnimations(prevHeroHp);
   } catch (err) {
@@ -960,7 +975,6 @@ function returnToMenu() {
 function resetGameState() {
   gameState        = null;
   selected         = null;
-  prevBoards       = null;
   prevIsPlayerTurn = null;
   turnNumber       = 0;
   isActing         = false;
