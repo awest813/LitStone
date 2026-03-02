@@ -1,5 +1,5 @@
 """
-server.py — Flask web server for TinyStone.
+server.py — Flask web server for LitStone.
 Serves the browser-based UI and exposes a JSON REST API for all game actions.
 """
 
@@ -37,7 +37,7 @@ def _state_response() -> dict:
         "p2":             _serialize(gs["p2"]),
         "is_player_turn": gs.get("is_player_turn", True),
         "turn_number":    gs.get("turn_number", 1),
-        "log":            list(GAME_LOG[-40:]),
+        "log":            list(GAME_LOG[-60:]),
         "winner":         winner,
         "card_db":        CARD_DB,
         "_legal_moves":   legal,
@@ -94,6 +94,7 @@ def new_game():
     gs["turn_number"]    = 1
     gs["is_player_turn"] = True
     start_turn(gs["p1"])
+    log_action("--- Your Turn (Turn 1) ---")
 
     return jsonify(_state_response())
 
@@ -132,11 +133,15 @@ def do_action():
 
     if action == "end_turn":
         gs["is_player_turn"] = False
-        # Run the full AI turn synchronously
+        log_action("--- AI's Turn ---")
         run_ai_turn(p2, p1)
-        gs["turn_number"]    += 1
-        gs["is_player_turn"] = True
-        start_turn(p1)
+        gs["turn_number"] += 1
+        # Only start the player's turn if nobody has won
+        winner = check_win(p1, p2)
+        if not winner:
+            gs["is_player_turn"] = True
+            start_turn(p1)
+            log_action(f"--- Your Turn (Turn {gs['turn_number']}) ---")
         return jsonify(_state_response())
 
     # Validate and execute player move
@@ -167,5 +172,5 @@ def legal_moves():
 # Entry point
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    print("TinyStone server starting — open http://localhost:5000 in your browser.")
+    print("LitStone server starting — open http://localhost:5000 in your browser.")
     app.run(debug=True, port=5000)
