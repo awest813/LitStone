@@ -14,6 +14,14 @@ let selected  = null;        // { type: "hand"|"board"|"hero_power"|"hero_weapon
 let draftDeck = [];
 let selectedClass = null;
 
+// Deck-builder UI state
+let filterType = "all";  // "all" | "minion" | "spell" | "weapon"
+let sortBy     = "cost"; // "cost" | "name"
+
+// Deck-builder constants
+const MANA_CURVE_MAX_COST   = 7;   // buckets 1-7; costs ≥7 are grouped under "7+"
+const MAX_AUTOFILL_ATTEMPTS = 500; // safety cap for the random auto-fill loop
+
 // UI state
 let isActing          = false; // prevents double-submit during server round-trips
 let prevIsPlayerTurn  = null;  // tracks turn transitions for banner
@@ -56,21 +64,57 @@ function showScreen(id) {
 // ---------------------------------------------------------------------------
 function selectClass(cls) {
   selectedClass = cls;
-  draftDeck = [];
+  draftDeck  = [];
+  filterType = "all";
+  sortBy     = "cost";
   showScreen("screen-deck");
   document.getElementById("deck-title").textContent = `Build Your ${cls} Deck`;
+  // Reset filter/sort button states
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.toggle("active", b.dataset.filter === "all"));
+  document.querySelectorAll(".sort-btn").forEach(b => b.classList.toggle("active", b.dataset.sort === "cost"));
   renderCardPool();
   updateDeckSidebar();
+  renderSavedDecks();
 }
 
 // ---------------------------------------------------------------------------
 // DECK BUILDER
 // ---------------------------------------------------------------------------
+function setFilter(type) {
+  filterType = type;
+  document.querySelectorAll(".filter-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.filter === type)
+  );
+  renderCardPool();
+}
+
+function setSort(sort) {
+  sortBy = sort;
+  document.querySelectorAll(".sort-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.sort === sort)
+  );
+  renderCardPool();
+}
+
 function renderCardPool() {
   const pool = document.getElementById("card-pool");
   pool.innerHTML = "";
 
-  Object.entries(CARD_DB).forEach(([name, card]) => {
+  let entries = Object.entries(CARD_DB);
+
+  // Apply type filter
+  if (filterType !== "all") {
+    entries = entries.filter(([, card]) => card.type === filterType);
+  }
+
+  // Apply sort
+  if (sortBy === "cost") {
+    entries.sort((a, b) => a[1].cost - b[1].cost || a[0].localeCompare(b[0]));
+  } else {
+    entries.sort((a, b) => a[0].localeCompare(b[0]));
+  }
+
+  entries.forEach(([name, card]) => {
     const count  = draftDeck.filter(c => c === name).length;
     const isFull = count >= 2 || draftDeck.length >= 15;
     const div    = document.createElement("div");
@@ -138,10 +182,12 @@ function updateDeckSidebar() {
   list.innerHTML = "";
   const unique = [...new Set(draftDeck)].sort();
   unique.forEach(name => {
-    const n   = draftDeck.filter(c => c === name).length;
-    const li  = document.createElement("li");
+    const n    = draftDeck.filter(c => c === name).length;
+    const cost = CARD_DB[name]?.cost ?? "?";
+    const li   = document.createElement("li");
     li.className = "deck-entry";
-    li.innerHTML = `<span class="deck-entry-name">${name}</span>
+    li.innerHTML = `<span class="deck-entry-cost">${cost}</span>
+                    <span class="deck-entry-name">${name}</span>
                     <span class="deck-entry-count">x${n}</span>
                     <span class="deck-entry-remove" title="Remove">✕</span>`;
     li.querySelector(".deck-entry-remove").addEventListener("click", () => removeFromDeck(name));
@@ -149,6 +195,117 @@ function updateDeckSidebar() {
   });
 
   document.getElementById("btn-start-ai").disabled = count !== 15;
+  renderManaCurve();
+}
+
+function renderManaCurve() {
+  const curveEl = document.getElementById("mana-curve");
+  if (!curveEl) return;
+
+  const counts = {};
+  for (let i = 1; i <= MANA_CURVE_MAX_COST; i++) counts[i] = 0;
+  draftDeck.forEach(name => {
+    const cost   = CARD_DB[name]?.cost ?? 0;
+    const bucket = Math.min(cost, MANA_CURVE_MAX_COST);
+    // Cards with cost 0 are excluded from the curve (none exist in the current DB)
+    if (bucket > 0) counts[bucket] = (counts[bucket] || 0) + 1;
+  });
+
+  const maxCount = Math.max(...Object.values(counts), 1);
+  curveEl.innerHTML = Object.entries(counts).map(([cost, count]) => {
+    const pct   = Math.round((count / maxCount) * 100);
+    const label = Number(cost) === MANA_CURVE_MAX_COST ? `${cost}+` : cost;
+    return `<div class="curve-bar-wrap">
+      <div class="curve-bar-inner">
+        <div class="curve-bar" style="height:${pct}%" title="${count} card${count !== 1 ? "s" : ""}"></div>
+      </div>
+      <div class="curve-label">${label}</div>
+    </div>`;
+  }).join("");
+}
+
+function autoFillDeck() {
+  const pool = Object.keys(CARD_DB);
+  let tries = 0;
+  while (draftDeck.length < 15 && tries < MAX_AUTOFILL_ATTEMPTS) {
+    tries++;
+    const name = pool[Math.floor(Math.random() * pool.length)];
+    if (draftDeck.filter(c => c === name).length < 2) {
+      draftDeck.push(name);
+    }
+  }
+  renderCardPool();
+  updateDeckSidebar();
+}
+
+function clearDeck() {
+  draftDeck = [];
+  renderCardPool();
+  updateDeckSidebar();
+}
+
+// ---------------------------------------------------------------------------
+// SAVE / LOAD DECKS  (localStorage)
+// ---------------------------------------------------------------------------
+function getSavedDecks() {
+  try {
+    return JSON.parse(localStorage.getItem("litstoneDecks") || "{}");
+  } catch (_) {
+    return {};
+  }
+}
+
+function saveDeck() {
+  const nameInput = document.getElementById("save-deck-name");
+  const name = nameInput?.value.trim();
+  if (!name || draftDeck.length === 0) return;
+  const saved = getSavedDecks();
+  saved[name] = { heroClass: selectedClass, cards: [...draftDeck] };
+  localStorage.setItem("litstoneDecks", JSON.stringify(saved));
+  nameInput.value = "";
+  renderSavedDecks();
+}
+
+function loadDeck(name) {
+  const saved = getSavedDecks();
+  const entry = saved[name];
+  if (!entry) return;
+  // Filter out any cards that no longer exist in CARD_DB (e.g. after a card set update)
+  draftDeck = entry.cards.filter(c => CARD_DB[c]);
+  renderCardPool();
+  updateDeckSidebar();
+}
+
+function deleteSavedDeck(name) {
+  const saved = getSavedDecks();
+  delete saved[name];
+  localStorage.setItem("litstoneDecks", JSON.stringify(saved));
+  renderSavedDecks();
+}
+
+function renderSavedDecks() {
+  const el = document.getElementById("saved-decks-list");
+  if (!el) return;
+  const entries = Object.entries(getSavedDecks());
+  if (entries.length === 0) {
+    el.innerHTML = `<div class="saved-decks-empty">No saved decks</div>`;
+    return;
+  }
+  el.innerHTML = "";
+  entries.forEach(([name, data]) => {
+    const div = document.createElement("div");
+    div.className = "saved-deck-entry";
+    const cls = data.heroClass || "";
+    div.innerHTML = `
+      <span class="saved-deck-name" title="${name}">${name}</span>
+      <span class="saved-deck-class">${cls}</span>
+      <button class="btn-load-deck">Load</button>
+      <button class="btn-delete-deck">✕</button>
+    `;
+    div.querySelector(".btn-load-deck").addEventListener("click", () => loadDeck(name));
+    div.querySelector(".btn-delete-deck").addEventListener("click", () => deleteSavedDeck(name));
+    el.appendChild(div);
+  });
 }
 
 async function startGame() {

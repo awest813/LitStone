@@ -307,7 +307,46 @@ body::after {
   text-shadow: 0 0 20px rgba(232,160,32,.4);
 }
 
-.deck-subtitle { font-size: 13px; color: var(--col-text-dim); margin-bottom: 14px; }
+.deck-subtitle { font-size: 13px; color: var(--col-text-dim); margin-bottom: 10px; }
+
+/* Filter & sort controls */
+.deck-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.filter-group, .sort-group { display: flex; gap: 4px; align-items: center; }
+
+.filter-btn, .sort-btn {
+  background: var(--col-panel);
+  border: 1px solid var(--col-border);
+  border-radius: 6px;
+  color: var(--col-text-dim);
+  font-size: 11px;
+  font-family: 'Cinzel', serif;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+
+.filter-btn.active, .sort-btn.active {
+  background: var(--col-mana);
+  border-color: var(--col-mana-bright);
+  color: #fff;
+  box-shadow: 0 0 6px rgba(74,158,221,.4);
+}
+
+.filter-btn:hover:not(.active), .sort-btn:hover:not(.active) {
+  border-color: var(--col-border-bright);
+  color: var(--col-text);
+}
+
+.sort-label { font-size: 11px; color: var(--col-text-dim); }
+
 .deck-layout { display: flex; gap: 20px; flex: 1; min-height: 0; width: 100%; }
 
 .card-pool {
@@ -395,7 +434,7 @@ body::after {
 
 /* Deck sidebar */
 .deck-sidebar {
-  width: 200px;
+  width: 220px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -425,6 +464,65 @@ body::after {
   box-shadow: 0 0 6px rgba(0,184,148,.5);
 }
 
+/* Mana curve */
+.mana-curve-box {
+  background: var(--col-panel);
+  border: 1px solid var(--col-border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  flex-shrink: 0;
+}
+
+.mana-curve-title {
+  font-size: 9px;
+  text-align: center;
+  color: var(--col-text-dim);
+  margin-bottom: 6px;
+  font-family: 'Cinzel', serif;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.mana-curve {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 38px;
+  gap: 3px;
+}
+
+.curve-bar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  height: 100%;
+}
+
+.curve-bar-inner {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.curve-bar {
+  width: 100%;
+  background: linear-gradient(180deg, var(--col-mana-bright), var(--col-mana));
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+  transition: height .3s ease;
+  box-shadow: 0 0 4px rgba(74,158,221,.35);
+}
+
+.curve-label {
+  font-size: 8px;
+  color: var(--col-text-dim);
+  margin-top: 3px;
+  font-weight: 700;
+  font-family: 'Cinzel', serif;
+}
+
 .deck-list {
   list-style: none;
   flex: 1;
@@ -436,19 +534,134 @@ body::after {
 }
 
 .deck-entry {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 4px 6px;
+  display: flex; align-items: center;
+  padding: 3px 4px;
   border-radius: 5px;
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
   transition: background .12s;
+  gap: 4px;
 }
 
 .deck-entry:hover { background: rgba(255,255,255,.06); }
-.deck-entry-name { flex: 1; color: var(--col-text); }
-.deck-entry-count { color: var(--col-gold); font-weight: 700; margin: 0 6px; }
-.deck-entry-remove { color: var(--col-red); font-size: 14px; opacity: .6; transition: opacity .12s; }
+.deck-entry-cost {
+  width: 16px; height: 16px;
+  background: radial-gradient(circle at 35% 35%, var(--col-mana-bright), var(--col-mana));
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; color: #fff;
+  flex-shrink: 0;
+}
+.deck-entry-name { flex: 1; color: var(--col-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deck-entry-count { color: var(--col-gold); font-weight: 700; flex-shrink: 0; }
+.deck-entry-remove { color: var(--col-red); font-size: 13px; opacity: .6; transition: opacity .12s; flex-shrink: 0; }
 .deck-entry-remove:hover { opacity: 1; }
+
+/* Quick action buttons */
+.deck-quick-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-autofill, .btn-clear-deck {
+  flex: 1;
+  font-size: 10px;
+  padding: 5px 4px;
+}
+
+.btn-autofill {
+  background: linear-gradient(135deg, #0d2a4a, #1a4a78);
+  border-color: var(--col-mana-bright);
+  color: var(--col-mana-bright);
+}
+.btn-autofill:hover { background: linear-gradient(135deg, #1a4a78, #2371b5); }
+
+.btn-clear-deck {
+  background: linear-gradient(135deg, #3a0a0a, #5a1010);
+  border-color: rgba(214,48,49,.6);
+  color: #e07070;
+}
+.btn-clear-deck:hover { background: linear-gradient(135deg, #5a1010, #7a1515); }
+
+/* Save / load section */
+.deck-save-section {
+  background: var(--col-panel);
+  border: 1px solid var(--col-border);
+  border-radius: 10px;
+  padding: 8px;
+  flex-shrink: 0;
+}
+
+.deck-save-row { display: flex; gap: 5px; }
+
+.deck-name-input {
+  flex: 1;
+  background: var(--col-surface);
+  border: 1px solid var(--col-border);
+  border-radius: 5px;
+  color: var(--col-text);
+  font-size: 10px;
+  padding: 4px 7px;
+  font-family: 'Crimson Text', Georgia, serif;
+  min-width: 0;
+}
+.deck-name-input::placeholder { color: var(--col-text-dim); }
+.deck-name-input:focus { outline: none; border-color: var(--col-mana-bright); }
+
+.btn-save-deck {
+  padding: 4px 7px;
+  font-size: 13px;
+  background: var(--col-panel);
+  border: 1px solid var(--col-border);
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--col-text);
+  transition: border-color .15s;
+}
+.btn-save-deck:hover { border-color: var(--col-gold); }
+
+.saved-decks-list {
+  margin-top: 6px;
+  max-height: 72px;
+  overflow-y: auto;
+}
+
+.saved-decks-empty { font-size: 10px; color: var(--col-text-dim); text-align: center; padding: 4px 0; }
+
+.saved-deck-entry {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 2px;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  font-size: 10px;
+}
+.saved-deck-entry:last-child { border-bottom: none; }
+
+.saved-deck-name {
+  flex: 1;
+  color: var(--col-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.saved-deck-class { color: var(--col-text-dim); font-size: 9px; flex-shrink: 0; }
+
+.btn-load-deck, .btn-delete-deck {
+  padding: 1px 5px;
+  font-size: 9px;
+  border-radius: 3px;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid;
+  flex-shrink: 0;
+  font-family: 'Cinzel', serif;
+}
+.btn-load-deck   { color: var(--col-mana-bright); border-color: var(--col-mana); }
+.btn-load-deck:hover   { background: rgba(74,158,221,.18); }
+.btn-delete-deck { color: var(--col-red); border-color: rgba(214,48,49,.45); }
+.btn-delete-deck:hover { background: rgba(214,48,49,.15); }
 
 /* ============================================================
    GAME SCREEN

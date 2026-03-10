@@ -76,6 +76,8 @@ Ideas that may be incorporated into any version:
 - AI difficulty settings (Easy / Normal / Hard)
 - Replay system — save and replay past games
 - Draft / Arena mode — pick cards one at a time from random sets
-- Deck import/export via a compact string format
+- [x] Deck builder filter & sort — filter card pool by type (Minion / Spell / Weapon); sort by cost or name
+- [x] Mana curve — live bar chart showing the distribution of cards by mana cost in the deck builder
+- [x] Save / load decks — name, save, and reload decks using browser localStorage
 - Accessibility improvements (screen reader support, high-contrast theme)
 - Localization (i18n framework for non-English languages)

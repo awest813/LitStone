@@ -59,6 +59,21 @@
   <h2 class="deck-title" id="deck-title">Build Your Deck</h2>
   <p class="deck-subtitle">Click cards to add · Maximum 2 copies · 15 cards total</p>
 
+  <!-- Filter & sort controls -->
+  <div class="deck-controls">
+    <div class="filter-group" role="group" aria-label="Filter by card type">
+      <button class="filter-btn active" data-filter="all"    onclick="setFilter('all')">All</button>
+      <button class="filter-btn"        data-filter="minion" onclick="setFilter('minion')">Minions</button>
+      <button class="filter-btn"        data-filter="spell"  onclick="setFilter('spell')">Spells</button>
+      <button class="filter-btn"        data-filter="weapon" onclick="setFilter('weapon')">Weapons</button>
+    </div>
+    <div class="sort-group" role="group" aria-label="Sort card pool">
+      <span class="sort-label">Sort:</span>
+      <button class="sort-btn active" data-sort="cost" onclick="setSort('cost')">Cost</button>
+      <button class="sort-btn"        data-sort="name" onclick="setSort('name')">Name</button>
+    </div>
+  </div>
+
   <div class="deck-layout">
     <!-- Card pool grid -->
     <div class="card-pool" id="card-pool"></div>
@@ -69,7 +84,31 @@
         <span id="deck-count">0</span><span class="deck-count-sep">/</span><span>15</span>
         <div class="deck-progress-bar"><div id="deck-progress" class="deck-progress-fill"></div></div>
       </div>
+
+      <!-- Mana curve -->
+      <div class="mana-curve-box">
+        <div class="mana-curve-title">Mana Curve</div>
+        <div class="mana-curve" id="mana-curve"></div>
+      </div>
+
       <ul class="deck-list" id="deck-list"></ul>
+
+      <!-- Quick actions -->
+      <div class="deck-quick-actions">
+        <button class="btn btn-autofill"    onclick="autoFillDeck()" title="Randomly fill remaining slots">⚡ Auto-fill</button>
+        <button class="btn btn-clear-deck"  onclick="clearDeck()"    title="Remove all cards from deck">🗑 Clear</button>
+      </div>
+
+      <!-- Save / load decks (localStorage) -->
+      <div class="deck-save-section">
+        <div class="deck-save-row">
+          <input type="text" id="save-deck-name" class="deck-name-input"
+                 placeholder="Deck name…" maxlength="24" aria-label="Deck name" />
+          <button class="btn btn-save-deck" onclick="saveDeck()" title="Save deck">💾</button>
+        </div>
+        <div class="saved-decks-list" id="saved-decks-list"></div>
+      </div>
+
       <button class="btn btn-primary" id="btn-start-ai" disabled onclick="startGame()">
         ⚔️ Play vs AI
       </button>
