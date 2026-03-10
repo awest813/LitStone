@@ -37,13 +37,17 @@ const KW_SHORT = [
 ];
 const CARD_EMOJIS = {
   // Standard cards
-  PE:"🪚", GD:"🛡️", RD:"🪓", KN:"⚔️", PA:"🏰", DR:"🐉",
-  SP:"🕷️", CL:"📖", BM:"💣", ZP:"⚡", BL:"💥", MD:"💚",
-  IN:"🔍", CV:"🌊", BS:"✨", AX:"⚒️",
-  // Literary Legend minions
-  GT:"🥂", DV:"🧛", EB:"📜", DY:"🎩", HC:"⛰️", AB:"⚓", HM:"🕵️", DO:"🖼️",
+  TC:"📯", CG:"🛡️", HW:"🤺", EK:"⚔️", TP:"🏰", SD:"🐉",
+  CS:"🕷️", CC:"🙏", TA:"⚗️", QB:"✒️", IV:"🔥", HY:"🎶",
+  DC:"🔍", RA:"🎯", FB:"✨", HB:"🗡️",
   // Literary support spells
-  SQ:"🎭", RV:"🪶", MR:"🌙",
+  LW:"📖", NV:"🪶", EL:"🧪",
+  // Legendary minions
+  SH:"🕵️", JW:"🩺", PM:"♟️", VH:"🏹", VF:"🔬", FM:"🧟", AL:"🗝️", MH:"🎩",
+  RB:"🐇", QH:"♥️", CH:"😼", SW:"🍎", RP:"🧵", SB:"😴", LR:"🧺", RU:"🪙",
+  BW:"🐺", PP:"🎶", BY:"🧹", BB:"🔑", KA:"⚔️", ME:"🔮", LT:"🛡️", GV:"🌹",
+  MF:"🧙‍♀️", MD:"🩸", GW:"🛡️", RH:"🏹", MM:"🌿", FT:"🍺", LJ:"💪", WS:"🎯",
+  ES:"💰", OT:"🥣",
 };
 
 // Hero class accent colors
@@ -517,7 +521,7 @@ function applyPostRenderAnimations(prev) {
           spawnFloat(`+${heal}♥`, "var(--col-heal)", card, "normal");
         }
         // ATK changes are checked independently so both ATK and HP floats show
-        // (e.g. Blessing gives +2/+2 — both changes should be visible)
+        // (e.g. Fairy Blessing gives +2/+2 — both changes should be visible)
         if (minion.atk > prevMinion.atk) {
           if (minion.hp >= prevMinion.hp) {
             card.classList.add("buff-glow");
