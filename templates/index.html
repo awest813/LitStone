@@ -18,7 +18,7 @@
   <p class="menu-subtitle">Choose Your Class</p>
   <div class="hero-grid">
 
-    <div class="hero-card" data-class="Mage" onclick="selectClass('Mage')">
+    <div class="hero-card" data-class="Mage" role="button" tabindex="0" aria-label="Choose Mage class" onclick="selectClass('Mage')">
       <div class="hero-glow mage-glow"></div>
       <div class="hero-emblem">🔮</div>
       <h2>Mage</h2>
@@ -29,7 +29,7 @@
       <div class="hero-flavour">Masters of arcane fire, capable of precise strikes against any foe.</div>
     </div>
 
-    <div class="hero-card" data-class="Warrior" onclick="selectClass('Warrior')">
+    <div class="hero-card" data-class="Warrior" role="button" tabindex="0" aria-label="Choose Warrior class" onclick="selectClass('Warrior')">
       <div class="hero-glow warrior-glow"></div>
       <div class="hero-emblem">⚔️</div>
       <h2>Warrior</h2>
@@ -40,7 +40,7 @@
       <div class="hero-flavour">Hardened veterans who forge impenetrable defences under fire.</div>
     </div>
 
-    <div class="hero-card" data-class="Priest" onclick="selectClass('Priest')">
+    <div class="hero-card" data-class="Priest" role="button" tabindex="0" aria-label="Choose Priest class" onclick="selectClass('Priest')">
       <div class="hero-glow priest-glow"></div>
       <div class="hero-emblem">✨</div>
       <h2>Priest</h2>
@@ -85,7 +85,9 @@
 <div id="screen-game" class="screen">
 
   <!-- AI thinking progress bar (top of screen) -->
-  <div id="ai-thinking-bar" class="ai-thinking-bar"></div>
+  <div id="ai-thinking-bar" class="ai-thinking-bar" aria-hidden="true"></div>
+
+  <div id="status-toast" class="status-toast hidden" role="status" aria-live="polite"></div>
 
   <!-- Turn banner (centre-screen flash) -->
   <div id="turn-banner" class="turn-banner"></div>

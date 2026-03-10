@@ -170,12 +170,21 @@ async function startGame() {
     showTurnBanner(true);
     renderGame();
   } catch (err) {
-    alert("Failed to start game. Please check your connection and try again.");
+    showStatusToast("Failed to start game. Check your connection and try again.");
   }
 }
 
 function goBack() {
   showScreen("screen-menu");
+}
+
+function showStatusToast(message, ms = 2400) {
+  const toast = document.getElementById("status-toast");
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.remove("hidden");
+  clearTimeout(showStatusToast._timer);
+  showStatusToast._timer = setTimeout(() => toast.classList.add("hidden"), ms);
 }
 
 // ---------------------------------------------------------------------------
@@ -280,7 +289,7 @@ function setAiThinking(active) {
   const bar = document.getElementById("ai-thinking-bar");
   if (bar) bar.classList.toggle("active", active);
   const etBtn = document.getElementById("btn-end-turn");
-  if (etBtn && active) etBtn.textContent = "AI thinking…";
+  if (etBtn) etBtn.textContent = active ? "AI thinking…" : "End Turn";
 }
 
 // ---------------------------------------------------------------------------
@@ -880,7 +889,21 @@ function handleHeroPowerClick(player, canUse) {
 
 // Right-click / Escape to cancel
 document.addEventListener("keydown", e => { if (e.key === "Escape") clearSelection(); });
-document.addEventListener("contextmenu", e => { e.preventDefault(); clearSelection(); });
+document.addEventListener("contextmenu", e => {
+  if (document.getElementById("screen-game")?.classList.contains("active")) {
+    e.preventDefault();
+    clearSelection();
+  }
+});
+
+document.querySelectorAll(".hero-card").forEach(card => {
+  card.addEventListener("keydown", e => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    const cls = card.dataset.class;
+    if (cls) selectClass(cls);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // API CALLS
