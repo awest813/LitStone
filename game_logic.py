@@ -11,6 +11,7 @@ import random
 # ---------------------------------------------------------------------------
 
 CARD_DB = {
+    # ---------- Standard cards ----------
     "Peasant": {"type": "minion", "cost": 1, "atk": 2, "hp": 1, "taunt": False, "icon": "PE"},
     "Guard":   {"type": "minion", "cost": 2, "atk": 2, "hp": 3, "taunt": True,  "icon": "GD"},
     "Raider":  {"type": "minion", "cost": 3, "atk": 4, "hp": 2, "taunt": False, "icon": "RD"},
@@ -27,6 +28,42 @@ CARD_DB = {
     "Cleave":  {"type": "spell",  "cost": 4, "effect": "damage_all", "val": 2, "icon": "CV"},
     "Blessing":{"type": "spell",  "cost": 2, "effect": "buff",       "val": [2, 2], "icon": "BS"},
     "Axe":     {"type": "weapon", "cost": 3, "atk": 3, "durability": 2, "icon": "AX"},
+
+    # ---------- Literary Legend minions (max 1 copy per deck) ----------
+    # The Great Gatsby (F. Scott Fitzgerald, 1925 — US public domain since 2021)
+    "Gatsby":     {"type": "minion", "cost": 6, "atk": 4, "hp": 7, "taunt": True,
+                   "legendary": True, "icon": "GT"},
+    # Dracula (Bram Stoker, 1897)
+    "Dracula":    {"type": "minion", "cost": 7, "atk": 5, "hp": 7, "poisonous": True,
+                   "deathrattle": {"effect": "dmg_hero", "val": 3},
+                   "legendary": True, "icon": "DV"},
+    # Pride and Prejudice (Jane Austen, 1813)
+    "Elizabeth":  {"type": "minion", "cost": 4, "atk": 3, "hp": 5,
+                   "battlecry": {"effect": "draw_cards", "val": 2},
+                   "legendary": True, "icon": "EB"},
+    "Darcy":      {"type": "minion", "cost": 5, "atk": 4, "hp": 6, "taunt": True,
+                   "legendary": True, "icon": "DY"},
+    # Wuthering Heights (Emily Brontë, 1847)
+    "Heathcliff": {"type": "minion", "cost": 4, "atk": 6, "hp": 3, "charge": True,
+                   "legendary": True, "icon": "HC"},
+    # Moby-Dick (Herman Melville, 1851)
+    "Ahab":       {"type": "minion", "cost": 6, "atk": 6, "hp": 4, "charge": True, "taunt": True,
+                   "legendary": True, "icon": "AB"},
+    # The Adventures of Sherlock Holmes (Arthur Conan Doyle, 1892)
+    "Holmes":     {"type": "minion", "cost": 4, "atk": 1, "hp": 6,
+                   "battlecry": {"effect": "draw_cards", "val": 2},
+                   "legendary": True, "icon": "HM"},
+    # The Picture of Dorian Gray (Oscar Wilde, 1890)
+    "Dorian":     {"type": "minion", "cost": 5, "atk": 2, "hp": 8, "divine_shield": True,
+                   "legendary": True, "icon": "DO"},
+
+    # ---------- Literary support spells ----------
+    # A single cheap card-draw spell (fills a gap in the spell pool)
+    "Soliloquy":  {"type": "spell",  "cost": 1, "effect": "draw",       "val": 1, "icon": "SQ"},
+    # Mid-cost single-target damage between Zap (2/3) and Blast (4/6)
+    "Raven":      {"type": "spell",  "cost": 3, "effect": "damage",     "val": 4, "icon": "RV"},
+    # Cheaper heal alternative to Mend (3/5)
+    "Moonrise":   {"type": "spell",  "cost": 2, "effect": "heal",       "val": 4, "icon": "MR"},
 }
 
 HERO_CLASSES = ["Mage", "Warrior", "Priest"]
@@ -71,7 +108,8 @@ def create_player(name: str, hero_class: str = "Mage",
         pool = list(CARD_DB.keys())
         while len(deck) < 15:
             c = random.choice(pool)
-            if deck.count(c) < 2:
+            max_copies = 1 if CARD_DB[c].get("legendary") else 2
+            if deck.count(c) < max_copies:
                 deck.append(c)
     if shuffle:
         random.shuffle(deck)
@@ -216,6 +254,10 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
                     player["hp"] += amt
                     log_action(f"   [B.CRY] Battlecry: Heals hero for {amt}!")
                     notify("heal", player, "hero", amt)
+                elif bc["effect"] == "draw_cards":
+                    log_action(f"   [B.CRY] Battlecry: {player['name']} draws {bc['val']} card(s)!")
+                    for _ in range(bc["val"]):
+                        draw_card(player, on_event)
 
         elif card["type"] == "weapon":
             player["weapon"] = {"name": card_name, "atk": card["atk"],

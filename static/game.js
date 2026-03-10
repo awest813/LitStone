@@ -36,9 +36,14 @@ const KW_SHORT = [
   ["poisonous","POISON"], ["battlecry","B.CRY"], ["deathrattle","D.RATTLE"],
 ];
 const CARD_EMOJIS = {
+  // Standard cards
   PE:"🪚", GD:"🛡️", RD:"🪓", KN:"⚔️", PA:"🏰", DR:"🐉",
   SP:"🕷️", CL:"📖", BM:"💣", ZP:"⚡", BL:"💥", MD:"💚",
   IN:"🔍", CV:"🌊", BS:"✨", AX:"⚒️",
+  // Literary Legend minions
+  GT:"🥂", DV:"🧛", EB:"📜", DY:"🎩", HC:"⛰️", AB:"⚓", HM:"🕵️", DO:"🖼️",
+  // Literary support spells
+  SQ:"🎭", RV:"🪶", MR:"🌙",
 };
 
 // Hero class accent colors
@@ -115,10 +120,12 @@ function renderCardPool() {
   }
 
   entries.forEach(([name, card]) => {
+    const isLegendary = !!card.legendary;
+    const maxCopies  = isLegendary ? 1 : 2;
     const count  = draftDeck.filter(c => c === name).length;
-    const isFull = count >= 2 || draftDeck.length >= 15;
+    const isFull = count >= maxCopies || draftDeck.length >= 15;
     const div    = document.createElement("div");
-    div.className = `pool-card pool-card--${card.type}${isFull ? " pool-card--full" : ""}`;
+    div.className = `pool-card pool-card--${card.type}${isFull ? " pool-card--full" : ""}${isLegendary ? " pool-card--legendary" : ""}`;
     div.dataset.name = name;
 
     const icon = CARD_EMOJIS[card.icon] || card.icon;
@@ -145,6 +152,7 @@ function renderCardPool() {
     div.innerHTML = `
       <div class="gem-cost">${card.cost}</div>
       ${count > 0 ? `<div class="gem-count">${count}</div>` : ""}
+      ${isLegendary ? `<div class="legendary-crown" title="Legendary — only 1 copy per deck">♦</div>` : ""}
       <div class="pool-art">${icon}</div>
       <div class="pool-name">${name}</div>
       ${statsHtml}
@@ -160,7 +168,8 @@ function renderCardPool() {
 
 function addCardToDeck(name) {
   if (draftDeck.length >= 15) return;
-  if (draftDeck.filter(c => c === name).length >= 2) return;
+  const maxCopies = CARD_DB[name]?.legendary ? 1 : 2;
+  if (draftDeck.filter(c => c === name).length >= maxCopies) return;
   draftDeck.push(name);
   renderCardPool();
   updateDeckSidebar();
@@ -230,7 +239,8 @@ function autoFillDeck() {
   while (draftDeck.length < 15 && tries < MAX_AUTOFILL_ATTEMPTS) {
     tries++;
     const name = pool[Math.floor(Math.random() * pool.length)];
-    if (draftDeck.filter(c => c === name).length < 2) {
+    const maxCopies = CARD_DB[name]?.legendary ? 1 : 2;
+    if (draftDeck.filter(c => c === name).length < maxCopies) {
       draftDeck.push(name);
     }
   }
@@ -359,7 +369,8 @@ function spellDesc(card, short = false) {
 
 function battlecryDesc(bc) {
   if (!bc) return "";
-  if (bc.effect === "heal_hero") return `Battlecry: Restore ${bc.val} HP to your hero.`;
+  if (bc.effect === "heal_hero")  return `Battlecry: Restore ${bc.val} HP to your hero.`;
+  if (bc.effect === "draw_cards") return `Battlecry: Draw ${bc.val} card${bc.val !== 1 ? "s" : ""}.`;
   return "";
 }
 
@@ -373,6 +384,7 @@ function buildTooltipHtml(name, card) {
   const isMinion = card.type === "minion";
   const isWeapon = card.type === "weapon";
   const isSpell  = card.type === "spell";
+  const isLegendary = !!card.legendary;
 
   let stats = "";
   if (isMinion) stats = `<div class="tooltip-stats">ATK ${card.atk} &nbsp;·&nbsp; HP ${card.hp}</div>`;
@@ -389,9 +401,13 @@ function buildTooltipHtml(name, card) {
     `<div class="tooltip-desc" style="margin-top:4px">${t}</div>`
   ).join("");
 
+  const legendaryBadge = isLegendary
+    ? `<div class="tooltip-legendary">♦ LEGENDARY</div>` : "";
+
   return `
     <div class="tooltip-name">${name}</div>
     <div class="tooltip-type">${card.type.toUpperCase()} · ${card.cost} Mana</div>
+    ${legendaryBadge}
     ${stats}
     ${kws}
     ${abilities}
@@ -779,6 +795,7 @@ function renderBoard(elId, player, isOpp) {
     if (minion.taunt)                                                   cls += " taunt";
     if (minion.divine_shield)                                           cls += " divine-shield";
     if (!minion.can_attack && !isOpp)                                   cls += " exhausted";
+    if (card.legendary)                                                 cls += " legendary";
 
     if (selected) {
       const valid = isValidMinionTarget(idx, isOpp);
@@ -831,6 +848,7 @@ function renderHand(p1) {
     let cls = `hand-card hand-card--${card.type}`;
     if (!affordable)                                       cls += " unaffordable";
     if (selected?.type === "hand" && selected.idx === idx) cls += " selected";
+    if (card.legendary)                                    cls += " legendary";
 
     let extra = "";
     if (card.type === "minion" || card.type === "weapon") {

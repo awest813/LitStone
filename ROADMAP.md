@@ -41,7 +41,7 @@ Goals: deepen the card pool and hero variety.
 - [ ] **More cards** — expand the library to 30+ cards, including new spell types and minion keywords
 - [ ] **Additional hero classes** — Rogue (poisoned blade), Paladin (divine inspiration), Shaman (totems)
 - [ ] **Class-specific cards** — some cards restricted to certain hero classes
-- [ ] **Legendary minions** — high-cost, high-impact unique cards (one copy per deck)
+- [x] **Legendary minions** — high-cost, high-impact unique cards (one copy per deck); 8 literary legends added (Gatsby, Dracula, Elizabeth, Darcy, Heathcliff, Ahab, Holmes, Dorian) plus 3 literary support spells
 - [ ] **Adventure / campaign mode** — scripted encounters against bosses with predefined decks
 
 ---

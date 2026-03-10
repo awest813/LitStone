@@ -1338,6 +1338,90 @@ body::after {
 .tooltip-stats  { color: var(--col-text); font-size: 12px; font-weight: 600; margin-bottom: 6px; }
 .tooltip-desc   { color: var(--col-text-dim); font-style: italic; font-size: 11px; line-height: 1.5; }
 .tooltip-kw     { font-size: 11px; font-weight: 700; margin-bottom: 2px; }
+.tooltip-legendary {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  color: var(--col-gold-bright);
+  letter-spacing: .12em;
+  margin-bottom: 6px;
+  text-shadow: 0 0 8px rgba(232,160,32,.5);
+}
+
+/* ---- Legendary card styling ---- */
+
+/* Legendary crown badge in deck builder pool */
+.legendary-crown {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: var(--col-gold-bright);
+  font-family: 'Cinzel', serif;
+  letter-spacing: .04em;
+  background: var(--col-bg);
+  padding: 0 3px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 6;
+  text-shadow: 0 0 6px rgba(232,160,32,.7);
+}
+
+/* Pool card — legendary variant */
+.pool-card--legendary {
+  border-color: var(--col-gold-dim);
+  box-shadow: 0 0 10px rgba(232,160,32,.25), inset 0 0 8px rgba(232,160,32,.06);
+}
+.pool-card--legendary .pool-art {
+  background: linear-gradient(160deg, #1a1000, #332000);
+}
+.pool-card--legendary:hover:not(.pool-card--full) {
+  border-color: var(--col-gold-bright);
+  box-shadow: 0 12px 32px rgba(0,0,0,.7), 0 0 22px rgba(232,160,32,.45);
+}
+
+/* Legendary minion card on the game board */
+.minion-card.legendary {
+  background: linear-gradient(175deg, #f4e8c8, #e8d490);
+  border-color: var(--col-gold);
+  box-shadow: 0 0 10px rgba(232,160,32,.4), inset 0 1px 0 rgba(255,255,255,.5);
+}
+.minion-card.legendary .minion-art {
+  background: linear-gradient(160deg, #2a1800, #1a0e00);
+  border-color: rgba(232,160,32,.3);
+}
+.minion-card.legendary .minion-name {
+  color: #3a2600;
+}
+
+/* Legendary animation: gentle golden shimmer */
+@keyframes legendaryShimmer {
+  0%, 100% { box-shadow: 0 0 8px rgba(232,160,32,.35), inset 0 1px 0 rgba(255,255,255,.5); }
+  50%       { box-shadow: 0 0 18px rgba(232,160,32,.65), inset 0 1px 0 rgba(255,255,255,.5); }
+}
+.minion-card.legendary {
+  animation: legendaryShimmer 2.4s ease-in-out infinite;
+}
+/* Disable shimmer when card has stronger visual state active */
+.minion-card.legendary.can-attack,
+.minion-card.legendary.selected,
+.minion-card.legendary.valid-target {
+  animation: none;
+}
+
+/* Legendary hand card */
+.hand-card.legendary {
+  background: linear-gradient(175deg, #f4e8c8, #e8d490);
+  border-color: var(--col-gold);
+  box-shadow: 0 4px 12px rgba(0,0,0,.5), 0 0 10px rgba(232,160,32,.3), inset 0 1px 0 rgba(255,255,255,.5);
+}
+.hand-card.legendary .minion-art {
+  background: linear-gradient(160deg, #2a1800, #1a0e00);
+}
+.hand-card.legendary .minion-name {
+  color: #3a2600;
+}
 
 /* ---- FX / animations ---- */
 .fx-layer { position: absolute; inset: 0; pointer-events: none; z-index: 500; overflow: hidden; }

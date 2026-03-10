@@ -74,7 +74,7 @@ def new_game():
         isinstance(deck, list) and
         len(deck) == 15 and
         all(c in valid_cards for c in deck) and
-        all(deck.count(c) <= 2 for c in deck)
+        all(deck.count(c) <= (1 if CARD_DB[c].get("legendary") else 2) for c in deck)
     )
 
     GAME_LOG.clear()

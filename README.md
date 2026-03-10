@@ -5,9 +5,10 @@ A lightweight, browser-based card game inspired by Hearthstone. Play against an 
 ## Features
 
 - **3 Hero Classes** — Mage, Warrior, and Priest, each with a unique hero power
-- **16-card library** — Minions, spells, and weapons with distinct mechanics
+- **27-card library** — Minions, spells, and weapons with distinct mechanics, including 8 Legendary literary characters and 3 literary support spells
 - **Rich card mechanics** — Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle
-- **Deck Builder** — Build a custom 15-card deck (max 2 copies per card) before each game
+- **Literary Legends** — Legendary minions based on public domain literature: Gatsby, Dracula, Elizabeth, Darcy, Heathcliff, Ahab, Holmes, Dorian (max 1 copy per deck)
+- **Deck Builder** — Build a custom 15-card deck (max 2 copies per card; max 1 copy of Legendary cards) before each game
 - **AI opponent** — Heuristic-driven AI that evaluates board state and plays competitively
 - **Combat log** — Real-time log of every action taken during the game
 - **Fatigue system** — Players take increasing damage when their deck runs out
@@ -67,6 +68,29 @@ Open [http://localhost:5000](http://localhost:5000) in your browser.
 | Minion | Placed on the board to attack and defend |
 | Spell  | One-time effect (damage, heal, draw, AoE, buff) |
 | Weapon | Equips to your hero, enabling direct attacks |
+
+### Literary Legend Cards (Legendary — max 1 per deck)
+
+These legendary minions are based on characters from public domain literature and have a distinctive golden card frame.
+
+| Card | Cost | ATK | HP | Keywords / Ability | Source |
+|------|------|-----|----|--------------------|--------|
+| Gatsby | 6 | 4 | 7 | Taunt | *The Great Gatsby* (Fitzgerald, 1925) |
+| Dracula | 7 | 5 | 7 | Poisonous · Deathrattle: deal 3 dmg | *Dracula* (Stoker, 1897) |
+| Elizabeth | 4 | 3 | 5 | Battlecry: Draw 2 cards | *Pride and Prejudice* (Austen, 1813) |
+| Darcy | 5 | 4 | 6 | Taunt | *Pride and Prejudice* (Austen, 1813) |
+| Heathcliff | 4 | 6 | 3 | Charge | *Wuthering Heights* (Brontë, 1847) |
+| Ahab | 6 | 6 | 4 | Charge · Taunt | *Moby-Dick* (Melville, 1851) |
+| Holmes | 4 | 1 | 6 | Battlecry: Draw 2 cards | *Sherlock Holmes* (Doyle, 1892) |
+| Dorian | 5 | 2 | 8 | Divine Shield | *The Picture of Dorian Gray* (Wilde, 1890) |
+
+### Literary Support Spells
+
+| Card | Cost | Effect |
+|------|------|--------|
+| Soliloquy | 1 | Draw 1 card |
+| Raven | 3 | Deal 4 damage |
+| Moonrise | 2 | Restore 4 HP |
 
 ### Keyword Reference
 
