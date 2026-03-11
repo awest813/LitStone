@@ -17,7 +17,7 @@ from game_logic import (
     create_player, draw_card, start_turn, do_mulligan,
     get_legal_moves, execute_move, check_win,
     run_ai_turn, log_action, damage_hero, get_valid_targets,
-    cleanup_dead,
+    cleanup_dead, evaluate_ai_move,
 )
 
 
@@ -149,11 +149,43 @@ class TestDoMulligan(unittest.TestCase):
         p = create_player("P1", "Mage")
         for _ in range(3):
             draw_card(p)
-        original_hand = list(p["hand"])
         do_mulligan(p, [0, 1, 2])
         self.assertEqual(len(p["hand"]), 3)
-        # Deck should have grown by 3 (returned) then shrunk by 3 (redrawn), net 0 change
+        # Deck shrinks by 3 (replacement draws) then grows by 3 (returned cards): net 0
         self.assertEqual(len(p["deck"]), 12)
+
+    def test_no_redeal_of_swapped_cards(self):
+        """Mulligan must never give back the same cards that were just swapped."""
+        p = create_player("P1", "Mage", shuffle=False)
+        # Fill the deck entirely with one type of card so replacements are
+        # always that type, and put a different type in the hand to swap.
+        p["deck"] = ["Storybook Dragon"] * 12
+        p["hand"] = ["Town Crier"] * 3
+        do_mulligan(p, [0, 1, 2])
+        # All replacement draws must come from the pre-existing deck, which
+        # contains only Storybook Dragon.
+        self.assertEqual(p["hand"], ["Storybook Dragon"] * 3)
+        # Swapped cards must be back in the deck somewhere.
+        self.assertIn("Town Crier", p["deck"])
+
+    def test_partial_swap_no_redeal(self):
+        """Partial swap must not redeal the swapped card."""
+        p = create_player("P1", "Mage", shuffle=False)
+        p["deck"] = ["Storybook Dragon"] * 12
+        p["hand"] = ["Town Crier", "Castle Guard", "Highwayman"]
+        # Swap only the first card (Town Crier)
+        do_mulligan(p, [0])
+        # Hand still has 3 cards
+        self.assertEqual(len(p["hand"]), 3)
+        # The replacement draw comes from the deck (Storybook Dragon) and is
+        # appended to the end of the hand; the swapped card must NOT be in hand.
+        self.assertNotIn("Town Crier", p["hand"])
+        self.assertIn("Storybook Dragon", p["hand"])
+        # Castle Guard and Highwayman were kept
+        self.assertIn("Castle Guard", p["hand"])
+        self.assertIn("Highwayman", p["hand"])
+        # Swapped card is back in the deck
+        self.assertIn("Town Crier", p["deck"])
 
     def test_hand_size_preserved(self):
         p = create_player("P1", "Mage")
@@ -676,6 +708,100 @@ class TestRunAiTurn(unittest.TestCase):
         # After the first attack that kills P1, AI should stop
         moves = run_ai_turn(p2, p1)
         self.assertIsNotNone(check_win(p1, p2))  # game should be over
+
+
+class TestEvaluateAiMove(unittest.TestCase):
+    """Tests for evaluate_ai_move scoring."""
+
+    def setUp(self):
+        GAME_LOG.clear()
+
+    def _setup_ai_game(self):
+        p1 = create_player("P1", "Mage")
+        p2 = create_player("AI", "Mage")
+        p1["mana"] = 10
+        p1["max_mana"] = 10
+        p2["mana"] = 10
+        p2["max_mana"] = 10
+        return p1, p2
+
+    def test_heal_spell_scores_positively_when_hurt(self):
+        """AI should value a heal spell when it is damaged."""
+        p1, p2 = self._setup_ai_game()
+        p2["hp"] = 10  # badly hurt
+        p2["hand"] = ["Restorative Hymn"]  # heal 5
+        move = ("play", 0, None)
+        score = evaluate_ai_move(p2, p1, move)
+        self.assertGreater(score, 0)
+
+    def test_heal_spell_low_score_when_full_hp(self):
+        """AI should score a heal spell lower at full HP than when damaged."""
+        p1, p2_full = self._setup_ai_game()
+        _, p2_hurt = self._setup_ai_game()
+        p2_full["hp"] = 30  # full HP — effective heal is 0
+        p2_full["hand"] = ["Restorative Hymn"]
+        p2_hurt["hp"] = 15  # badly hurt — effective heal is 5
+        p2_hurt["hand"] = ["Restorative Hymn"]
+        score_full = evaluate_ai_move(p2_full, p1, ("play", 0, None))
+        score_hurt = evaluate_ai_move(p2_hurt, p1, ("play", 0, None))
+        self.assertLess(score_full, score_hurt)
+
+    def test_heal_spell_score_increases_with_damage(self):
+        """More damage taken → higher heal-spell score."""
+        p1, p2_healthy = self._setup_ai_game()
+        _, p2_hurt = self._setup_ai_game()
+        p2_healthy["hp"] = 28
+        p2_healthy["hand"] = ["Elixir of Life"]
+        p2_hurt["hp"] = 10
+        p2_hurt["hand"] = ["Elixir of Life"]
+        score_healthy = evaluate_ai_move(p2_healthy, p1, ("play", 0, None))
+        score_hurt = evaluate_ai_move(p2_hurt, p1, ("play", 0, None))
+        self.assertGreater(score_hurt, score_healthy)
+
+    def test_lethal_attack_gets_high_score(self):
+        """An attack that kills the opponent hero should score very highly."""
+        p1, p2 = self._setup_ai_game()
+        p1["hp"] = 3
+        attacker = _make_minion("Big", 5, 5, can_attack=True)
+        p2["board"].append(attacker)
+        move = ("attack", 0, "hero")
+        score = evaluate_ai_move(p2, p1, move)
+        self.assertGreaterEqual(score, 1000)
+
+
+class TestExecuteMoveCleanup(unittest.TestCase):
+    """Tests for cleanup_dead being called even in error paths."""
+
+    def setUp(self):
+        GAME_LOG.clear()
+
+    def _setup_game(self):
+        p1 = create_player("P1", "Mage")
+        p2 = create_player("AI", "Warrior")
+        p1["mana"] = 10
+        p1["max_mana"] = 10
+        return p1, p2
+
+    def test_dead_minion_cleaned_up_after_buff_invalid_target(self):
+        """cleanup_dead must run even if a buff card has an out-of-range target."""
+        p1, p2 = self._setup_game()
+        # Place a dead minion on p1's board manually (should be cleaned up)
+        dead = _make_minion("DeadOne", 1, 0)
+        p1["board"] = [dead]
+        p1["hand"]  = ["Fairy Blessing"]  # buff +2/+2
+        # Target index 5 is clearly out of range (board has 1 minion at index 0)
+        execute_move(p1, p2, ("play", 0, 5))
+        # The dead minion should have been cleaned up
+        self.assertEqual(len(p1["board"]), 0)
+
+    def test_dead_minion_cleaned_up_after_add_shield_invalid_target(self):
+        """cleanup_dead must run even if an add_shield card has an out-of-range target."""
+        p1, p2 = self._setup_game()
+        dead = _make_minion("DeadOne", 1, 0)
+        p1["board"] = [dead]
+        p1["hand"]  = ["Enchanted Shield"]
+        execute_move(p1, p2, ("play", 0, 5))
+        self.assertEqual(len(p1["board"]), 0)
 
 
 class TestCardDbIntegrity(unittest.TestCase):
