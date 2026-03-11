@@ -51,6 +51,31 @@
       <div class="hero-flavour">Wielders of holy light, sustaining allies through any ordeal.</div>
     </div>
 
+    <div class="hero-card" data-class="Rogue" role="button" tabindex="0" aria-label="Choose Rogue class" onclick="selectClass('Rogue')">
+      <div class="hero-glow rogue-glow"></div>
+      <div class="hero-emblem">🗡️</div>
+      <h2>Rogue</h2>
+      <div class="hero-power-badge">
+        <span class="badge-cost">2</span>
+        <span class="badge-text">Dagger Mastery<br><em>Equip a 1/2 Wicked Dagger</em></span>
+      </div>
+      <div class="hero-flavour">Shadowy assassins who stay armed with a fresh blade every turn.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- =====================  SCREEN: MULLIGAN  ============================= -->
+<div id="screen-mulligan" class="screen">
+  <div class="mulligan-overlay">
+    <h2 class="mulligan-title">Opening Hand</h2>
+    <p class="mulligan-subtitle">Click cards to swap them for new ones, then confirm.</p>
+    <div class="mulligan-cards" id="mulligan-cards"></div>
+    <div class="mulligan-actions">
+      <button class="btn btn-primary" id="btn-mulligan-confirm" onclick="confirmMulligan()">
+        ✓ Keep Hand
+      </button>
+    </div>
   </div>
 </div>
 

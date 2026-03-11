@@ -8,7 +8,7 @@ from flask import Flask, jsonify, request, render_template
 
 from game_logic import (
     CARD_DB, HERO_CLASSES, GAME_LOG,
-    create_player, draw_card, start_turn,
+    create_player, draw_card, start_turn, do_mulligan,
     get_legal_moves, execute_move, check_win,
     run_ai_turn, log_action,
 )
@@ -31,7 +31,8 @@ def _serialize(player: dict) -> dict:
 def _state_response() -> dict:
     gs = GAME_STATE
     winner = check_win(gs["p1"], gs["p2"]) if gs else None
-    legal  = get_legal_moves(gs["p1"], gs["p2"]) if gs and not winner else []
+    mulligan = gs.get("mulligan_phase", False)
+    legal  = get_legal_moves(gs["p1"], gs["p2"]) if gs and not winner and not mulligan else []
     return {
         "p1":             _serialize(gs["p1"]),
         "p2":             _serialize(gs["p2"]),
@@ -41,6 +42,7 @@ def _state_response() -> dict:
         "winner":         winner,
         "card_db":        CARD_DB,
         "_legal_moves":   legal,
+        "mulligan_phase": mulligan,
     }
 
 
@@ -85,7 +87,7 @@ def new_game():
     gs["p1"] = create_player("Player", player_cls, deck if deck_valid else None)
     gs["p2"] = create_player("AI", ai_class)
 
-    # Deal opening hands
+    # Deal opening hands (mulligan phase — player sees these before game begins)
     for _ in range(3):
         draw_card(gs["p1"])
     for _ in range(4):
@@ -93,6 +95,29 @@ def new_game():
 
     gs["turn_number"]    = 1
     gs["is_player_turn"] = True
+    gs["mulligan_phase"] = True
+    log_action("--- Mulligan Phase: choose cards to replace ---")
+
+    return jsonify(_state_response())
+
+
+@app.route("/api/mulligan", methods=["POST"])
+def do_mulligan_route():
+    if not GAME_STATE:
+        return jsonify({"error": "No game in progress"}), 400
+    gs = GAME_STATE
+    if not gs.get("mulligan_phase"):
+        return jsonify({"error": "Not in mulligan phase"}), 400
+
+    data    = request.get_json()
+    indices = data.get("indices", [])
+    if not isinstance(indices, list):
+        indices = []
+    # Validate indices
+    indices = [i for i in indices if isinstance(i, int) and 0 <= i < len(gs["p1"]["hand"])]
+
+    do_mulligan(gs["p1"], indices)
+    gs["mulligan_phase"] = False
     start_turn(gs["p1"])
     log_action("--- Your Turn (Turn 1) ---")
 

@@ -52,7 +52,22 @@ const CARD_EMOJIS = {
 
 // Hero class accent colors
 const HERO_COLORS = {
-  Mage: "#2980b9", Warrior: "#c0392b", Priest: "#d4820a",
+  Mage: "#2980b9", Warrior: "#c0392b", Priest: "#d4820a", Rogue: "#1abc9c",
+};
+
+// Hero class icons (used across multiple render functions)
+const HERO_ICONS = {
+  Mage: "🔮", Warrior: "⚔️", Priest: "✨", Rogue: "🗡️",
+};
+
+// Hero power labels (used in renderHeroPower)
+const HERO_POWER_LABELS = {
+  Mage: "Fireblast", Warrior: "Armor Up", Priest: "Heal", Rogue: "Dagger",
+};
+
+// Hero power icons
+const HERO_POWER_ICONS = {
+  Mage: "🔥", Warrior: "🛡️", Priest: "💚", Rogue: "🗡️",
 };
 
 // ---------------------------------------------------------------------------
@@ -65,6 +80,9 @@ function showScreen(id) {
   });
   if (id === "screen-game") {
     document.getElementById("screen-game").style.display = "grid";
+  }
+  if (id === "screen-mulligan") {
+    document.getElementById("screen-mulligan").style.display = "flex";
   }
 }
 
@@ -322,6 +340,91 @@ function renderSavedDecks() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// MULLIGAN
+// ---------------------------------------------------------------------------
+let mulliganSwapSet = new Set(); // indices of cards marked for swap
+
+function renderMulligan(state) {
+  const hand = state.p1.hand;
+  mulliganSwapSet = new Set();
+  const container = document.getElementById("mulligan-cards");
+  container.innerHTML = "";
+
+  hand.forEach((name, idx) => {
+    const card = CARD_DB[name] || {};
+    const icon = CARD_EMOJIS[card.icon] || card.icon || "?";
+    const div  = document.createElement("div");
+    div.className = "mulligan-card marked-keep";
+    div.dataset.idx = idx;
+
+    let statsHtml = "";
+    if (card.type === "minion") {
+      statsHtml = `<div class="mulligan-card-stats"><span class="atk">${card.atk}⚔</span><span class="hp">${card.hp}♥</span></div>`;
+    } else if (card.type === "weapon") {
+      statsHtml = `<div class="mulligan-card-stats"><span class="atk">${card.atk}⚔</span><span class="hp">${card.durability}🛡</span></div>`;
+    } else {
+      statsHtml = `<div class="mulligan-card-desc">${spellDesc(card, true)}</div>`;
+    }
+
+    div.innerHTML = `
+      <div class="mulligan-card-cost">${card.cost}</div>
+      <div class="mulligan-card-art">${icon}</div>
+      <div class="mulligan-card-name">${name}</div>
+      <div class="mulligan-card-type">${card.type}</div>
+      ${statsHtml}
+    `;
+
+    div.addEventListener("click", () => toggleMulliganCard(div, idx));
+    container.appendChild(div);
+  });
+
+  document.getElementById("btn-mulligan-confirm").textContent = "✓ Keep Hand";
+  showScreen("screen-mulligan");
+}
+
+function toggleMulliganCard(el, idx) {
+  if (mulliganSwapSet.has(idx)) {
+    mulliganSwapSet.delete(idx);
+    el.classList.remove("marked-swap");
+    el.classList.add("marked-keep");
+  } else {
+    mulliganSwapSet.add(idx);
+    el.classList.remove("marked-keep");
+    el.classList.add("marked-swap");
+  }
+  const swapCount = mulliganSwapSet.size;
+  const btn = document.getElementById("btn-mulligan-confirm");
+  btn.textContent = swapCount > 0 ? `↺ Swap ${swapCount} Card${swapCount > 1 ? "s" : ""}` : "✓ Keep Hand";
+}
+
+async function confirmMulligan() {
+  const indices = Array.from(mulliganSwapSet);
+  try {
+    const res  = await fetch("/api/mulligan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ indices }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      showStatusToast(data.error);
+      return;
+    }
+    CARD_DB          = data.card_db || CARD_DB;
+    gameState        = data;
+    selected         = null;
+    prevIsPlayerTurn = null;
+    turnNumber       = 1;
+    isActing         = false;
+    showScreen("screen-game");
+    showTurnBanner(true);
+    renderGame();
+  } catch (err) {
+    showStatusToast("Network error during mulligan.");
+  }
+}
+
 async function startGame() {
   if (draftDeck.length !== 15) return;
   try {
@@ -331,15 +434,19 @@ async function startGame() {
       body: JSON.stringify({ hero_class: selectedClass, deck: draftDeck }),
     });
     const data = await res.json();
-    CARD_DB          = data.card_db;
-    gameState        = data;
-    selected         = null;
-    prevIsPlayerTurn = null;
-    turnNumber       = 1;
-    isActing         = false;
-    showScreen("screen-game");
-    showTurnBanner(true);
-    renderGame();
+    CARD_DB   = data.card_db;
+    gameState = data;
+    isActing  = false;
+    if (data.mulligan_phase) {
+      renderMulligan(data);
+    } else {
+      selected         = null;
+      prevIsPlayerTurn = null;
+      turnNumber       = 1;
+      showScreen("screen-game");
+      showTurnBanner(true);
+      renderGame();
+    }
   } catch (err) {
     showStatusToast("Failed to start game. Check your connection and try again.");
   }
@@ -630,8 +737,7 @@ function renderHero(elId, player, isOpp) {
   const el = document.getElementById(elId);
 
   const hpPct = Math.max(0, Math.min(100, (player.hp / 30) * 100));
-  const icons = { Mage: "🔮", Warrior: "⚔️", Priest: "✨" };
-  const icon  = icons[player.hero_class] || "?";
+  const icon  = HERO_ICONS[player.hero_class] || "?";
   const accentColor = HERO_COLORS[player.hero_class] || "#2e4a66";
 
   let cls = "hero-panel";
@@ -751,17 +857,15 @@ function renderHeroMana(trayId, player) {
 function renderHeroPower(elId, player, isOpp) {
   const el = document.getElementById(elId);
   const canUse = !player.hero_power_used && player.mana >= 2;
-  const icons  = { Mage: "🔥", Warrior: "🛡️", Priest: "💚" };
-  const icon   = icons[player.hero_class] || "⚡";
+  const icon   = HERO_POWER_ICONS[player.hero_class] || "⚡";
 
   let cls = "hero-power-panel";
   if (!canUse) cls += " used";
   if (!isOpp && selected?.type === "hero_power") cls += " selected";
 
-  const labels = { Mage: "Fireblast", Warrior: "Armor Up", Priest: "Heal" };
   el.className = cls;
   el.dataset.class = player.hero_class;
-  el.innerHTML = `<div class="hp-icon">${icon}</div><div class="hp-cost">${labels[player.hero_class]}<br>2 Mana</div>`;
+  el.innerHTML = `<div class="hp-icon">${icon}</div><div class="hp-cost">${HERO_POWER_LABELS[player.hero_class] || "Power"}<br>2 Mana</div>`;
 
   if (!isOpp) {
     el.onclick = () => handleHeroPowerClick(player, canUse);
@@ -1073,7 +1177,9 @@ function handleHeroPowerClick(player, canUse) {
   if (selected?.type === "hero_power") { clearSelection(); return; }
   clearSelection();
 
-  if (player.hero_class === "Warrior") { sendAction("hero_power", null, null); return; }
+  if (player.hero_class === "Warrior" || player.hero_class === "Rogue") {
+    sendAction("hero_power", null, null); return;
+  }
   selected = { type: "hero_power" };
   renderGame();
 }
@@ -1194,6 +1300,7 @@ function resetGameState() {
   prevIsPlayerTurn = null;
   turnNumber       = 0;
   isActing         = false;
+  mulliganSwapSet  = new Set();
   setAiThinking(false);
 }
 

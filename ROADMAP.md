@@ -39,7 +39,7 @@ Goals: make the game feel complete and production-ready for single-player use.
 Goals: deepen the card pool and hero variety.
 
 - [x] **More cards** — expanded the library to 50+ cards with broader literary themes
-- [ ] **Additional hero classes** — Rogue (poisoned blade), Paladin (divine inspiration), Shaman (totems)
+- [x] **Additional hero classes** — Rogue (Dagger Mastery: equip a 1/2 Wicked Dagger); Paladin and Shaman remain planned
 - [ ] **Class-specific cards** — some cards restricted to certain hero classes
 - [x] **Legendary minions** — high-cost, high-impact unique cards (one copy per deck); expanded roster to 34 literary legends plus 3 themed support spells
 - [ ] **Adventure / campaign mode** — scripted encounters against bosses with predefined decks

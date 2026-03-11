@@ -4,9 +4,10 @@ A lightweight, browser-based card game inspired by Hearthstone. Play against an 
 
 ## Features
 
-- **3 Hero Classes** — Mage, Warrior, and Priest, each with a unique hero power
+- **4 Hero Classes** — Mage, Warrior, Priest, and Rogue, each with a unique hero power
 - **53-card library** — Literary-themed minions, spells, and a weapon with distinct mechanics, plus 34 Legendary storybook heroes and villains
 - **Rich card mechanics** — Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle
+- **Mulligan phase** — Select any opening-hand cards to redraw before each game starts
 - **Literary Legends** — Legendary minions inspired by Sherlock Holmes, Dr. John Watson, Professor Moriarty, Van Helsing, Victor Frankenstein, Frankenstein's Monster, Alice, The Mad Hatter, The White Rabbit, The Queen of Hearts, The Cheshire Cat, Snow White, Rapunzel, Sleeping Beauty, Little Red Riding Hood, Rumpelstiltskin, The Big Bad Wolf, Pied Piper, Baba Yaga, Bluebeard, King Arthur, Merlin, Lancelot, Guinevere, Morgan le Fay, Mordred, Gawain, Robin Hood, Maid Marian, Friar Tuck, Little John, Will Scarlet, Ebenezer Scrooge, and Oliver Twist (max 1 copy per deck)
 - **Deck Builder** — Build a custom 15-card deck (max 2 copies per card; max 1 copy of Legendary cards) before each game
 - **AI opponent** — Heuristic-driven AI that evaluates board state and plays competitively
@@ -60,6 +61,7 @@ Open [http://localhost:5000](http://localhost:5000) in your browser.
 | Mage    | Fireblast    | Deal 1 damage to any target         |
 | Warrior | Armor Up!    | Gain 2 Armor                        |
 | Priest  | Lesser Heal  | Restore 2 HP to a friendly character |
+| Rogue   | Dagger Mastery | Equip a 1/2 Wicked Dagger         |
 
 ### Card Types
 

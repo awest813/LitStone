@@ -39,6 +39,7 @@
   --mage-col:         #2980b9;
   --warrior-col:      #c0392b;
   --priest-col:       #d4820a;
+  --rogue-col:        #1abc9c;
 }
 
 body {
@@ -230,6 +231,7 @@ body::after {
 .hero-card[data-class="Mage"]    { --hero-accent: var(--mage-col); }
 .hero-card[data-class="Warrior"] { --hero-accent: var(--warrior-col); }
 .hero-card[data-class="Priest"]  { --hero-accent: var(--priest-col); }
+.hero-card[data-class="Rogue"]   { --hero-accent: var(--rogue-col); }
 .hero-card:hover {
   border-color: var(--hero-accent, var(--col-border));
   box-shadow: 0 20px 60px rgba(0,0,0,.85), 0 0 30px color-mix(in srgb, var(--hero-accent, transparent) 35%, transparent);
@@ -243,6 +245,7 @@ body::after {
 .mage-glow    { background: radial-gradient(circle, var(--mage-col), transparent); }
 .warrior-glow { background: radial-gradient(circle, var(--warrior-col), transparent); }
 .priest-glow  { background: radial-gradient(circle, var(--priest-col), transparent); }
+.rogue-glow   { background: radial-gradient(circle, var(--rogue-col), transparent); }
 
 .hero-emblem {
   font-size: 58px;
@@ -900,6 +903,11 @@ body::after {
   border-color: #a06020;
   box-shadow: 0 0 20px rgba(212,130,10,.25), inset 0 1px 0 rgba(255,200,100,.08);
 }
+.hero-panel[data-class="Rogue"]   {
+  background: radial-gradient(circle at 40% 35%, #003a30, #001710);
+  border-color: #1abc9c;
+  box-shadow: 0 0 20px rgba(26,188,156,.25), inset 0 1px 0 rgba(100,255,220,.08);
+}
 
 .hero-panel.attackable   { border-color: var(--col-green);  box-shadow: 0 0 18px rgba(0,184,148,.5); cursor: pointer; }
 .hero-panel.valid-target { border-color: var(--col-gold);   box-shadow: 0 0 22px rgba(232,160,32,.6); cursor: pointer; animation: targetPulse 1.2s ease-in-out infinite; }
@@ -1027,6 +1035,11 @@ body::after {
   background: radial-gradient(circle at 40% 35%, #8a5000, #3a2000);
   border-color: #c07820;
   color: #ffe0a0;
+}
+.hero-power-panel[data-class="Rogue"] {
+  background: radial-gradient(circle at 40% 35%, #005a44, #002018);
+  border-color: #1abc9c;
+  color: #a0ffe8;
 }
 
 .hero-power-panel::after {
@@ -1859,3 +1872,106 @@ body::after {
 }
 .hand-opp-card:nth-child(odd)  { transform: rotate(-2deg); }
 .hand-opp-card:nth-child(even) { transform: rotate(2deg); }
+
+/* ============================================================
+   MULLIGAN SCREEN
+   ============================================================ */
+#screen-mulligan {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 15, 26, .96);
+}
+
+.mulligan-overlay {
+  text-align: center;
+  padding: 40px 48px;
+  background: linear-gradient(160deg, var(--col-surface), var(--col-panel));
+  border: 1px solid var(--col-border-bright);
+  border-radius: 20px;
+  box-shadow: 0 24px 80px rgba(0,0,0,.9);
+  max-width: 720px;
+  width: 100%;
+}
+
+.mulligan-title {
+  font-family: "Cinzel", serif;
+  font-size: 28px;
+  color: var(--col-gold-bright);
+  margin-bottom: 8px;
+  text-shadow: 0 0 20px rgba(232,160,32,.4);
+}
+
+.mulligan-subtitle {
+  font-size: 14px;
+  color: var(--col-text-dim);
+  margin-bottom: 32px;
+  letter-spacing: .04em;
+}
+
+.mulligan-cards {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+.mulligan-card {
+  position: relative;
+  width: 130px;
+  min-height: 180px;
+  background: var(--col-card-face);
+  border: 2px solid var(--col-border);
+  border-radius: var(--radius-card);
+  color: #1a1a1a;
+  padding: 8px 8px 10px;
+  cursor: pointer;
+  transition: transform .2s, box-shadow .2s, border-color .2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: var(--shadow-card);
+  user-select: none;
+}
+.mulligan-card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-hover);
+}
+.mulligan-card.marked-swap {
+  border-color: var(--col-red);
+  box-shadow: 0 0 18px rgba(214, 48, 49, .6);
+  opacity: .7;
+}
+.mulligan-card.marked-swap::after {
+  content: "SWAP";
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%) rotate(-15deg);
+  font-family: "Cinzel", serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--col-red);
+  text-shadow: 0 0 10px rgba(214,48,49,.8);
+  pointer-events: none;
+}
+.mulligan-card.marked-keep {
+  border-color: var(--col-green);
+  box-shadow: 0 0 18px rgba(0, 184, 148, .5);
+}
+
+.mulligan-card-art  { font-size: 40px; margin: 6px 0 4px; }
+.mulligan-card-name { font-family: "Cinzel", serif; font-size: 10px; font-weight: 700; text-align: center; line-height: 1.2; }
+.mulligan-card-cost { position: absolute; top: 6px; left: 6px; width: 26px; height: 26px; border-radius: 50%; background: var(--col-mana); color: #fff; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+.mulligan-card-type { font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+.mulligan-card-desc { font-size: 10px; color: #444; text-align: center; margin-top: 4px; line-height: 1.3; }
+.mulligan-card-stats { display: flex; gap: 8px; margin-top: 6px; font-weight: 700; font-size: 11px; }
+.mulligan-card-stats .atk { color: #b5510a; }
+.mulligan-card-stats .hp  { color: #a01010; }
+
+.mulligan-actions {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
