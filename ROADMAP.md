@@ -8,7 +8,7 @@ This document tracks planned improvements and future directions for LitStone.
 
 The current state of the project establishes the core gameplay loop.
 
-- [x] 16-card library (minions, spells, weapon)
+- [x] Literary-themed card library (50+ minions, spells, a weapon, and support spells)
 - [x] 3 hero classes with unique hero powers (Mage, Warrior, Priest)
 - [x] Full keyword system: Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle
 - [x] Deck builder (15 cards, max 2 copies)
@@ -38,10 +38,10 @@ Goals: make the game feel complete and production-ready for single-player use.
 
 Goals: deepen the card pool and hero variety.
 
-- [ ] **More cards** — expand the library to 30+ cards, including new spell types and minion keywords
+- [x] **More cards** — expanded the library to 50+ cards with broader literary themes
 - [ ] **Additional hero classes** — Rogue (poisoned blade), Paladin (divine inspiration), Shaman (totems)
 - [ ] **Class-specific cards** — some cards restricted to certain hero classes
-- [x] **Legendary minions** — high-cost, high-impact unique cards (one copy per deck); 8 literary legends added (Gatsby, Dracula, Elizabeth, Darcy, Heathcliff, Ahab, Holmes, Dorian) plus 3 literary support spells
+- [x] **Legendary minions** — high-cost, high-impact unique cards (one copy per deck); expanded roster to 34 literary legends plus 3 themed support spells
 - [ ] **Adventure / campaign mode** — scripted encounters against bosses with predefined decks
 
 ---
