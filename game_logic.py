@@ -342,6 +342,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
                         notify("blocked", opp, i, "BLOCKED!")
                     else:
                         tm["hp"] -= card["val"]
+                        log_action(f"   {tm['name']} takes {card['val']} damage.")
                         notify("damage", opp, i, card["val"])
 
             elif card["effect"] == "buff":
@@ -381,7 +382,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             notify("damage", opp, "hero", attacker["atk"])
         else:
             defender = opp["board"][target]
-            log_action(f">> {attacker['name']} attacks {defender['name']}!")
+            log_action(f">> {attacker['name']} attacks {defender['name']} for {attacker['atk']} damage!")
 
             if defender.get("divine_shield"):
                 defender["divine_shield"] = False
@@ -401,6 +402,8 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             else:
                 attacker["hp"] -= defender["atk"]
                 notify("damage", player, idx, defender["atk"])
+                if defender["atk"] > 0:
+                    log_action(f"   {attacker['name']} takes {defender['atk']} retaliation damage.")
                 if defender.get("poisonous") and defender["atk"] > 0:
                     attacker["hp"] = 0
                     log_action(f"   [POISON] Poisonous destroys {attacker['name']}!")
@@ -417,7 +420,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             notify("damage", opp, "hero", w_atk)
         else:
             defender = opp["board"][target]
-            log_action(f">> {player['name']} attacks {defender['name']} with {weapon['name']}!")
+            log_action(f">> {player['name']} attacks {defender['name']} with {weapon['name']} for {w_atk} damage!")
             if defender.get("divine_shield"):
                 defender["divine_shield"] = False
                 log_action(f"   {defender['name']}'s Divine Shield blocks the attack!")
@@ -427,6 +430,8 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
                 notify("damage", opp, target, w_atk)
             damage_hero(player, defender["atk"])
             notify("damage", player, "hero", defender["atk"])
+            if defender["atk"] > 0:
+                log_action(f"   {player['name']}'s hero takes {defender['atk']} retaliation damage.")
 
         weapon["durability"] -= 1
         if weapon["durability"] <= 0:
@@ -484,6 +489,7 @@ def cleanup_dead(player: dict, opp: dict, on_event=None) -> None:
             if m["hp"] > 0:
                 alive.append(m)
             else:
+                log_action(f"   {m['name']} is destroyed!")
                 if "deathrattle" in m:
                     dr = m["deathrattle"]
                     if dr["effect"] == "dmg_hero":

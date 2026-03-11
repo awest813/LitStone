@@ -545,21 +545,29 @@ function flashHero(elId) {
 /** Detect hero HP changes and flash accordingly, spawning anchored floats */
 function applyHeroAnimations(prev) {
   if (!prev || !gameState) return;
-  if (gameState.p1.hp < prev.p1) {
-    const dmg = prev.p1 - gameState.p1.hp;
+  if (gameState.p1.hp < prev.p1.hp) {
+    const dmg = prev.p1.hp - gameState.p1.hp;
     flashHero("hero-player");
     spawnFloat(`-${dmg}`, "var(--col-dmg)", document.getElementById("hero-player"), "big");
-  } else if (gameState.p1.hp > prev.p1) {
-    const heal = gameState.p1.hp - prev.p1;
+  } else if (gameState.p1.hp > prev.p1.hp) {
+    const heal = gameState.p1.hp - prev.p1.hp;
     spawnFloat(`+${heal}♥`, "var(--col-heal)", document.getElementById("hero-player"), "normal");
   }
-  if (gameState.p2.hp < prev.p2) {
-    const dmg = prev.p2 - gameState.p2.hp;
+  const p1ArmorGain = (gameState.p1.armor || 0) - (prev.p1.armor || 0);
+  if (p1ArmorGain > 0) {
+    spawnFloat(`+${p1ArmorGain}🛡`, "var(--col-gold)", document.getElementById("hero-player"), "normal");
+  }
+  if (gameState.p2.hp < prev.p2.hp) {
+    const dmg = prev.p2.hp - gameState.p2.hp;
     flashHero("hero-opp");
     spawnFloat(`-${dmg}`, "var(--col-dmg)", document.getElementById("hero-opp"), "big");
-  } else if (gameState.p2.hp > prev.p2) {
-    const heal = gameState.p2.hp - prev.p2;
+  } else if (gameState.p2.hp > prev.p2.hp) {
+    const heal = gameState.p2.hp - prev.p2.hp;
     spawnFloat(`+${heal}♥`, "var(--col-heal)", document.getElementById("hero-opp"), "normal");
+  }
+  const p2ArmorGain = (gameState.p2.armor || 0) - (prev.p2.armor || 0);
+  if (p2ArmorGain > 0) {
+    spawnFloat(`+${p2ArmorGain}🛡`, "var(--col-gold)", document.getElementById("hero-opp"), "normal");
   }
 }
 
@@ -983,6 +991,10 @@ function handleHandClick(idx, p1, name, card, affordable) {
       sendAction("play", idx, null);
       return;
     }
+    if (card.effect === "buff" && p1.board.length === 0) {
+      spawnFloat("No friendly minions to buff!", "var(--col-red)", null, "normal");
+      return;
+    }
     selected = { type: "hand", idx };
     renderGame();
   }
@@ -1094,8 +1106,9 @@ async function sendAction(action, idx, target) {
   const etBtn = document.getElementById("btn-end-turn");
   etBtn.disabled = true;
 
-  const prevSnap   = snapshotBoards();
-  const prevHeroHp = { p1: gameState.p1.hp, p2: gameState.p2.hp };
+  const prevSnap     = snapshotBoards();
+  const prevHeroSnap = { p1: { hp: gameState.p1.hp, armor: gameState.p1.armor || 0 },
+                         p2: { hp: gameState.p2.hp, armor: gameState.p2.armor || 0 } };
 
   try {
     const res = await fetch("/api/action", {
@@ -1111,7 +1124,7 @@ async function sendAction(action, idx, target) {
       gameState = data;
       renderGame();
       applyPostRenderAnimations(prevSnap);
-      applyHeroAnimations(prevHeroHp);
+      applyHeroAnimations(prevHeroSnap);
     }
   } catch (err) {
     spawnFloat("Network error!", "var(--col-red)", null, "normal");
@@ -1130,8 +1143,9 @@ async function endTurn() {
   etBtn.disabled = true;
   setAiThinking(true);
 
-  const prevSnap   = snapshotBoards();
-  const prevHeroHp = { p1: gameState.p1.hp, p2: gameState.p2.hp };
+  const prevSnap     = snapshotBoards();
+  const prevHeroSnap = { p1: { hp: gameState.p1.hp, armor: gameState.p1.armor || 0 },
+                         p2: { hp: gameState.p2.hp, armor: gameState.p2.armor || 0 } };
 
   try {
     const res  = await fetch("/api/action", {
@@ -1152,7 +1166,7 @@ async function endTurn() {
     renderGame();
     if (!gameState.winner) showTurnBanner(true);
     applyPostRenderAnimations(prevSnap);
-    applyHeroAnimations(prevHeroHp);
+    applyHeroAnimations(prevHeroSnap);
   } catch (err) {
     spawnFloat("Network error!", "var(--col-red)", null, "normal");
     setAiThinking(false);
