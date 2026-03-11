@@ -12,10 +12,10 @@ import random
 
 CARD_DB = {
     # ---------- Standard cards ----------
-    "Town Crier":       {"type": "minion", "cost": 1, "atk": 2, "hp": 1, "taunt": False, "icon": "TC"},
+    "Town Crier":       {"type": "minion", "cost": 1, "atk": 1, "hp": 2, "taunt": False, "icon": "TC"},
     "Castle Guard":     {"type": "minion", "cost": 2, "atk": 2, "hp": 3, "taunt": True,  "icon": "CG"},
-    "Highwayman":       {"type": "minion", "cost": 3, "atk": 4, "hp": 2, "taunt": False, "icon": "HW"},
-    "Errant Knight":    {"type": "minion", "cost": 3, "atk": 3, "hp": 1, "charge": True, "icon": "EK"},
+    "Highwayman":       {"type": "minion", "cost": 3, "atk": 3, "hp": 3, "taunt": False, "icon": "HW"},
+    "Errant Knight":    {"type": "minion", "cost": 3, "atk": 3, "hp": 2, "charge": True, "icon": "EK"},
     "Templar Captain":  {"type": "minion", "cost": 4, "atk": 3, "hp": 3, "taunt": True,  "divine_shield": True, "icon": "TP"},
     "Storybook Dragon": {"type": "minion", "cost": 5, "atk": 5, "hp": 6, "taunt": False, "icon": "SD"},
     "Cave Spider":      {"type": "minion", "cost": 2, "atk": 1, "hp": 2, "poisonous": True, "icon": "CS"},
@@ -32,7 +32,7 @@ CARD_DB = {
     "Heroic Blade":     {"type": "weapon", "cost": 3, "atk": 3, "durability": 2, "icon": "HB"},
 
     # ---------- Legendary minions (max 1 copy per deck) ----------
-    "Sherlock Holmes": {"type": "minion", "cost": 4, "atk": 2, "hp": 6,
+    "Sherlock Holmes": {"type": "minion", "cost": 5, "atk": 2, "hp": 6,
                         "battlecry": {"effect": "draw_cards", "val": 2},
                         "legendary": True, "icon": "SH"},
     "Dr. John Watson": {"type": "minion", "cost": 4, "atk": 3, "hp": 5,
@@ -41,7 +41,7 @@ CARD_DB = {
     "Professor Moriarty": {"type": "minion", "cost": 6, "atk": 5, "hp": 5, "poisonous": True,
                            "deathrattle": {"effect": "dmg_hero", "val": 3},
                            "legendary": True, "icon": "PM"},
-    "Van Helsing": {"type": "minion", "cost": 5, "atk": 5, "hp": 4, "charge": True,
+    "Van Helsing": {"type": "minion", "cost": 5, "atk": 5, "hp": 3, "charge": True,
                     "legendary": True, "icon": "VH"},
     "Victor Frankenstein": {"type": "minion", "cost": 4, "atk": 3, "hp": 6,
                             "battlecry": {"effect": "draw_cards", "val": 1},
@@ -52,10 +52,10 @@ CARD_DB = {
     "Alice": {"type": "minion", "cost": 3, "atk": 3, "hp": 4,
               "battlecry": {"effect": "draw_cards", "val": 1},
               "legendary": True, "icon": "AL"},
-    "The Mad Hatter": {"type": "minion", "cost": 5, "atk": 4, "hp": 5,
+    "The Mad Hatter": {"type": "minion", "cost": 6, "atk": 4, "hp": 5,
                        "battlecry": {"effect": "draw_cards", "val": 2},
                        "legendary": True, "icon": "MH"},
-    "The White Rabbit": {"type": "minion", "cost": 2, "atk": 2, "hp": 3, "charge": True,
+    "The White Rabbit": {"type": "minion", "cost": 3, "atk": 2, "hp": 3, "charge": True,
                          "legendary": True, "icon": "RB"},
     "The Queen of Hearts": {"type": "minion", "cost": 6, "atk": 6, "hp": 5, "taunt": True,
                             "legendary": True, "icon": "QH"},
@@ -68,17 +68,17 @@ CARD_DB = {
                  "legendary": True, "icon": "RP"},
     "Sleeping Beauty": {"type": "minion", "cost": 3, "atk": 2, "hp": 5, "divine_shield": True,
                         "legendary": True, "icon": "SB"},
-    "Little Red Riding Hood": {"type": "minion", "cost": 3, "atk": 4, "hp": 3, "charge": True,
+    "Little Red Riding Hood": {"type": "minion", "cost": 4, "atk": 4, "hp": 3, "charge": True,
                                "legendary": True, "icon": "LR"},
     "Rumpelstiltskin": {"type": "minion", "cost": 5, "atk": 4, "hp": 4,
                         "deathrattle": {"effect": "dmg_hero", "val": 3},
                         "legendary": True, "icon": "RU"},
-    "The Big Bad Wolf": {"type": "minion", "cost": 5, "atk": 5, "hp": 4, "charge": True,
+    "The Big Bad Wolf": {"type": "minion", "cost": 5, "atk": 5, "hp": 3, "charge": True,
                          "legendary": True, "icon": "BW"},
     "Pied Piper": {"type": "minion", "cost": 4, "atk": 3, "hp": 5,
                    "battlecry": {"effect": "draw_cards", "val": 1},
                    "legendary": True, "icon": "PP"},
-    "Baba Yaga": {"type": "minion", "cost": 6, "atk": 5, "hp": 6, "poisonous": True,
+    "Baba Yaga": {"type": "minion", "cost": 6, "atk": 5, "hp": 5, "poisonous": True,
                   "legendary": True, "icon": "BY"},
     "Bluebeard": {"type": "minion", "cost": 5, "atk": 6, "hp": 4, "taunt": True,
                   "legendary": True, "icon": "BB"},
@@ -87,18 +87,18 @@ CARD_DB = {
     "Merlin": {"type": "minion", "cost": 6, "atk": 4, "hp": 7,
                "battlecry": {"effect": "draw_cards", "val": 2},
                "legendary": True, "icon": "ME"},
-    "Lancelot": {"type": "minion", "cost": 5, "atk": 5, "hp": 5, "charge": True,
+    "Lancelot": {"type": "minion", "cost": 5, "atk": 5, "hp": 4, "charge": True,
                  "legendary": True, "icon": "LT"},
     "Guinevere": {"type": "minion", "cost": 4, "atk": 3, "hp": 6, "divine_shield": True,
                   "legendary": True, "icon": "GV"},
     "Morgan le Fay": {"type": "minion", "cost": 6, "atk": 5, "hp": 5, "poisonous": True,
                       "legendary": True, "icon": "MF"},
-    "Mordred": {"type": "minion", "cost": 6, "atk": 7, "hp": 4,
+    "Mordred": {"type": "minion", "cost": 6, "atk": 6, "hp": 4,
                 "deathrattle": {"effect": "dmg_hero", "val": 3},
                 "legendary": True, "icon": "MD"},
     "Gawain": {"type": "minion", "cost": 5, "atk": 4, "hp": 6, "taunt": True,
                "legendary": True, "icon": "GW"},
-    "Robin Hood": {"type": "minion", "cost": 4, "atk": 4, "hp": 4, "charge": True,
+    "Robin Hood": {"type": "minion", "cost": 4, "atk": 4, "hp": 3, "charge": True,
                    "legendary": True, "icon": "RH"},
     "Maid Marian": {"type": "minion", "cost": 3, "atk": 3, "hp": 4,
                     "battlecry": {"effect": "heal_hero", "val": 3},
@@ -107,7 +107,7 @@ CARD_DB = {
                    "legendary": True, "icon": "FT"},
     "Little John": {"type": "minion", "cost": 4, "atk": 5, "hp": 4, "taunt": True,
                     "legendary": True, "icon": "LJ"},
-    "Will Scarlet": {"type": "minion", "cost": 3, "atk": 4, "hp": 2, "charge": True,
+    "Will Scarlet": {"type": "minion", "cost": 3, "atk": 3, "hp": 2, "charge": True,
                      "legendary": True, "icon": "WS"},
     "Ebenezer Scrooge": {"type": "minion", "cost": 5, "atk": 3, "hp": 7,
                          "battlecry": {"effect": "draw_cards", "val": 2},
@@ -122,8 +122,8 @@ CARD_DB = {
     "Elixir of Life":  {"type": "spell",  "cost": 2, "effect": "heal",       "val": 4, "icon": "EL"},
 }
 
-HERO_CLASSES = ["Mage", "Warrior", "Priest"]
-HERO_ICONS   = {"Mage": "MG", "Warrior": "WR", "Priest": "PR"}
+HERO_CLASSES = ["Mage", "Warrior", "Priest", "Rogue"]
+HERO_ICONS   = {"Mage": "MG", "Warrior": "WR", "Priest": "PR", "Rogue": "RG"}
 
 KW_COLORS = {
     "taunt": "#E74C3C", "divine_shield": "#F1C40F", "charge": "#2ECC71",
@@ -212,6 +212,28 @@ def start_turn(player: dict, on_event=None) -> None:
     draw_card(player, on_event)
 
 
+def do_mulligan(player: dict, swap_indices: list) -> None:
+    """Swap selected hand cards back into the deck and draw replacements.
+
+    Cards at *swap_indices* are returned to a shuffled deck slot, then the
+    player draws that many new cards.  Cards NOT in swap_indices are kept.
+    """
+    if not swap_indices:
+        return
+    # Gather cards to swap, keeping their order irrelevant
+    to_swap = []
+    for i in sorted(set(swap_indices), reverse=True):
+        if 0 <= i < len(player["hand"]):
+            to_swap.append(player["hand"].pop(i))
+    # Put them back into the deck at random positions
+    for card in to_swap:
+        insert_pos = random.randint(0, len(player["deck"]))
+        player["deck"].insert(insert_pos, card)
+    # Draw replacements
+    for _ in range(len(to_swap)):
+        draw_card(player)
+
+
 # ---------------------------------------------------------------------------
 # 3. CORE RULES & LOGIC
 # ---------------------------------------------------------------------------
@@ -278,6 +300,8 @@ def get_legal_moves(player: dict, opp: dict) -> list:
         elif cls == "Priest":
             for t in ["hero"] + list(range(len(player["board"]))):
                 moves.append(("hero_power", None, t))
+        elif cls == "Rogue":
+            moves.append(("hero_power", None, None))
 
     return moves
 
@@ -479,6 +503,13 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
                 log_action(f">> {player['name']} uses Lesser Heal! Restores {amt} HP to {tm['name']}.")
                 notify("heal", player, target, amt)
 
+        elif cls == "Rogue":
+            # Dagger Mastery: equip (or refresh) a 1/2 Wicked Dagger
+            player["weapon"] = {"name": "Wicked Dagger", "atk": 1, "durability": 2}
+            player["hero_can_attack"] = True
+            log_action(f">> {player['name']} uses Dagger Mastery! Equipped a 1/2 Wicked Dagger.")
+            notify("armor", player, "hero", 0)
+
     cleanup_dead(player, opp, on_event)
 
 
@@ -620,6 +651,9 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
                 tm = p2["board"][target]
                 max_hp = tm.get("max_hp", tm["hp"])
                 score += 4 if tm["hp"] < max_hp else -5
+        elif cls == "Rogue":
+            # Dagger Mastery: equip 1/2 weapon — worth it if no weapon already
+            score += 4 if not p2.get("weapon") else -2
 
     return score
 
