@@ -377,11 +377,12 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
 
             elif card["effect"] == "buff":
                 if target is None or not (0 <= target < len(player["board"])):
+                    log_action(f"   [ERROR] {card_name} target out of range — card wasted!")
                     return
                 tm = player["board"][target]
+                tm["max_hp"]  = tm.get("max_hp", tm["hp"]) + card["val"][1]
                 tm["atk"]    += card["val"][0]
                 tm["hp"]     += card["val"][1]
-                tm["max_hp"]  = tm.get("max_hp", tm["hp"]) + card["val"][1]
                 log_action(f"   {player['name']} buffs {tm['name']} by +{card['val'][0]}/+{card['val'][1]}!")
                 notify("heal", player, target, card["val"][1])
 
@@ -404,9 +405,9 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             elif card["effect"] == "buff_all":
                 log_action(f"   {player['name']} rallies all minions with +{card['val'][0]}/+{card['val'][1]}!")
                 for i, tm in enumerate(player["board"]):
+                    tm["max_hp"] = tm.get("max_hp", tm["hp"]) + card["val"][1]
                     tm["atk"]   += card["val"][0]
                     tm["hp"]    += card["val"][1]
-                    tm["max_hp"] = tm.get("max_hp", tm["hp"]) + card["val"][1]
                     notify("heal", player, i, card["val"][1])
 
             elif card["effect"] == "heal_all":
@@ -424,6 +425,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
 
             elif card["effect"] == "add_shield":
                 if target is None or not (0 <= target < len(player["board"])):
+                    log_action(f"   [ERROR] {card_name} target out of range — card wasted!")
                     return
                 tm = player["board"][target]
                 tm["divine_shield"] = True
