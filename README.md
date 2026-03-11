@@ -5,7 +5,7 @@ A lightweight, browser-based card game inspired by Hearthstone. Play against an 
 ## Features
 
 - **4 Hero Classes** — Mage, Warrior, Priest, and Rogue, each with a unique hero power
-- **53-card library** — Literary-themed minions, spells, and a weapon with distinct mechanics, plus 34 Legendary storybook heroes and villains
+- **56-card library** — Literary-themed minions, spells, and a weapon with distinct mechanics, plus 34 Legendary storybook heroes and villains
 - **Rich card mechanics** — Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle
 - **Mulligan phase** — Select any opening-hand cards to redraw before each game starts
 - **Literary Legends** — Legendary minions inspired by Sherlock Holmes, Dr. John Watson, Professor Moriarty, Van Helsing, Victor Frankenstein, Frankenstein's Monster, Alice, The Mad Hatter, The White Rabbit, The Queen of Hearts, The Cheshire Cat, Snow White, Rapunzel, Sleeping Beauty, Little Red Riding Hood, Rumpelstiltskin, The Big Bad Wolf, Pied Piper, Baba Yaga, Bluebeard, King Arthur, Merlin, Lancelot, Guinevere, Morgan le Fay, Mordred, Gawain, Robin Hood, Maid Marian, Friar Tuck, Little John, Will Scarlet, Ebenezer Scrooge, and Oliver Twist (max 1 copy per deck)
@@ -77,38 +77,38 @@ These legendary minions are based on classic literature and folklore and have a 
 
 | Card | Cost | ATK | HP | Keywords / Ability | Source |
 |------|------|-----|----|--------------------|--------|
-| Sherlock Holmes | 4 | 2 | 6 | Battlecry: draw 2 cards | *Sherlock Holmes* (Doyle) |
+| Sherlock Holmes | 5 | 2 | 6 | Battlecry: draw 2 cards | *Sherlock Holmes* (Doyle) |
 | Dr. John Watson | 4 | 3 | 5 | Battlecry: heal hero 4 | *Sherlock Holmes* (Doyle) |
 | Professor Moriarty | 6 | 5 | 5 | Poisonous · Deathrattle: deal 3 dmg | *Sherlock Holmes* (Doyle) |
 | Van Helsing | 5 | 5 | 4 | Charge | *Dracula* (Stoker) |
 | Victor Frankenstein | 4 | 3 | 6 | Battlecry: draw 1 card | *Frankenstein* (Shelley) |
 | Frankenstein's Monster | 6 | 6 | 6 | Taunt · Deathrattle: deal 3 dmg | *Frankenstein* (Shelley) |
 | Alice | 3 | 3 | 4 | Battlecry: draw 1 card | *Alice's Adventures in Wonderland* (Carroll) |
-| The Mad Hatter | 5 | 4 | 5 | Battlecry: draw 2 cards | *Alice's Adventures in Wonderland* (Carroll) |
-| The White Rabbit | 2 | 2 | 3 | Charge | *Alice's Adventures in Wonderland* (Carroll) |
+| The Mad Hatter | 6 | 4 | 5 | Battlecry: draw 2 cards | *Alice's Adventures in Wonderland* (Carroll) |
+| The White Rabbit | 3 | 2 | 3 | Charge | *Alice's Adventures in Wonderland* (Carroll) |
 | The Queen of Hearts | 6 | 6 | 5 | Taunt | *Alice's Adventures in Wonderland* (Carroll) |
 | The Cheshire Cat | 4 | 4 | 4 | Divine Shield | *Alice's Adventures in Wonderland* (Carroll) |
 | Snow White | 5 | 3 | 7 | Divine Shield | *Snow White* (Grimm) |
 | Rapunzel | 4 | 2 | 6 | Battlecry: heal hero 3 | *Rapunzel* (Grimm) |
 | Sleeping Beauty | 3 | 2 | 5 | Divine Shield | *Sleeping Beauty* (Perrault/Grimm) |
-| Little Red Riding Hood | 3 | 4 | 3 | Charge | *Little Red Riding Hood* (Perrault/Grimm) |
+| Little Red Riding Hood | 4 | 4 | 3 | Charge | *Little Red Riding Hood* (Perrault/Grimm) |
 | Rumpelstiltskin | 5 | 4 | 4 | Deathrattle: deal 3 dmg | *Rumpelstiltskin* (Grimm) |
-| The Big Bad Wolf | 5 | 5 | 4 | Charge | *Little Red Riding Hood* (Perrault/Grimm) |
+| The Big Bad Wolf | 5 | 5 | 3 | Charge | *Little Red Riding Hood* (Perrault/Grimm) |
 | Pied Piper | 4 | 3 | 5 | Battlecry: draw 1 card | *The Pied Piper of Hamelin* (Browning/Grimm) |
-| Baba Yaga | 6 | 5 | 6 | Poisonous | Slavic folklore |
-| Bluebeard | 5 | 6 | 4 | Taunt | *Bluebeard* (Perrault) |
+| Baba Yaga | 6 | 5 | 5 | Poisonous | Slavic folklore |
+| Bluebeard | 5 | 5 | 4 | Taunt | *Bluebeard* (Perrault) |
 | King Arthur | 7 | 6 | 8 | Taunt | Arthurian legend |
 | Merlin | 6 | 4 | 7 | Battlecry: draw 2 cards | Arthurian legend |
-| Lancelot | 5 | 5 | 5 | Charge | Arthurian legend |
+| Lancelot | 5 | 5 | 3 | Charge | Arthurian legend |
 | Guinevere | 4 | 3 | 6 | Divine Shield | Arthurian legend |
 | Morgan le Fay | 6 | 5 | 5 | Poisonous | Arthurian legend |
-| Mordred | 6 | 7 | 4 | Deathrattle: deal 3 dmg | Arthurian legend |
+| Mordred | 6 | 6 | 4 | Deathrattle: deal 3 dmg | Arthurian legend |
 | Gawain | 5 | 4 | 6 | Taunt | Arthurian legend |
-| Robin Hood | 4 | 4 | 4 | Charge | English folklore |
+| Robin Hood | 4 | 4 | 3 | Charge | English folklore |
 | Maid Marian | 3 | 3 | 4 | Battlecry: heal hero 3 | English folklore |
 | Friar Tuck | 4 | 3 | 6 | Taunt | English folklore |
-| Little John | 4 | 5 | 4 | Taunt | English folklore |
-| Will Scarlet | 3 | 4 | 2 | Charge | English folklore |
+| Little John | 4 | 4 | 5 | Taunt | English folklore |
+| Will Scarlet | 3 | 3 | 2 | Charge | English folklore |
 | Ebenezer Scrooge | 5 | 3 | 7 | Battlecry: draw 2 cards | *A Christmas Carol* (Dickens) |
 | Oliver Twist | 3 | 3 | 3 | Battlecry: draw 1 card | *Oliver Twist* (Dickens) |
 
@@ -119,6 +119,9 @@ These legendary minions are based on classic literature and folklore and have a 
 | Library Whisper | 1 | Draw 1 card |
 | Nevermore | 3 | Deal 4 damage |
 | Elixir of Life | 2 | Restore 4 HP |
+| Rallying Banner | 3 | Give all friendly minions +1/+1 |
+| Circle of Mending | 3 | Restore 3 HP to all friendly characters |
+| Enchanted Shield | 2 | Give a friendly minion Divine Shield |
 
 ### Core Set Minions & Spells
 

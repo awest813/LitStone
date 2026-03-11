@@ -475,6 +475,9 @@ function spellDesc(card, short = false) {
   if (e === "draw")       return short ? `Draw ${v} Cards`     : `Draw ${v} cards.`;
   if (e === "damage_all") return short ? `AoE ${v} Dmg`        : `Deal ${v} dmg to all enemy minions.`;
   if (e === "buff")       return short ? `Buff +${v[0]}/+${v[1]}` : `Give a minion +${v[0]}/+${v[1]}.`;
+  if (e === "buff_all")   return short ? `Buff All +${v[0]}/+${v[1]}` : `Give all friendly minions +${v[0]}/+${v[1]}.`;
+  if (e === "heal_all")   return short ? `Heal All ${v} HP`   : `Restore ${v} HP to all friendly characters.`;
+  if (e === "add_shield") return short ? `Add Shield`          : `Give a friendly minion Divine Shield.`;
   return "";
 }
 
@@ -793,6 +796,7 @@ function isValidHeroTarget(isOpp) {
   if (actionType === "play") {
     const card = CARD_DB[gameState.p1.hand[selected.idx]];
     if (card?.effect === "damage" && !isOpp) return false;
+    if (card?.effect === "add_shield") return false;
   }
   if (actionType === "hero_power") {
     if (gameState.p1.hero_class === "Priest" &&  isOpp) return false;
@@ -821,7 +825,7 @@ function isValidMinionTarget(boardIdx, isOpp) {
   if ((actionType === "attack" || actionType === "hero_attack") && !isOpp) return false;
   if (actionType === "play") {
     const card = CARD_DB[gameState.p1.hand[selected.idx]];
-    if (card?.effect === "buff"   &&  isOpp) return false;
+    if (["buff", "add_shield"].includes(card?.effect) &&  isOpp) return false;
     if (card?.effect === "damage" && !isOpp) return false;
   }
   if (actionType === "hero_power") {
@@ -1091,12 +1095,12 @@ function handleHandClick(idx, p1, name, card, affordable) {
     return;
   }
   if (card.type === "spell") {
-    if (["heal", "draw", "damage_all"].includes(card.effect)) {
+    if (["heal", "draw", "damage_all", "buff_all", "heal_all"].includes(card.effect)) {
       sendAction("play", idx, null);
       return;
     }
-    if (card.effect === "buff" && p1.board.length === 0) {
-      spawnFloat("No friendly minions to buff!", "var(--col-red)", null, "normal");
+    if (["buff", "add_shield"].includes(card.effect) && p1.board.length === 0) {
+      spawnFloat("No friendly minions to target!", "var(--col-red)", null, "normal");
       return;
     }
     selected = { type: "hand", idx };
