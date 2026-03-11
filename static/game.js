@@ -41,7 +41,7 @@ const CARD_EMOJIS = {
   CS:"🕷️", CC:"🙏", TA:"⚗️", QB:"✒️", IV:"🔥", HY:"🎶",
   DC:"🔍", RA:"🎯", FB:"✨", HB:"🗡️",
   // Literary support spells
-  LW:"📖", NV:"🪶", EL:"🧪",
+  LW:"📖", NV:"🪶", EL:"🧪", RL:"🚩", CM:"💚", EN:"🔰",
   // Legendary minions
   SH:"🕵️", JW:"🩺", PM:"♟️", VH:"🏹", VF:"🔬", FM:"🧟", AL:"🗝️", MH:"🎩",
   RB:"🐇", QH:"♥️", CH:"😼", SW:"🍎", RP:"🧵", SB:"😴", LR:"🧺", RU:"🪙",
@@ -400,6 +400,8 @@ function toggleMulliganCard(el, idx) {
 
 async function confirmMulligan() {
   const indices = Array.from(mulliganSwapSet);
+  const btn = document.getElementById("btn-mulligan-confirm");
+  if (btn) btn.disabled = true;
   try {
     const res  = await fetch("/api/mulligan", {
       method: "POST",
@@ -409,19 +411,21 @@ async function confirmMulligan() {
     const data = await res.json();
     if (data.error) {
       showStatusToast(data.error);
+      if (btn) btn.disabled = false;
       return;
     }
     CARD_DB          = data.card_db || CARD_DB;
     gameState        = data;
     selected         = null;
     prevIsPlayerTurn = null;
-    turnNumber       = 1;
+    turnNumber       = data.turn_number || 1;
     isActing         = false;
     showScreen("screen-game");
     showTurnBanner(true);
     renderGame();
   } catch (err) {
     showStatusToast("Network error during mulligan.");
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -442,7 +446,7 @@ async function startGame() {
     } else {
       selected         = null;
       prevIsPlayerTurn = null;
-      turnNumber       = 1;
+      turnNumber       = data.turn_number || 1;
       showScreen("screen-game");
       showTurnBanner(true);
       renderGame();
@@ -1086,7 +1090,13 @@ function handleHandClick(idx, p1, name, card, affordable) {
   clearSelection();
 
   if (card.type === "minion") {
-    if (p1.board.length >= 7) { spawnFloat("Board is full!", "var(--col-red)", null, "normal"); return; }
+    const handEl  = document.getElementById("hand-player");
+    const cardEls = handEl ? handEl.querySelectorAll(".hand-card") : [];
+    if (p1.board.length >= 7) {
+      spawnFloat("Board is full!", "var(--col-red)", cardEls[idx] || null, "small");
+      shakeElement(cardEls[idx]);
+      return;
+    }
     sendAction("play", idx, null);
     return;
   }
@@ -1100,7 +1110,10 @@ function handleHandClick(idx, p1, name, card, affordable) {
       return;
     }
     if (["buff", "add_shield"].includes(card.effect) && p1.board.length === 0) {
-      spawnFloat("No friendly minions to target!", "var(--col-red)", null, "normal");
+      const handEl  = document.getElementById("hand-player");
+      const cardEls = handEl ? handEl.querySelectorAll(".hand-card") : [];
+      spawnFloat("No friendly minions!", "var(--col-red)", cardEls[idx] || null, "small");
+      shakeElement(cardEls[idx]);
       return;
     }
     selected = { type: "hand", idx };
@@ -1122,10 +1135,9 @@ function handleMinionClick(idx, isOpp, player, minion) {
   if (selected) {
     const targetValid = isValidMinionTarget(idx, isOpp);
     if (!targetValid) {
-      spawnFloat("Invalid target!", "var(--col-red)", null, "normal");
-      // Shake the clicked element
       const boardEl = document.getElementById(isOpp ? "board-opp" : "board-player");
       const cards   = boardEl ? boardEl.querySelectorAll(".minion-card") : [];
+      spawnFloat("Invalid target!", "var(--col-red)", cards[idx] || null, "small");
       shakeElement(cards[idx]);
       return;
     }
@@ -1150,8 +1162,9 @@ function handleHeroClick(isOpp, player) {
 
   if (selected) {
     if (!isValidHeroTarget(isOpp)) {
-      spawnFloat("Invalid target!", "var(--col-red)", null, "normal");
-      shakeElement(document.getElementById(isOpp ? "hero-opp" : "hero-player"));
+      const heroEl = document.getElementById(isOpp ? "hero-opp" : "hero-player");
+      spawnFloat("Invalid target!", "var(--col-red)", heroEl, "small");
+      shakeElement(heroEl);
       return;
     }
 
@@ -1269,10 +1282,8 @@ async function endTurn() {
     CARD_DB   = data.card_db || CARD_DB;
     gameState = data;
     setAiThinking(false);
-    // The server processes the entire AI turn synchronously, so the client
-    // never sees is_player_turn=false. Increment turn counter first so
-    // renderGame() picks it up for the badge, then fire the banner.
-    if (!gameState.winner) turnNumber++;
+    // Sync turn counter from server; fall back to client increment for resilience.
+    if (!gameState.winner) turnNumber = gameState.turn_number || (turnNumber + 1);
     renderGame();
     if (!gameState.winner) showTurnBanner(true);
     applyPostRenderAnimations(prevSnap);
