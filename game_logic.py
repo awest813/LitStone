@@ -41,7 +41,7 @@ CARD_DB = {
     "Professor Moriarty": {"type": "minion", "cost": 6, "atk": 5, "hp": 5, "poisonous": True,
                            "deathrattle": {"effect": "dmg_hero", "val": 3},
                            "legendary": True, "icon": "PM"},
-    "Van Helsing": {"type": "minion", "cost": 5, "atk": 5, "hp": 3, "charge": True,
+    "Van Helsing": {"type": "minion", "cost": 5, "atk": 5, "hp": 4, "charge": True,
                     "legendary": True, "icon": "VH"},
     "Victor Frankenstein": {"type": "minion", "cost": 4, "atk": 3, "hp": 6,
                             "battlecry": {"effect": "draw_cards", "val": 1},
@@ -80,14 +80,14 @@ CARD_DB = {
                    "legendary": True, "icon": "PP"},
     "Baba Yaga": {"type": "minion", "cost": 6, "atk": 5, "hp": 5, "poisonous": True,
                   "legendary": True, "icon": "BY"},
-    "Bluebeard": {"type": "minion", "cost": 5, "atk": 6, "hp": 4, "taunt": True,
+    "Bluebeard": {"type": "minion", "cost": 5, "atk": 5, "hp": 4, "taunt": True,
                   "legendary": True, "icon": "BB"},
     "King Arthur": {"type": "minion", "cost": 7, "atk": 6, "hp": 8, "taunt": True,
                    "legendary": True, "icon": "KA"},
     "Merlin": {"type": "minion", "cost": 6, "atk": 4, "hp": 7,
                "battlecry": {"effect": "draw_cards", "val": 2},
                "legendary": True, "icon": "ME"},
-    "Lancelot": {"type": "minion", "cost": 5, "atk": 5, "hp": 4, "charge": True,
+    "Lancelot": {"type": "minion", "cost": 5, "atk": 5, "hp": 3, "charge": True,
                  "legendary": True, "icon": "LT"},
     "Guinevere": {"type": "minion", "cost": 4, "atk": 3, "hp": 6, "divine_shield": True,
                   "legendary": True, "icon": "GV"},
@@ -105,7 +105,7 @@ CARD_DB = {
                     "legendary": True, "icon": "MM"},
     "Friar Tuck": {"type": "minion", "cost": 4, "atk": 3, "hp": 6, "taunt": True,
                    "legendary": True, "icon": "FT"},
-    "Little John": {"type": "minion", "cost": 4, "atk": 5, "hp": 4, "taunt": True,
+    "Little John": {"type": "minion", "cost": 4, "atk": 4, "hp": 5, "taunt": True,
                     "legendary": True, "icon": "LJ"},
     "Will Scarlet": {"type": "minion", "cost": 3, "atk": 3, "hp": 2, "charge": True,
                      "legendary": True, "icon": "WS"},
@@ -120,6 +120,9 @@ CARD_DB = {
     "Library Whisper": {"type": "spell",  "cost": 1, "effect": "draw",       "val": 1, "icon": "LW"},
     "Nevermore":       {"type": "spell",  "cost": 3, "effect": "damage",     "val": 4, "icon": "NV"},
     "Elixir of Life":  {"type": "spell",  "cost": 2, "effect": "heal",       "val": 4, "icon": "EL"},
+    "Rallying Banner": {"type": "spell",  "cost": 3, "effect": "buff_all",   "val": [1, 1], "icon": "RL"},
+    "Circle of Mending": {"type": "spell", "cost": 3, "effect": "heal_all",  "val": 3, "icon": "CM"},
+    "Enchanted Shield": {"type": "spell", "cost": 2, "effect": "add_shield", "val": 1, "icon": "EN"},
 }
 
 HERO_CLASSES = ["Mage", "Warrior", "Priest", "Rogue"]
@@ -144,6 +147,9 @@ def get_spell_desc(card: dict, short: bool = False) -> str:
     if e == "draw":       return f"Draw {v} Cards"          if short else f"Draw {v} cards."
     if e == "damage_all": return f"AoE Dmg {v}"             if short else f"Deal {v} dmg to all enemies."
     if e == "buff":       return f"Buff +{v[0]}/+{v[1]}"   if short else f"Give a minion +{v[0]}/+{v[1]}."
+    if e == "buff_all":   return f"Buff All +{v[0]}/+{v[1]}" if short else f"Give all friendly minions +{v[0]}/+{v[1]}."
+    if e == "heal_all":   return f"Heal All {v} HP"         if short else f"Restore {v} HP to all friendly characters."
+    if e == "add_shield": return "Add Shield"               if short else "Give a friendly minion Divine Shield."
     return ""
 
 
@@ -269,12 +275,12 @@ def get_legal_moves(player: dict, opp: dict) -> list:
             if len(player["board"]) < 7:
                 moves.append(("play", hand_idx, None))
         elif card["type"] == "spell":
-            if card["effect"] in ("heal", "draw", "damage_all"):
+            if card["effect"] in ("heal", "draw", "damage_all", "buff_all", "heal_all"):
                 moves.append(("play", hand_idx, None))
             elif card["effect"] == "damage":
                 for t in get_valid_targets(opp, is_attack=False):
                     moves.append(("play", hand_idx, t))
-            elif card["effect"] == "buff":
+            elif card["effect"] in ("buff", "add_shield"):
                 for t in range(len(player["board"])):
                     moves.append(("play", hand_idx, t))
         elif card["type"] == "weapon":
@@ -394,6 +400,35 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
                         tm["hp"] -= card["val"]
                         log_action(f"   Deals {card['val']} damage to {tm['name']}.")
                         notify("damage", opp, target, card["val"])
+
+            elif card["effect"] == "buff_all":
+                log_action(f"   {player['name']} rallies all minions with +{card['val'][0]}/+{card['val'][1]}!")
+                for i, tm in enumerate(player["board"]):
+                    tm["atk"]   += card["val"][0]
+                    tm["hp"]    += card["val"][1]
+                    tm["max_hp"] = tm.get("max_hp", tm["hp"]) + card["val"][1]
+                    notify("heal", player, i, card["val"][1])
+
+            elif card["effect"] == "heal_all":
+                log_action(f"   {player['name']} mends all friendly characters for {card['val']} HP!")
+                amt_hero = max(0, min(card["val"], 30 - player["hp"]))
+                player["hp"] += amt_hero
+                if amt_hero:
+                    notify("heal", player, "hero", amt_hero)
+                for i, tm in enumerate(player["board"]):
+                    max_hp = tm.get("max_hp", tm["hp"])
+                    amt = max(0, min(card["val"], max_hp - tm["hp"]))
+                    tm["hp"] += amt
+                    if amt:
+                        notify("heal", player, i, amt)
+
+            elif card["effect"] == "add_shield":
+                if target is None or not (0 <= target < len(player["board"])):
+                    return
+                tm = player["board"][target]
+                tm["divine_shield"] = True
+                log_action(f"   {player['name']} grants Divine Shield to {tm['name']}!")
+                notify("heal", player, target, 0)
 
     # ---- ATTACK -------------------------------------------------------------
     elif action == "attack":
@@ -598,6 +633,22 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
                 tm = p2["board"][target]
                 if tm["can_attack"]: score += card["val"][0] * 3
                 if tm["hp"] > 2:     score += 2
+
+            elif card["effect"] == "buff_all":
+                n = len(p2["board"])
+                score += n * sum(card["val"]) if n else -8
+
+            elif card["effect"] == "heal_all":
+                heal_val = card["val"]
+                score += 3 if p2["hp"] < 20 else 0
+                score += sum(
+                    min(heal_val, m.get("max_hp", m["hp"]) - m["hp"])
+                    for m in p2["board"]
+                )
+
+            elif card["effect"] == "add_shield":
+                tm = p2["board"][target]
+                score += tm["atk"] * 2 if tm["can_attack"] else tm["hp"]
 
     elif action == "attack":
         attacker = p2["board"][idx]
