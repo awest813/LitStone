@@ -145,7 +145,7 @@ def get_spell_desc(card: dict, short: bool = False) -> str:
     if e == "damage":     return f"Deal {v} Dmg"            if short else f"Deal {v} damage."
     if e == "heal":       return f"Heal {v} HP"             if short else f"Restore {v} HP."
     if e == "draw":       return f"Draw {v} Cards"          if short else f"Draw {v} cards."
-    if e == "damage_all": return f"AoE Dmg {v}"             if short else f"Deal {v} dmg to all enemies."
+    if e == "damage_all": return f"AoE Dmg {v}"             if short else f"Deal {v} dmg to all enemy minions."
     if e == "buff":       return f"Buff +{v[0]}/+{v[1]}"   if short else f"Give a minion +{v[0]}/+{v[1]}."
     if e == "buff_all":   return f"Buff All +{v[0]}/+{v[1]}" if short else f"Give all friendly minions +{v[0]}/+{v[1]}."
     if e == "heal_all":   return f"Heal All {v} HP"         if short else f"Restore {v} HP to all friendly characters."
@@ -221,23 +221,26 @@ def start_turn(player: dict, on_event=None) -> None:
 def do_mulligan(player: dict, swap_indices: list) -> None:
     """Swap selected hand cards back into the deck and draw replacements.
 
-    Cards at *swap_indices* are returned to a shuffled deck slot, then the
-    player draws that many new cards.  Cards NOT in swap_indices are kept.
+    Replacement cards are drawn first (from the existing deck), then the
+    swapped cards are shuffled back in.  This guarantees the player can never
+    be redealt the exact cards they just chose to swap away.
+    Cards NOT in swap_indices are kept unchanged.
     """
     if not swap_indices:
         return
-    # Gather cards to swap, keeping their order irrelevant
+    # Gather cards to swap (removing from hand in reverse-index order)
     to_swap = []
     for i in sorted(set(swap_indices), reverse=True):
         if 0 <= i < len(player["hand"]):
             to_swap.append(player["hand"].pop(i))
-    # Put them back into the deck at random positions
+    # Draw replacements BEFORE returning the swapped cards so they cannot
+    # appear in the replacement draws.
+    for _ in range(len(to_swap)):
+        draw_card(player)
+    # Return swapped cards to random positions in the deck
     for card in to_swap:
         insert_pos = random.randint(0, len(player["deck"]))
         player["deck"].insert(insert_pos, card)
-    # Draw replacements
-    for _ in range(len(to_swap)):
-        draw_card(player)
 
 
 # ---------------------------------------------------------------------------
@@ -378,6 +381,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             elif card["effect"] == "buff":
                 if target is None or not (0 <= target < len(player["board"])):
                     log_action(f"   [ERROR] {card_name} target out of range — card wasted!")
+                    cleanup_dead(player, opp, on_event)
                     return
                 tm = player["board"][target]
                 tm["max_hp"]  = tm.get("max_hp", tm["hp"]) + card["val"][1]
@@ -426,6 +430,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             elif card["effect"] == "add_shield":
                 if target is None or not (0 <= target < len(player["board"])):
                     log_action(f"   [ERROR] {card_name} target out of range — card wasted!")
+                    cleanup_dead(player, opp, on_event)
                     return
                 tm = player["board"][target]
                 tm["divine_shield"] = True
@@ -621,7 +626,11 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
                     score += 1
 
             elif card["effect"] == "heal":
-                score += 5 if p2["hp"] < 15 else -5
+                # Score proportionally to how much healing is actually needed;
+                # small penalty if the AI is already close to full health.
+                hp_missing = 30 - p2["hp"]
+                effective_heal = min(card["val"], hp_missing)
+                score += effective_heal if effective_heal > 0 else -3
 
             elif card["effect"] == "draw":
                 score += card["val"] * 4 if len(p2["hand"]) < 9 else -10

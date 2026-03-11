@@ -140,6 +140,9 @@ def do_action():
     p1  = gs["p1"]
     p2  = gs["p2"]
 
+    if gs.get("mulligan_phase"):
+        return jsonify({"error": "Mulligan phase in progress"}), 400
+
     if not gs.get("is_player_turn"):
         return jsonify({"error": "Not your turn"}), 400
 

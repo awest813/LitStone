@@ -1154,6 +1154,14 @@ function handleMinionClick(idx, isOpp, player, minion) {
   if (!isOpp && minion.can_attack) {
     selected = { type: "board", idx };
     renderGame();
+    return;
+  }
+
+  // Clicking an enemy minion with nothing selected: hint the player
+  if (isOpp && !selected) {
+    const boardEl = document.getElementById("board-opp");
+    const cards   = boardEl ? boardEl.querySelectorAll(".minion-card") : [];
+    spawnFloat("Select your attacker first!", "var(--col-gold)", cards[idx] || null, "small");
   }
 }
 
@@ -1277,6 +1285,15 @@ async function endTurn() {
       body: JSON.stringify({ action: "end_turn", idx: null, target: null }),
     });
     const data = await res.json();
+    if (data.error) {
+      spawnFloat(data.error, "var(--col-red)", null, "normal");
+      setAiThinking(false);
+      if (gameState?.is_player_turn && !gameState?.winner) {
+        etBtn.textContent = "End Turn";
+        etBtn.disabled = false;
+      }
+      return;
+    }
     // Guard: player may have resigned while the AI was thinking
     if (gameState === null) return;
     CARD_DB   = data.card_db || CARD_DB;
