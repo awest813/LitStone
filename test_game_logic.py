@@ -386,6 +386,9 @@ class TestExecuteMove(unittest.TestCase):
         self.assertEqual(p1["weapon"]["atk"], 3)
         self.assertEqual(p1["weapon"]["durability"], 2)
         self.assertTrue(p1["hero_can_attack"])
+        # Verify the corrected cost (was 3, now 2)
+        from game_logic import CARD_DB
+        self.assertEqual(CARD_DB["Heroic Blade"]["cost"], 2)
 
     def test_play_damage_spell_hero(self):
         p1, p2 = self._setup_game()
@@ -514,6 +517,31 @@ class TestExecuteMove(unittest.TestCase):
         self.assertEqual(p2["board"][0]["hp"], 5)   # no damage
         self.assertEqual(p1["board"][0]["hp"], 2)   # attacker still takes retaliation
 
+    def test_attacker_divine_shield_not_consumed_by_zero_attack_defender(self):
+        """Divine shield must NOT be consumed when the defender has 0 attack (no retaliation)."""
+        p1, p2 = self._setup_game()
+        attacker = _make_minion("Attacker", 3, 4, can_attack=True, divine_shield=True)
+        p1["board"].append(attacker)
+        zero_atk_defender = _make_minion("Dummy", 0, 5)
+        p2["board"].append(zero_atk_defender)
+        execute_move(p1, p2, ("attack", 0, 0))
+        # Attacker's divine shield should still be intact — there was nothing to block
+        self.assertTrue(p1["board"][0].get("divine_shield"),
+                        "divine_shield was wrongly consumed by a 0-attack defender")
+        # Defender took damage normally
+        self.assertEqual(p2["board"][0]["hp"], 2)
+
+    def test_attacker_divine_shield_consumed_by_nonzero_attack_defender(self):
+        """Divine shield IS consumed when defender has non-zero attack."""
+        p1, p2 = self._setup_game()
+        attacker = _make_minion("Attacker", 3, 4, can_attack=True, divine_shield=True)
+        p1["board"].append(attacker)
+        defender = _make_minion("Defender", 2, 5)
+        p2["board"].append(defender)
+        execute_move(p1, p2, ("attack", 0, 0))
+        self.assertFalse(p1["board"][0].get("divine_shield"))  # consumed
+        self.assertEqual(p1["board"][0]["hp"], 4)   # no damage taken
+
     def test_poisonous_kills_defender(self):
         p1, p2 = self._setup_game()
         poison = _make_minion("PoisonMinion", 1, 4, can_attack=True, poisonous=True)
@@ -594,6 +622,60 @@ class TestExecuteMove(unittest.TestCase):
         # Tinker Alchemist should be dead and deathrattle should have fired
         self.assertEqual(len(p1["board"]), 0)
         self.assertEqual(p2["hp"], 28)  # deathrattle dealt 2 to opponent (p2 is the enemy)
+
+    def test_enchanted_shield_costs_one_mana(self):
+        """Enchanted Shield should cost 1 mana after balance fix."""
+        p1, p2 = self._setup_game()
+        p1["mana"] = 1
+        p1["max_mana"] = 1
+        p1["board"].append(_make_minion("Town Crier", 1, 2))
+        p1["hand"] = ["Enchanted Shield"]
+        execute_move(p1, p2, ("play", 0, 0))
+        self.assertTrue(p1["board"][0]["divine_shield"])
+        self.assertEqual(p1["mana"], 0)
+
+    def test_inkwell_blast_deals_one_to_all_enemy_minions(self):
+        """Inkwell Blast (2 mana) deals 1 damage to every enemy minion."""
+        p1, p2 = self._setup_game()
+        p2["board"].append(_make_minion("Opp1", 1, 3))
+        p2["board"].append(_make_minion("Opp2", 2, 1))  # will die
+        p1["hand"] = ["Inkwell Blast"]
+        execute_move(p1, p2, ("play", 0, None))
+        self.assertEqual(p2["board"][0]["hp"], 2)   # 3 - 1
+        self.assertEqual(len(p2["board"]), 1)        # Opp2 (1 hp) destroyed
+        self.assertEqual(p1["mana"], 8)              # 10 - 2
+
+    def test_merlin_battlecry_heals_hero(self):
+        """Merlin's battlecry should heal the hero for 6 HP (not draw cards)."""
+        p1, p2 = self._setup_game()
+        p1["hp"] = 20
+        p1["hand"] = ["Merlin"]
+        execute_move(p1, p2, ("play", 0, None))
+        self.assertEqual(p1["hp"], 26)  # 20 + 6 from Merlin's battlecry
+
+    def test_big_bad_wolf_is_poisonous_and_charge(self):
+        """The Big Bad Wolf should be both poisonous and charge after differentiation."""
+        from game_logic import CARD_DB
+        bbw = CARD_DB["The Big Bad Wolf"]
+        self.assertTrue(bbw.get("poisonous"), "Big Bad Wolf should be poisonous")
+        self.assertTrue(bbw.get("charge"), "Big Bad Wolf should have charge")
+
+    def test_little_red_riding_hood_different_stats_from_robin_hood(self):
+        """LRRH and Robin Hood should have different stat distributions."""
+        from game_logic import CARD_DB
+        lrrh = CARD_DB["Little Red Riding Hood"]
+        rh = CARD_DB["Robin Hood"]
+        self.assertNotEqual(
+            (lrrh["atk"], lrrh["hp"]), (rh["atk"], rh["hp"]),
+            "Little Red Riding Hood and Robin Hood should have different atk/hp"
+        )
+
+    def test_morgan_le_fay_has_divine_shield_not_poisonous(self):
+        """Morgan le Fay should be differentiated from Baba Yaga by using divine_shield."""
+        from game_logic import CARD_DB
+        mlf = CARD_DB["Morgan le Fay"]
+        self.assertFalse(mlf.get("poisonous"), "Morgan le Fay should no longer be poisonous")
+        self.assertTrue(mlf.get("divine_shield"), "Morgan le Fay should have divine_shield")
 
 
 class TestCheckWin(unittest.TestCase):
