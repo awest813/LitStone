@@ -29,7 +29,7 @@ CARD_DB = {
     "Deductive Clue":   {"type": "spell",  "cost": 3, "effect": "draw",       "val": 2, "icon": "DC"},
     "Rebel's Ambush":   {"type": "spell",  "cost": 4, "effect": "damage_all", "val": 2, "icon": "RA"},
     "Fairy Blessing":   {"type": "spell",  "cost": 2, "effect": "buff",       "val": [2, 2], "icon": "FB"},
-    "Heroic Blade":     {"type": "weapon", "cost": 3, "atk": 3, "durability": 2, "icon": "HB"},
+    "Heroic Blade":     {"type": "weapon", "cost": 2, "atk": 3, "durability": 2, "icon": "HB"},
 
     # ---------- Legendary minions (max 1 copy per deck) ----------
     "Sherlock Holmes": {"type": "minion", "cost": 5, "atk": 2, "hp": 6,
@@ -68,13 +68,13 @@ CARD_DB = {
                  "legendary": True, "icon": "RP"},
     "Sleeping Beauty": {"type": "minion", "cost": 3, "atk": 2, "hp": 5, "divine_shield": True,
                         "legendary": True, "icon": "SB"},
-    "Little Red Riding Hood": {"type": "minion", "cost": 4, "atk": 4, "hp": 3, "charge": True,
+    "Little Red Riding Hood": {"type": "minion", "cost": 4, "atk": 3, "hp": 5, "charge": True,
                                "legendary": True, "icon": "LR"},
     "Rumpelstiltskin": {"type": "minion", "cost": 5, "atk": 4, "hp": 4,
                         "deathrattle": {"effect": "dmg_hero", "val": 3},
                         "legendary": True, "icon": "RU"},
-    "The Big Bad Wolf": {"type": "minion", "cost": 5, "atk": 5, "hp": 3, "charge": True,
-                         "legendary": True, "icon": "BW"},
+    "The Big Bad Wolf": {"type": "minion", "cost": 5, "atk": 5, "hp": 2, "charge": True,
+                         "poisonous": True, "legendary": True, "icon": "BW"},
     "Pied Piper": {"type": "minion", "cost": 4, "atk": 3, "hp": 5,
                    "battlecry": {"effect": "draw_cards", "val": 1},
                    "legendary": True, "icon": "PP"},
@@ -85,13 +85,13 @@ CARD_DB = {
     "King Arthur": {"type": "minion", "cost": 7, "atk": 6, "hp": 8, "taunt": True,
                    "legendary": True, "icon": "KA"},
     "Merlin": {"type": "minion", "cost": 6, "atk": 4, "hp": 7,
-               "battlecry": {"effect": "draw_cards", "val": 2},
+               "battlecry": {"effect": "heal_hero", "val": 6},
                "legendary": True, "icon": "ME"},
     "Lancelot": {"type": "minion", "cost": 5, "atk": 5, "hp": 3, "charge": True,
                  "legendary": True, "icon": "LT"},
     "Guinevere": {"type": "minion", "cost": 4, "atk": 3, "hp": 6, "divine_shield": True,
                   "legendary": True, "icon": "GV"},
-    "Morgan le Fay": {"type": "minion", "cost": 6, "atk": 5, "hp": 5, "poisonous": True,
+    "Morgan le Fay": {"type": "minion", "cost": 6, "atk": 5, "hp": 6, "divine_shield": True,
                       "legendary": True, "icon": "MF"},
     "Mordred": {"type": "minion", "cost": 6, "atk": 6, "hp": 4,
                 "deathrattle": {"effect": "dmg_hero", "val": 3},
@@ -122,7 +122,8 @@ CARD_DB = {
     "Elixir of Life":  {"type": "spell",  "cost": 2, "effect": "heal",       "val": 4, "icon": "EL"},
     "Rallying Banner": {"type": "spell",  "cost": 3, "effect": "buff_all",   "val": [1, 1], "icon": "RL"},
     "Circle of Mending": {"type": "spell", "cost": 3, "effect": "heal_all",  "val": 3, "icon": "CM"},
-    "Enchanted Shield": {"type": "spell", "cost": 2, "effect": "add_shield", "val": 1, "icon": "EN"},
+    "Enchanted Shield": {"type": "spell", "cost": 1, "effect": "add_shield", "val": 1, "icon": "EN"},
+    "Inkwell Blast":    {"type": "spell", "cost": 2, "effect": "damage_all", "val": 1, "icon": "IB"},
 }
 
 HERO_CLASSES = ["Mage", "Warrior", "Priest", "Rogue"]
@@ -461,18 +462,18 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
                     defender["hp"] = 0
                     log_action(f"   [POISON] Poisonous destroys {defender['name']}!")
 
-            if attacker.get("divine_shield"):
-                attacker["divine_shield"] = False
-                log_action(f"   {attacker['name']}'s Divine Shield blocks retaliation!")
-                notify("blocked", player, idx, "BLOCKED!")
-            else:
-                attacker["hp"] -= defender["atk"]
-                notify("damage", player, idx, defender["atk"])
-                if defender["atk"] > 0:
+            if defender["atk"] > 0:
+                if attacker.get("divine_shield"):
+                    attacker["divine_shield"] = False
+                    log_action(f"   {attacker['name']}'s Divine Shield blocks retaliation!")
+                    notify("blocked", player, idx, "BLOCKED!")
+                else:
+                    attacker["hp"] -= defender["atk"]
+                    notify("damage", player, idx, defender["atk"])
                     log_action(f"   {attacker['name']} takes {defender['atk']} retaliation damage.")
-                if defender.get("poisonous") and defender["atk"] > 0:
-                    attacker["hp"] = 0
-                    log_action(f"   [POISON] Poisonous destroys {attacker['name']}!")
+                    if defender.get("poisonous"):
+                        attacker["hp"] = 0
+                        log_action(f"   [POISON] Poisonous destroys {attacker['name']}!")
 
     # ---- HERO ATTACK --------------------------------------------------------
     elif action == "hero_attack":
