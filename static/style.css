@@ -40,6 +40,7 @@
   --warrior-col:      #c0392b;
   --priest-col:       #d4820a;
   --rogue-col:        #1abc9c;
+  --paladin-col:      #c0a020;
 }
 
 body {
@@ -246,6 +247,7 @@ body::after {
 .warrior-glow { background: radial-gradient(circle, var(--warrior-col), transparent); }
 .priest-glow  { background: radial-gradient(circle, var(--priest-col), transparent); }
 .rogue-glow   { background: radial-gradient(circle, var(--rogue-col), transparent); }
+.paladin-glow { background: radial-gradient(circle, var(--paladin-col), transparent); }
 
 .hero-emblem {
   font-size: 58px;

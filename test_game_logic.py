@@ -886,6 +886,241 @@ class TestExecuteMoveCleanup(unittest.TestCase):
         self.assertEqual(len(p1["board"]), 0)
 
 
+class TestSilenceMechanic(unittest.TestCase):
+    """Tests for the Tome of Silence spell."""
+
+    def setUp(self):
+        GAME_LOG.clear()
+
+    def _setup_game(self):
+        p1 = create_player("P1", "Mage")
+        p2 = create_player("AI", "Warrior")
+        p1["mana"] = 10
+        p1["max_mana"] = 10
+        p2["mana"] = 10
+        p2["max_mana"] = 10
+        return p1, p2
+
+    def test_silence_removes_taunt(self):
+        p1, p2 = self._setup_game()
+        taunter = _make_minion("Castle Guard", 2, 3, taunt=True)
+        p2["board"].append(taunter)
+        p1["hand"] = ["Tome of Silence"]
+        execute_move(p1, p2, ("play", 0, 0))
+        self.assertFalse(p2["board"][0].get("taunt"), "Taunt should be removed after silence")
+
+    def test_silence_removes_divine_shield(self):
+        p1, p2 = self._setup_game()
+        shielded = _make_minion("Templar", 3, 3, divine_shield=True)
+        p2["board"].append(shielded)
+        p1["hand"] = ["Tome of Silence"]
+        execute_move(p1, p2, ("play", 0, 0))
+        self.assertFalse(p2["board"][0].get("divine_shield"))
+
+    def test_silence_removes_poisonous(self):
+        p1, p2 = self._setup_game()
+        poisoner = _make_minion("Cave Spider", 1, 2, poisonous=True)
+        p2["board"].append(poisoner)
+        p1["hand"] = ["Tome of Silence"]
+        execute_move(p1, p2, ("play", 0, 0))
+        self.assertFalse(p2["board"][0].get("poisonous"))
+
+    def test_silence_removes_deathrattle(self):
+        p1, p2 = self._setup_game()
+        dr_minion = _make_minion("DRMinion", 1, 3)
+        dr_minion["deathrattle"] = {"effect": "dmg_hero", "val": 3}
+        p2["board"].append(dr_minion)
+        p1["hand"] = ["Tome of Silence"]
+        execute_move(p1, p2, ("play", 0, 0))
+        self.assertNotIn("deathrattle", p2["board"][0], "Deathrattle should be removed after silence")
+
+    def test_silence_preserves_stats(self):
+        p1, p2 = self._setup_game()
+        minion = _make_minion("Minion", 4, 5, taunt=True, divine_shield=True)
+        p2["board"].append(minion)
+        p1["hand"] = ["Tome of Silence"]
+        execute_move(p1, p2, ("play", 0, 0))
+        self.assertEqual(p2["board"][0]["atk"], 4)
+        self.assertEqual(p2["board"][0]["hp"], 5)
+
+    def test_silence_targets_only_enemy_minions_in_legal_moves(self):
+        p1 = create_player("P1", "Mage")
+        p2 = create_player("AI", "Warrior")
+        p1["mana"] = 10
+        p1["max_mana"] = 10
+        p2["board"].append(_make_minion("EnemyM", 2, 3))
+        p1["board"].append(_make_minion("FriendlyM", 1, 2))
+        p1["hand"] = ["Tome of Silence"]
+        moves = get_legal_moves(p1, p2)
+        play_moves = [m for m in moves if m[0] == "play"]
+        # Only enemy board index 0 should be valid target, not hero, not friendly
+        self.assertIn(("play", 0, 0), play_moves)  # target enemy minion at index 0
+        self.assertNotIn(("play", 0, "hero"), play_moves)
+        self.assertNotIn(("play", 0, None), play_moves)
+
+    def test_silence_no_legal_moves_when_enemy_board_empty(self):
+        p1 = create_player("P1", "Mage")
+        p2 = create_player("AI", "Warrior")
+        p1["mana"] = 10
+        p1["max_mana"] = 10
+        p1["hand"] = ["Tome of Silence"]
+        moves = get_legal_moves(p1, p2)
+        play_moves = [m for m in moves if m[0] == "play"]
+        self.assertEqual(play_moves, [])
+
+    def test_silence_silenced_deathrattle_does_not_fire(self):
+        """After silence, deathrattle must not fire when the minion dies."""
+        p1, p2 = self._setup_game()
+        p2["hp"] = 30
+        dr_minion = _make_minion("DRMinion", 1, 1)
+        dr_minion["deathrattle"] = {"effect": "dmg_hero", "val": 5}
+        p2["board"].append(dr_minion)
+        # Silence the deathrattle minion
+        p1["hand"] = ["Tome of Silence"]
+        execute_move(p1, p2, ("play", 0, 0))
+        # Now kill it with a damage spell
+        p1["hand"] = ["Quill Bolt"]  # 3 damage — enough to kill hp=1
+        p1["mana"] = 10
+        execute_move(p1, p2, ("play", 0, 0))
+        # Deathrattle should NOT have fired
+        self.assertEqual(p2["hp"], 30, "Silenced deathrattle must not deal damage")
+
+
+class TestHeroAttackEdgeCases(unittest.TestCase):
+    """Additional tests for hero_attack interactions."""
+
+    def setUp(self):
+        GAME_LOG.clear()
+
+    def _setup_game(self):
+        p1 = create_player("P1", "Mage")
+        p2 = create_player("AI", "Warrior")
+        p1["mana"] = 10
+        p1["max_mana"] = 10
+        return p1, p2
+
+    def test_hero_attack_zero_atk_defender_no_retaliation_damage(self):
+        """Hero attacks a 0-atk minion → hero takes no damage."""
+        p1, p2 = self._setup_game()
+        p1["weapon"] = {"name": "Heroic Blade", "atk": 3, "durability": 2}
+        p1["hero_can_attack"] = True
+        p2["board"].append(_make_minion("Dummy", 0, 5))
+        execute_move(p1, p2, ("hero_attack", None, 0))
+        self.assertEqual(p1["hp"], 30, "Hero should take 0 damage when attacking a 0-atk minion")
+
+    def test_hero_attack_divine_shield_weapon_durability_consumed(self):
+        """Hero attacks a divine-shielded minion: shield pops, weapon durability still consumed."""
+        p1, p2 = self._setup_game()
+        p1["weapon"] = {"name": "Heroic Blade", "atk": 3, "durability": 2}
+        p1["hero_can_attack"] = True
+        p2["board"].append(_make_minion("Shielded", 2, 5, divine_shield=True))
+        execute_move(p1, p2, ("hero_attack", None, 0))
+        self.assertFalse(p2["board"][0].get("divine_shield"))  # shield popped
+        self.assertEqual(p2["board"][0]["hp"], 5)               # no damage
+        self.assertEqual(p1["weapon"]["durability"], 1)          # durability consumed
+
+    def test_hero_attack_with_retaliation_damages_hero(self):
+        """Hero attacking a minion with non-zero attack does take retaliation damage."""
+        p1, p2 = self._setup_game()
+        p1["weapon"] = {"name": "Heroic Blade", "atk": 3, "durability": 2}
+        p1["hero_can_attack"] = True
+        p2["board"].append(_make_minion("Attacker", 4, 5))
+        execute_move(p1, p2, ("hero_attack", None, 0))
+        self.assertEqual(p1["hp"], 26, "Hero should take 4 retaliation damage")
+
+
+class TestPaladinHeroPower(unittest.TestCase):
+    """Tests for the Paladin Reinforce hero power."""
+
+    def setUp(self):
+        GAME_LOG.clear()
+
+    def test_paladin_hero_power_summons_recruit(self):
+        p1 = create_player("P1", "Paladin")
+        p2 = create_player("AI", "Mage")
+        p1["mana"] = 2
+        p1["max_mana"] = 2
+        execute_move(p1, p2, ("hero_power", None, None))
+        self.assertEqual(len(p1["board"]), 1)
+        self.assertEqual(p1["board"][0]["name"], "Silver Hand Recruit")
+        self.assertEqual(p1["board"][0]["atk"], 1)
+        self.assertEqual(p1["board"][0]["hp"], 1)
+
+    def test_paladin_hero_power_costs_2_mana(self):
+        p1 = create_player("P1", "Paladin")
+        p2 = create_player("AI", "Mage")
+        p1["mana"] = 2
+        p1["max_mana"] = 2
+        execute_move(p1, p2, ("hero_power", None, None))
+        self.assertEqual(p1["mana"], 0)
+        self.assertTrue(p1["hero_power_used"])
+
+    def test_paladin_hero_power_not_available_when_board_full(self):
+        p1 = create_player("P1", "Paladin")
+        p2 = create_player("AI", "Mage")
+        p1["mana"] = 2
+        p1["max_mana"] = 2
+        p1["board"] = [_make_minion(f"M{i}", 1, 1) for i in range(7)]
+        moves = get_legal_moves(p1, p2)
+        hp_moves = [m for m in moves if m[0] == "hero_power"]
+        self.assertEqual(hp_moves, [], "Paladin hero power must not be available when board is full")
+
+    def test_paladin_in_hero_classes(self):
+        self.assertIn("Paladin", HERO_CLASSES)
+
+    def test_paladin_create_player(self):
+        p = create_player("P", "Paladin")
+        self.assertEqual(p["hero_class"], "Paladin")
+
+
+class TestNewCards(unittest.TestCase):
+    """Tests for newly added cards: Ivanhoe, Quasimodo, Don Quixote, Tome of Silence."""
+
+    def setUp(self):
+        GAME_LOG.clear()
+
+    def test_ivanhoe_has_taunt_and_divine_shield(self):
+        card = CARD_DB["Ivanhoe"]
+        self.assertTrue(card.get("taunt"))
+        self.assertTrue(card.get("divine_shield"))
+        self.assertTrue(card.get("legendary"))
+
+    def test_quasimodo_has_taunt_and_battlecry(self):
+        card = CARD_DB["Quasimodo"]
+        self.assertTrue(card.get("taunt"))
+        self.assertIn("battlecry", card)
+        self.assertEqual(card["battlecry"]["effect"], "heal_hero")
+
+    def test_quasimodo_battlecry_heals_hero(self):
+        p1 = create_player("P1", "Mage")
+        p2 = create_player("AI", "Warrior")
+        p1["mana"] = 10
+        p1["max_mana"] = 10
+        p1["hp"] = 25
+        p1["hand"] = ["Quasimodo"]
+        execute_move(p1, p2, ("play", 0, None))
+        self.assertEqual(p1["hp"], 27)  # +2 from battlecry
+
+    def test_don_quixote_has_charge(self):
+        card = CARD_DB["Don Quixote"]
+        self.assertTrue(card.get("charge"))
+        self.assertTrue(card.get("legendary"))
+
+    def test_tome_of_silence_in_card_db(self):
+        card = CARD_DB["Tome of Silence"]
+        self.assertEqual(card["type"], "spell")
+        self.assertEqual(card["effect"], "silence")
+        self.assertEqual(card["cost"], 3)
+
+    def test_new_cards_have_required_fields(self):
+        for name in ("Ivanhoe", "Quasimodo", "Don Quixote", "Tome of Silence"):
+            with self.subTest(card=name):
+                card = CARD_DB[name]
+                self.assertIn("type", card)
+                self.assertIn("cost", card)
+                self.assertIn("icon", card)
+
+
 class TestCardDbIntegrity(unittest.TestCase):
     """Verify CARD_DB entries have required fields."""
 
@@ -924,7 +1159,7 @@ class TestCardDbIntegrity(unittest.TestCase):
                 self.assertLessEqual(count, 2, f"'{name}' appears {count} times")
 
     def test_hero_classes_valid(self):
-        self.assertEqual(HERO_CLASSES, ["Mage", "Warrior", "Priest", "Rogue"])
+        self.assertEqual(HERO_CLASSES, ["Mage", "Warrior", "Priest", "Rogue", "Paladin"])
 
 
 if __name__ == "__main__":
