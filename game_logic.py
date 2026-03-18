@@ -124,10 +124,20 @@ CARD_DB = {
     "Circle of Mending": {"type": "spell", "cost": 3, "effect": "heal_all",  "val": 3, "icon": "CM"},
     "Enchanted Shield": {"type": "spell", "cost": 1, "effect": "add_shield", "val": 1, "icon": "EN"},
     "Inkwell Blast":    {"type": "spell", "cost": 2, "effect": "damage_all", "val": 1, "icon": "IB"},
+    "Tome of Silence":  {"type": "spell", "cost": 3, "effect": "silence",    "val": 0, "icon": "TS"},
+
+    # ---------- New legendary minions ----------
+    "Ivanhoe":          {"type": "minion", "cost": 5, "atk": 4, "hp": 5, "taunt": True, "divine_shield": True,
+                         "legendary": True, "icon": "IH"},
+    "Quasimodo":        {"type": "minion", "cost": 4, "atk": 2, "hp": 7, "taunt": True,
+                         "battlecry": {"effect": "heal_hero", "val": 2},
+                         "legendary": True, "icon": "QS"},
+    "Don Quixote":      {"type": "minion", "cost": 3, "atk": 4, "hp": 2, "charge": True,
+                         "legendary": True, "icon": "DQ"},
 }
 
-HERO_CLASSES = ["Mage", "Warrior", "Priest", "Rogue"]
-HERO_ICONS   = {"Mage": "MG", "Warrior": "WR", "Priest": "PR", "Rogue": "RG"}
+HERO_CLASSES = ["Mage", "Warrior", "Priest", "Rogue", "Paladin"]
+HERO_ICONS   = {"Mage": "MG", "Warrior": "WR", "Priest": "PR", "Rogue": "RG", "Paladin": "PA"}
 
 KW_COLORS = {
     "taunt": "#E74C3C", "divine_shield": "#F1C40F", "charge": "#2ECC71",
@@ -151,6 +161,7 @@ def get_spell_desc(card: dict, short: bool = False) -> str:
     if e == "buff_all":   return f"Buff All +{v[0]}/+{v[1]}" if short else f"Give all friendly minions +{v[0]}/+{v[1]}."
     if e == "heal_all":   return f"Heal All {v} HP"         if short else f"Restore {v} HP to all friendly characters."
     if e == "add_shield": return "Add Shield"               if short else "Give a friendly minion Divine Shield."
+    if e == "silence":    return "Silence"                  if short else "Remove all text from an enemy minion."
     return ""
 
 
@@ -287,6 +298,9 @@ def get_legal_moves(player: dict, opp: dict) -> list:
             elif card["effect"] in ("buff", "add_shield"):
                 for t in range(len(player["board"])):
                     moves.append(("play", hand_idx, t))
+            elif card["effect"] == "silence":
+                for t in range(len(opp["board"])):
+                    moves.append(("play", hand_idx, t))
         elif card["type"] == "weapon":
             moves.append(("play", hand_idx, None))
 
@@ -312,6 +326,9 @@ def get_legal_moves(player: dict, opp: dict) -> list:
                 moves.append(("hero_power", None, t))
         elif cls == "Rogue":
             moves.append(("hero_power", None, None))
+        elif cls == "Paladin":
+            if len(player["board"]) < 7:
+                moves.append(("hero_power", None, None))
 
     return moves
 
@@ -438,6 +455,17 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
                 log_action(f"   {player['name']} grants Divine Shield to {tm['name']}!")
                 notify("heal", player, target, 0)
 
+            elif card["effect"] == "silence":
+                if target is None or not (0 <= target < len(opp["board"])):
+                    log_action(f"   [ERROR] {card_name} target out of range — card wasted!")
+                    cleanup_dead(player, opp, on_event)
+                    return
+                tm = opp["board"][target]
+                for kw in ("taunt", "divine_shield", "charge", "poisonous", "battlecry", "deathrattle"):
+                    tm.pop(kw, None)
+                log_action(f"   [SILENCE] {tm['name']} is silenced! All effects removed.")
+                notify("blocked", opp, target, "SILENCED!")
+
     # ---- ATTACK -------------------------------------------------------------
     elif action == "attack":
         attacker = player["board"][idx]
@@ -495,9 +523,9 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             else:
                 defender["hp"] -= w_atk
                 notify("damage", opp, target, w_atk)
-            damage_hero(player, defender["atk"])
-            notify("damage", player, "hero", defender["atk"])
             if defender["atk"] > 0:
+                damage_hero(player, defender["atk"])
+                notify("damage", player, "hero", defender["atk"])
                 log_action(f"   {player['name']}'s hero takes {defender['atk']} retaliation damage.")
 
         weapon["durability"] -= 1
@@ -551,6 +579,16 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             player["weapon"] = {"name": "Wicked Dagger", "atk": 1, "durability": 2}
             player["hero_can_attack"] = True
             log_action(f">> {player['name']} uses Dagger Mastery! Equipped a 1/2 Wicked Dagger.")
+            notify("armor", player, "hero", 0)
+
+        elif cls == "Paladin":
+            # Reinforce: summon a 1/1 Silver Hand Recruit
+            recruit = {
+                "name": "Silver Hand Recruit", "type": "minion", "cost": 0,
+                "atk": 1, "hp": 1, "max_hp": 1, "can_attack": False, "icon": "SR",
+            }
+            player["board"].append(recruit)
+            log_action(f">> {player['name']} uses Reinforce! Summons a 1/1 Silver Hand Recruit.")
             notify("armor", player, "hero", 0)
 
     cleanup_dead(player, opp, on_event)
@@ -662,6 +700,15 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
                 tm = p2["board"][target]
                 score += tm["atk"] * 2 if tm["can_attack"] else tm["hp"]
 
+            elif card["effect"] == "silence":
+                if 0 <= target < len(p1["board"]):
+                    tm = p1["board"][target]
+                    kw_count = sum(1 for kw in ("taunt", "divine_shield", "poisonous", "deathrattle")
+                                   if tm.get(kw))
+                    score += kw_count * 6
+                    if tm.get("taunt"):    score += 4   # removing taunt opens up better targets
+                    if tm.get("divine_shield"): score += 4
+
     elif action == "attack":
         attacker = p2["board"][idx]
         if target == "hero":
@@ -717,6 +764,9 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
         elif cls == "Rogue":
             # Dagger Mastery: equip 1/2 weapon — worth it if no weapon already
             score += 4 if not p2.get("weapon") else -2
+        elif cls == "Paladin":
+            # Reinforce: always decent if board isn't full
+            score += 3 if len(p2["board"]) < 7 else -10
 
     return score
 

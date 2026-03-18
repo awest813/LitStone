@@ -41,7 +41,9 @@ const CARD_EMOJIS = {
   CS:"🕷️", CC:"🙏", TA:"⚗️", QB:"✒️", IV:"🔥", HY:"🎶",
   DC:"🔍", RA:"🎯", FB:"✨", HB:"🗡️",
   // Literary support spells
-  LW:"📖", NV:"🪶", EL:"🧪", RL:"🚩", CM:"💚", EN:"🔰",
+  LW:"📖", NV:"🪶", EL:"🧪", RL:"🚩", CM:"💚", EN:"🔰", IB:"🖋️", TS:"🤫",
+  // New legendary minions
+  IH:"🏇", QS:"🔔", DQ:"🌀", SR:"⚔️",
   // Legendary minions
   SH:"🕵️", JW:"🩺", PM:"♟️", VH:"🏹", VF:"🔬", FM:"🧟", AL:"🗝️", MH:"🎩",
   RB:"🐇", QH:"♥️", CH:"😼", SW:"🍎", RP:"🧵", SB:"😴", LR:"🧺", RU:"🪙",
@@ -52,22 +54,22 @@ const CARD_EMOJIS = {
 
 // Hero class accent colors
 const HERO_COLORS = {
-  Mage: "#2980b9", Warrior: "#c0392b", Priest: "#d4820a", Rogue: "#1abc9c",
+  Mage: "#2980b9", Warrior: "#c0392b", Priest: "#d4820a", Rogue: "#1abc9c", Paladin: "#c0a020",
 };
 
 // Hero class icons (used across multiple render functions)
 const HERO_ICONS = {
-  Mage: "🔮", Warrior: "⚔️", Priest: "✨", Rogue: "🗡️",
+  Mage: "🔮", Warrior: "⚔️", Priest: "✨", Rogue: "🗡️", Paladin: "🛡️",
 };
 
 // Hero power labels (used in renderHeroPower)
 const HERO_POWER_LABELS = {
-  Mage: "Fireblast", Warrior: "Armor Up", Priest: "Heal", Rogue: "Dagger",
+  Mage: "Fireblast", Warrior: "Armor Up", Priest: "Heal", Rogue: "Dagger", Paladin: "Reinforce",
 };
 
 // Hero power icons
 const HERO_POWER_ICONS = {
-  Mage: "🔥", Warrior: "🛡️", Priest: "💚", Rogue: "🗡️",
+  Mage: "🔥", Warrior: "🛡️", Priest: "💚", Rogue: "🗡️", Paladin: "⚔️",
 };
 
 // ---------------------------------------------------------------------------
@@ -482,6 +484,7 @@ function spellDesc(card, short = false) {
   if (e === "buff_all")   return short ? `Buff All +${v[0]}/+${v[1]}` : `Give all friendly minions +${v[0]}/+${v[1]}.`;
   if (e === "heal_all")   return short ? `Heal All ${v} HP`   : `Restore ${v} HP to all friendly characters.`;
   if (e === "add_shield") return short ? `Add Shield`          : `Give a friendly minion Divine Shield.`;
+  if (e === "silence")    return short ? `Silence`             : `Remove all text from an enemy minion.`;
   return "";
 }
 
@@ -801,6 +804,7 @@ function isValidHeroTarget(isOpp) {
     const card = CARD_DB[gameState.p1.hand[selected.idx]];
     if (card?.effect === "damage" && !isOpp) return false;
     if (card?.effect === "add_shield") return false;
+    if (card?.effect === "silence") return false;  // silence targets minions only
   }
   if (actionType === "hero_power") {
     if (gameState.p1.hero_class === "Priest" &&  isOpp) return false;
@@ -831,6 +835,7 @@ function isValidMinionTarget(boardIdx, isOpp) {
     const card = CARD_DB[gameState.p1.hand[selected.idx]];
     if (["buff", "add_shield"].includes(card?.effect) &&  isOpp) return false;
     if (card?.effect === "damage" && !isOpp) return false;
+    if (card?.effect === "silence" && !isOpp) return false;  // silence targets enemy minions
   }
   if (actionType === "hero_power") {
     if (gameState.p1.hero_class === "Priest" &&  isOpp) return false;
@@ -1116,6 +1121,13 @@ function handleHandClick(idx, p1, name, card, affordable) {
       shakeElement(cardEls[idx]);
       return;
     }
+    if (card.effect === "silence" && gameState.p2.board.length === 0) {
+      const handEl  = document.getElementById("hand-player");
+      const cardEls = handEl ? handEl.querySelectorAll(".hand-card") : [];
+      spawnFloat("No enemy minions!", "var(--col-red)", cardEls[idx] || null, "small");
+      shakeElement(cardEls[idx]);
+      return;
+    }
     selected = { type: "hand", idx };
     renderGame();
   }
@@ -1202,7 +1214,7 @@ function handleHeroPowerClick(player, canUse) {
   if (selected?.type === "hero_power") { clearSelection(); return; }
   clearSelection();
 
-  if (player.hero_class === "Warrior" || player.hero_class === "Rogue") {
+  if (["Warrior", "Rogue", "Paladin"].includes(player.hero_class)) {
     sendAction("hero_power", null, null); return;
   }
   selected = { type: "hero_power" };
