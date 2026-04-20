@@ -4,11 +4,11 @@ A lightweight, browser-based card game inspired by Hearthstone. Play against an 
 
 ## Features
 
-- **4 Hero Classes** — Mage, Warrior, Priest, and Rogue, each with a unique hero power
-- **56-card library** — Literary-themed minions, spells, and a weapon with distinct mechanics, plus 34 Legendary storybook heroes and villains
+- **5 Hero Classes** — Mage, Warrior, Priest, Rogue, and Paladin, each with a unique hero power
+- **61-card library** — Literary-themed minions, spells, and a weapon with distinct mechanics, plus 37 Legendary storybook heroes and villains
 - **Rich card mechanics** — Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle
 - **Mulligan phase** — Select any opening-hand cards to redraw before each game starts
-- **Literary Legends** — Legendary minions inspired by Sherlock Holmes, Dr. John Watson, Professor Moriarty, Van Helsing, Victor Frankenstein, Frankenstein's Monster, Alice, The Mad Hatter, The White Rabbit, The Queen of Hearts, The Cheshire Cat, Snow White, Rapunzel, Sleeping Beauty, Little Red Riding Hood, Rumpelstiltskin, The Big Bad Wolf, Pied Piper, Baba Yaga, Bluebeard, King Arthur, Merlin, Lancelot, Guinevere, Morgan le Fay, Mordred, Gawain, Robin Hood, Maid Marian, Friar Tuck, Little John, Will Scarlet, Ebenezer Scrooge, and Oliver Twist (max 1 copy per deck)
+- **Literary Legends** — Legendary minions inspired by Sherlock Holmes, Dr. John Watson, Professor Moriarty, Van Helsing, Victor Frankenstein, Frankenstein's Monster, Alice, The Mad Hatter, The White Rabbit, The Queen of Hearts, The Cheshire Cat, Snow White, Rapunzel, Sleeping Beauty, Little Red Riding Hood, Rumpelstiltskin, The Big Bad Wolf, Pied Piper, Baba Yaga, Bluebeard, King Arthur, Merlin, Lancelot, Guinevere, Morgan le Fay, Mordred, Gawain, Robin Hood, Maid Marian, Friar Tuck, Little John, Will Scarlet, Ebenezer Scrooge, Oliver Twist, Ivanhoe, Quasimodo, and Don Quixote (max 1 copy per deck)
 - **Deck Builder** — Build a custom 15-card deck (max 2 copies per card; max 1 copy of Legendary cards) before each game
 - **AI opponent** — Heuristic-driven AI that evaluates board state and plays competitively
 - **Combat log** — Real-time log of every action taken during the game
@@ -62,6 +62,7 @@ Open [http://localhost:5000](http://localhost:5000) in your browser.
 | Warrior | Armor Up!    | Gain 2 Armor                        |
 | Priest  | Lesser Heal  | Restore 2 HP to a friendly character |
 | Rogue   | Dagger Mastery | Equip a 1/2 Wicked Dagger         |
+| Paladin | Reinforce      | Summon a 1/1 Silver Hand Recruit   |
 
 ### Card Types
 
@@ -91,17 +92,17 @@ These legendary minions are based on classic literature and folklore and have a 
 | Snow White | 5 | 3 | 7 | Divine Shield | *Snow White* (Grimm) |
 | Rapunzel | 4 | 2 | 6 | Battlecry: heal hero 3 | *Rapunzel* (Grimm) |
 | Sleeping Beauty | 3 | 2 | 5 | Divine Shield | *Sleeping Beauty* (Perrault/Grimm) |
-| Little Red Riding Hood | 4 | 4 | 3 | Charge | *Little Red Riding Hood* (Perrault/Grimm) |
+| Little Red Riding Hood | 4 | 3 | 5 | Charge | *Little Red Riding Hood* (Perrault/Grimm) |
 | Rumpelstiltskin | 5 | 4 | 4 | Deathrattle: deal 3 dmg | *Rumpelstiltskin* (Grimm) |
-| The Big Bad Wolf | 5 | 5 | 3 | Charge | *Little Red Riding Hood* (Perrault/Grimm) |
+| The Big Bad Wolf | 5 | 5 | 2 | Charge · Poisonous | *Little Red Riding Hood* (Perrault/Grimm) |
 | Pied Piper | 4 | 3 | 5 | Battlecry: draw 1 card | *The Pied Piper of Hamelin* (Browning/Grimm) |
 | Baba Yaga | 6 | 5 | 5 | Poisonous | Slavic folklore |
 | Bluebeard | 5 | 5 | 4 | Taunt | *Bluebeard* (Perrault) |
 | King Arthur | 7 | 6 | 8 | Taunt | Arthurian legend |
-| Merlin | 6 | 4 | 7 | Battlecry: draw 2 cards | Arthurian legend |
+| Merlin | 6 | 4 | 7 | Battlecry: heal hero 6 | Arthurian legend |
 | Lancelot | 5 | 5 | 3 | Charge | Arthurian legend |
 | Guinevere | 4 | 3 | 6 | Divine Shield | Arthurian legend |
-| Morgan le Fay | 6 | 5 | 5 | Poisonous | Arthurian legend |
+| Morgan le Fay | 6 | 5 | 6 | Divine Shield | Arthurian legend |
 | Mordred | 6 | 6 | 4 | Deathrattle: deal 3 dmg | Arthurian legend |
 | Gawain | 5 | 4 | 6 | Taunt | Arthurian legend |
 | Robin Hood | 4 | 4 | 3 | Charge | English folklore |
@@ -111,6 +112,9 @@ These legendary minions are based on classic literature and folklore and have a 
 | Will Scarlet | 3 | 3 | 2 | Charge | English folklore |
 | Ebenezer Scrooge | 5 | 3 | 7 | Battlecry: draw 2 cards | *A Christmas Carol* (Dickens) |
 | Oliver Twist | 3 | 3 | 3 | Battlecry: draw 1 card | *Oliver Twist* (Dickens) |
+| Ivanhoe | 5 | 4 | 5 | Taunt · Divine Shield | *Ivanhoe* (Scott) |
+| Quasimodo | 4 | 2 | 7 | Taunt · Battlecry: heal hero 2 | *The Hunchback of Notre-Dame* (Hugo) |
+| Don Quixote | 3 | 4 | 2 | Charge | *Don Quixote* (Cervantes) |
 
 ### Literary Support Spells
 
@@ -121,12 +125,14 @@ These legendary minions are based on classic literature and folklore and have a 
 | Elixir of Life | 2 | Restore 4 HP |
 | Rallying Banner | 3 | Give all friendly minions +1/+1 |
 | Circle of Mending | 3 | Restore 3 HP to all friendly characters |
-| Enchanted Shield | 2 | Give a friendly minion Divine Shield |
+| Enchanted Shield | 1 | Give a friendly minion Divine Shield |
+| Inkwell Blast | 2 | Deal 1 damage to all enemy minions |
+| Tome of Silence | 3 | Remove all text from an enemy minion |
 
 ### Core Set Minions & Spells
 
 - Minions: Town Crier, Castle Guard, Highwayman, Errant Knight, Templar Captain, Storybook Dragon, Cave Spider, Cathedral Cleric, Tinker Alchemist.
-- Spells & weapon: Quill Bolt, Inferno Verse, Restorative Hymn, Deductive Clue, Rebel's Ambush, Fairy Blessing, Heroic Blade.
+- Spells & weapon: Quill Bolt, Inferno Verse, Restorative Hymn, Deductive Clue, Rebel's Ambush, Fairy Blessing, Inkwell Blast, Tome of Silence, Heroic Blade.
 
 ### Keyword Reference
 
@@ -160,6 +166,7 @@ LitStone/
 | GET    | `/`                | Serves the game UI               |
 | GET    | `/api/cards`       | Returns the full card database   |
 | POST   | `/api/new_game`    | Starts a new game session        |
+| POST   | `/api/mulligan`    | Submit mulligan card swaps       |
 | GET    | `/api/state`       | Returns the current game state   |
 | POST   | `/api/action`      | Executes a player action         |
 | GET    | `/api/legal_moves` | Returns all legal moves for P1   |

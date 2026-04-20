@@ -28,6 +28,17 @@ def _serialize(player: dict) -> dict:
     return p
 
 
+def _serialize_opponent(player: dict) -> dict:
+    """Return a JSON-safe copy of an opponent player dict with hidden information masked."""
+    p = _serialize(player)
+    # Hide the AI's hand contents and deck order to prevent cheating via
+    # browser dev-tools / network inspection.  The frontend only needs the
+    # *count* of cards, not their identities.
+    p["hand"] = ["?"] * len(player["hand"])
+    p["deck"] = ["?"] * len(player["deck"])
+    return p
+
+
 def _state_response() -> dict:
     gs = GAME_STATE
     winner = check_win(gs["p1"], gs["p2"]) if gs else None
@@ -35,7 +46,7 @@ def _state_response() -> dict:
     legal  = get_legal_moves(gs["p1"], gs["p2"]) if gs and not winner and not mulligan else []
     return {
         "p1":             _serialize(gs["p1"]),
-        "p2":             _serialize(gs["p2"]),
+        "p2":             _serialize_opponent(gs["p2"]),
         "is_player_turn": gs.get("is_player_turn", True),
         "turn_number":    gs.get("turn_number", 1),
         "log":            list(GAME_LOG[-60:]),
