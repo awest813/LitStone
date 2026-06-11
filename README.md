@@ -21,8 +21,11 @@ A lightweight, browser-based card game inspired by Hearthstone. Play against an 
 | Layer    | Technology |
 |----------|------------|
 | Backend  | Python 3.12 + Flask |
+| Production | Gunicorn + WhiteNoise |
 | Frontend | Vanilla JavaScript, HTML5, CSS3 |
+| Frontend libs | [fuzzysort](https://github.com/farzher/fuzzysort) (MIT), [NProgress](https://github.com/rstacruz/nprogress) (MIT) |
 | Fonts    | Google Fonts (Cinzel, Crimson Text) |
+| CI       | GitHub Actions (pytest + Ruff) |
 
 ## Getting Started
 
@@ -36,22 +39,40 @@ A lightweight, browser-based card game inspired by Hearthstone. Play against an 
 ```bash
 git clone https://github.com/awest813/LitStone.git
 cd LitStone
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 ### Running the server
+
+Development:
 
 ```bash
 python3 server.py
 ```
 
-Open [http://localhost:5000](http://localhost:5000) in your browser.
-
-Run tests:
+Production (Gunicorn):
 
 ```bash
-python3 -m unittest test_game_logic -v
+gunicorn -c gunicorn.conf.py wsgi:app
 ```
+
+Docker:
+
+```bash
+docker build -t litstone .
+docker run -p 5000:5000 litstone
+```
+
+Open [http://localhost:5000](http://localhost:5000) in your browser.
+
+Run tests and lint:
+
+```bash
+pytest test_game_logic.py -v
+ruff check .
+```
+
+Third-party licenses: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 ## How to Play
 
@@ -161,14 +182,19 @@ LitStone/
 ├── game_logic.py        # Pure Python game rules, AI, and card database
 ├── server.py            # Flask server and REST API
 ├── test_game_logic.py   # Unit tests (113 tests)
-├── requirements.txt     # Python dependencies
+├── requirements.txt     # Python runtime dependencies
+├── requirements-dev.txt # pytest, Ruff, and runtime deps
+├── THIRD_PARTY_NOTICES.md  # MIT and other OSS attributions
+├── Dockerfile           # Production container (gunicorn)
+├── wsgi.py              # WSGI entry for gunicorn
 ├── ROADMAP.md           # Version roadmap
 ├── HEARTHSTONE_LITE_PLAN.md  # Strategic plan for HS-lite quality
 ├── templates/
 │   └── index.html       # Single-page HTML shell
 └── static/
     ├── game.js          # All frontend game logic and rendering
-    └── style.css        # Styling and animations
+    ├── style.css        # Styling and animations
+    └── vendor/          # Vendored MIT JS (fuzzysort, NProgress)
 ```
 
 ## API Endpoints

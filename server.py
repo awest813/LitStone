@@ -6,18 +6,37 @@ Serves the browser-based UI and exposes a JSON REST API for all game actions.
 import os
 import random
 import uuid
-from flask import Flask, jsonify, request, render_template
+
+from flask import Flask, jsonify, render_template, request
+from whitenoise import WhiteNoise
 
 from game_logic import (
-    CARD_DB, HERO_CLASSES, GAME_LOG, DECK_SIZE,
-    OPENING_HAND_FIRST, OPENING_HAND_SECOND, COIN_CARD,
-    create_player, draw_card, start_turn, do_mulligan,
-    get_legal_moves, execute_move, check_win,
-    run_ai_turn, log_action, give_coin, ai_do_mulligan,
-    set_active_log, card_allowed_for_class, cards_for_class,
+    CARD_DB,
+    DECK_SIZE,
+    GAME_LOG,
+    HERO_CLASSES,
+    OPENING_HAND_FIRST,
+    OPENING_HAND_SECOND,
+    ai_do_mulligan,
+    card_allowed_for_class,
+    cards_for_class,
+    check_win,
+    create_player,
+    do_mulligan,
+    draw_card,
+    execute_move,
+    get_legal_moves,
+    give_coin,
+    log_action,
+    run_ai_turn,
+    set_active_log,
+    start_turn,
 )
 
 app = Flask(__name__)
+
+_static_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+app.wsgi_app = WhiteNoise(app.wsgi_app, root=_static_root, prefix="static/")
 
 # ---------------------------------------------------------------------------
 # Per-session game state (keyed by game_id UUID)
