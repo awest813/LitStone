@@ -20,13 +20,14 @@ LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collec
 | Deck builder (filter, sort, search, curve, save/load, class pool) | ✅ Complete |
 | In-match UX (mana HUD, help bar, collapsible log, mobile hand/tray) | ✅ Partial |
 | Animations + Web Audio SFX (mute toggle) | ✅ Complete |
+| Procedural card art — class-themed frames, motifs, tooltip previews | ✅ Complete |
 | Rules tests | ✅ 131 tests in `test_game_logic.py` |
 
 ### Remaining gaps vs. Shippable Lite
 
 | Gap | Impact |
 |-----|--------|
-| Emoji art (no illustrated card frames) | Lower immersion |
+| Procedural card frames (no bespoke illustrated art per card) | Good readability; less immersion than full art |
 | AI difficulty tiers; reduced random noise | Flat replay challenge |
 | No tutorial, practice, or campaign bosses | Steep for new players |
 | No discover / secrets / windfury / lifesteal | Missing HS texture |

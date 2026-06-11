@@ -1404,27 +1404,6 @@ body::after {
   100% { transform: translate(var(--dx), var(--dy)) scale(0.1); opacity: 0; }
 }
 
-.fx-fly-card {
-  position: absolute;
-  width: 54px;
-  height: 72px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
-  pointer-events: none;
-  z-index: 650;
-  box-shadow: 0 8px 28px rgba(0,0,0,.75);
-  border: 2px solid #a09070;
-  background: linear-gradient(175deg, #e8dcc8, #d8c8b0);
-}
-
-.fx-fly-card--spell {
-  background: linear-gradient(175deg, #e0d0ee, #c8b0e0);
-  border-color: #8060a8;
-}
-
 .fx-death-shard {
   position: absolute;
   width: 10px;

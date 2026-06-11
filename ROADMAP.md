@@ -17,6 +17,7 @@ The current state of the project establishes the core gameplay loop.
 - [x] Heuristic AI opponent
 - [x] Flask REST API backend
 - [x] Browser-based UI with combat log
+- [x] Procedural card art — layered frames, class palettes, tooltip art previews
 - [x] Fatigue damage system
 - [x] Weapon system
 - [x] Mulligan phase (player)

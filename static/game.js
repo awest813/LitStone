@@ -41,38 +41,6 @@ const KW_SHORT = [
   ["taunt","TAUNT"], ["divine_shield","SHIELD"], ["charge","CHARGE"],
   ["poisonous","POISON"], ["battlecry","B.CRY"], ["deathrattle","D.RATTLE"],
 ];
-const CARD_EMOJIS = {
-  // Standard cards
-  TC:"📯", CG:"🛡️", HW:"🤺", EK:"⚔️", TP:"🏰", SD:"🐉",
-  CS:"🕷️", CC:"🙏", TA:"⚗️", QB:"✒️", IV:"🔥", HY:"🎶",
-  DC:"🔍", RA:"🎯", FB:"✨", HB:"🗡️",
-  // Literary support spells
-  LW:"📖", NV:"🪶", EL:"🧪", RL:"🚩", CM:"💚", EN:"🔰", IB:"🖋️", TS:"🤫",
-  // New legendary minions
-  IH:"🏇", QS:"🔔", DQ:"🌀", SR:"⚔️",
-  // Legendary minions
-  SH:"🕵️", JW:"🩺", PM:"♟️", VH:"🏹", VF:"🔬", FM:"🧟", AL:"🗝️", MH:"🎩",
-  RB:"🐇", QH:"♥️", CH:"😼", SW:"🍎", RP:"🧵", SB:"😴", LR:"🧺", RU:"🪙",
-  BW:"🐺", PP:"🎶", BY:"🧹", BB:"🔑", KA:"⚔️", ME:"🔮", LT:"🛡️", GV:"🌹",
-  MF:"🧙‍♀️", MD:"🩸", GW:"🛡️", RH:"🏹", MM:"🌿", FT:"🍺", LJ:"💪", WS:"🎯",
-  ES:"💰", OT:"🥣",
-  CN:"🪙",
-  // Mage class
-  NP:"🔥", EA:"📚", MK:"🪞", SK:"✨", SN:"🌋", AX:"📖", AM:"💨", MT:"☄️",
-  // Warrior class
-  BK:"🛡️", WG:"🏰", RR:"⚔️", BZ:"🪓", IA:"🔨", WD:"🥁", CV:"⚔️", FY:"🧱",
-  // Priest class
-  HA:"🙏", BI:"📿", RC:"💫", CP:"⛪", SS:"💧", SM:"⚡", HH:"🎵", GR:"💖",
-  // Rogue class
-  BA:"🥷", SC:"👤", VV:"🐍", TV:"🔪", AR:"🗡️", KT:"💉", SV:"🌪️", HL:"💰",
-  // Paladin class
-  SL:"✝️", DK:"🌅", CR:"🏇", TU:"🗡️", HS:"📜", KD:"👑", PS:"☀️", LH:"🤲",
-  // Shaman class
-  WL:"🐺", TN:"🗿", FK:"🔥", HM:"🔱", LL:"⚡", MV:"🌊", HX:"🧿", AN:"👻",
-  // Totems
-  ST:"🔥", HE:"💚", SF:"🪨", WA:"💨",
-};
-
 // Hero class accent colors
 const HERO_COLORS = {
   Mage: "#2980b9", Warrior: "#c0392b", Priest: "#d4820a", Rogue: "#1abc9c", Paladin: "#c0a020", Shaman: "#0077b6",
@@ -268,10 +236,8 @@ function renderCardPool() {
     const isFull = count >= maxCopies || draftDeck.length >= DECK_SIZE;
     const div    = document.createElement("div");
     const isClass = card.classes?.length > 0;
-    div.className = `pool-card pool-card--${card.type}${isFull ? " pool-card--full" : ""}${isLegendary ? " pool-card--legendary" : ""}${isClass ? " pool-card--class" : ""}`;
+    div.className = `pool-card pool-card--${card.type}${isFull ? " pool-card--full" : ""}${isLegendary ? " pool-card--legendary" : ""}${isClass ? " pool-card--class" : ""} ${CardArt.frameClasses(card, name)}`;
     div.dataset.name = name;
-
-    const icon = CARD_EMOJIS[card.icon] || card.icon;
 
     let statsHtml = "";
     if (card.type === "minion") {
@@ -297,7 +263,7 @@ function renderCardPool() {
       ${count > 0 ? `<div class="gem-count">${count}</div>` : ""}
       ${isLegendary ? `<div class="legendary-crown" title="Legendary — only 1 copy per deck">♦</div>` : ""}
       ${isClass ? `<div class="class-badge" title="${card.classes.join(", ")} only">${card.classes[0].slice(0,3)}</div>` : ""}
-      <div class="pool-art">${icon}</div>
+      ${CardArt.renderArt(card, name, "pool")}
       <div class="pool-name">${name}</div>
       ${statsHtml}
     `;
@@ -489,9 +455,8 @@ function renderMulligan(state) {
 
   hand.forEach((name, idx) => {
     const card = CARD_DB[name] || {};
-    const icon = CARD_EMOJIS[card.icon] || card.icon || "?";
     const div  = document.createElement("div");
-    div.className = "mulligan-card marked-keep";
+    div.className = `mulligan-card marked-keep ${CardArt.frameClasses(card, name)}`;
     div.dataset.idx = idx;
 
     let statsHtml = "";
@@ -505,7 +470,7 @@ function renderMulligan(state) {
 
     div.innerHTML = `
       <div class="mulligan-card-cost">${card.cost}</div>
-      <div class="mulligan-card-art">${icon}</div>
+      ${CardArt.renderArt(card, name, "mulligan")}
       <div class="mulligan-card-name">${name}</div>
       <div class="mulligan-card-type">${card.type}</div>
       ${statsHtml}
@@ -682,6 +647,7 @@ function buildTooltipHtml(name, card) {
     ? `<div class="tooltip-desc" style="color:var(--col-gold)">${card.classes.join(", ")} class</div>` : "";
 
   return `
+    <div class="tooltip-art-wrap">${CardArt.renderArt(card, name, "tooltip")}</div>
     <div class="tooltip-name">${name}</div>
     <div class="tooltip-type">${card.type.toUpperCase()} · ${card.cost} Mana</div>
     ${legendaryBadge}
@@ -1001,30 +967,31 @@ function findHeroElByName(name) {
   return null;
 }
 
-function animateFlyGhost(fromRect, toRect, emoji, cardType) {
+function animateFlyGhost(fromRect, toRect, card, name) {
   if (!motionEnabled() || !fromRect || !toRect) return;
   const layer = document.getElementById("fx-layer");
   if (!layer) return;
   const layerRect = layer.getBoundingClientRect();
   const el = document.createElement("div");
-  el.className = `fx-fly-card fx-fly-card--${cardType || "minion"}`;
-  el.textContent = emoji || "🃏";
+  el.innerHTML = CardArt.renderFlyCard(card || {}, name);
+  const fly = el.firstElementChild;
+  if (!fly) return;
 
   const sx = fromRect.left + fromRect.width / 2 - layerRect.left;
   const sy = fromRect.top + fromRect.height / 2 - layerRect.top;
-  el.style.left = `${sx}px`;
-  el.style.top  = `${sy}px`;
-  layer.appendChild(el);
+  fly.style.left = `${sx}px`;
+  fly.style.top  = `${sy}px`;
+  layer.appendChild(fly);
 
   const dx = toRect.left + toRect.width / 2 - layerRect.left - sx;
   const dy = toRect.top + toRect.height / 2 - layerRect.top - sy;
 
-  el.animate([
+  fly.animate([
     { transform: "translate(-50%, -50%) scale(1.15) rotate(-6deg)", opacity: 1 },
     { transform: `translate(calc(-50% + ${dx * 0.45}px), calc(-50% + ${dy * 0.25}px)) scale(1) rotate(2deg)`, opacity: 1, offset: 0.55 },
     { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.75) rotate(0deg)`, opacity: 0 },
   ], { duration: 380, easing: "cubic-bezier(.25, .8, .25, 1)", fill: "forwards" })
-    .addEventListener("finish", () => el.remove());
+    .addEventListener("finish", () => fly.remove());
 }
 
 function animateDeathBurst(rect) {
@@ -1165,8 +1132,7 @@ function applyActionAnimations(ctx) {
     if (card.type === "minion") {
       const played = findMinionEl("board-player", playedCardName);
       if (motion && handRect && played) {
-        const icon = CARD_EMOJIS[card.icon] || card.icon || "🃏";
-        animateFlyGhost(handRect, played.getBoundingClientRect(), icon, "minion");
+        animateFlyGhost(handRect, played.getBoundingClientRect(), card, playedCardName);
       }
       playSfx("play");
     } else if (card.type === "spell") {
@@ -1481,9 +1447,8 @@ function renderBoard(elId, player, isOpp) {
 
   player.board.forEach((minion, idx) => {
     const card = CARD_DB[minion.name] || {};
-    const icon = CARD_EMOJIS[card.icon] || card.icon || "?";
 
-    let cls = "minion-card";
+    let cls = `minion-card ${CardArt.frameClasses(card, minion.name)}`;
     if (!isOpp && minion.can_attack && !selected)                      cls += " can-attack";
     if (!isOpp && selected?.type === "board" && selected.idx === idx)  cls += " selected";
     if (minion.taunt)                                                   cls += " taunt";
@@ -1504,7 +1469,7 @@ function renderBoard(elId, player, isOpp) {
     const div = document.createElement("div");
     div.className = cls;
     div.innerHTML = `
-      <div class="minion-art">${icon}</div>
+      ${CardArt.renderArt(card, minion.name, "board")}
       <div class="minion-name">${minion.name}</div>
       <div class="kw-badges">${kws}</div>
       <div class="stat-badge atk">${minion.atk}</div>
@@ -1537,9 +1502,8 @@ function renderHand(p1) {
   p1.hand.forEach((name, idx) => {
     const card       = CARD_DB[name] || {};
     const affordable = p1.mana >= card.cost;
-    const icon       = CARD_EMOJIS[card.icon] || card.icon || "?";
 
-    let cls = `hand-card hand-card--${card.type}`;
+    let cls = `hand-card hand-card--${card.type} ${CardArt.frameClasses(card, name)}`;
     if (!affordable)                                       cls += " unaffordable";
     if (selected?.type === "hand" && selected.idx === idx) cls += " selected";
     if (card.legendary)                                    cls += " legendary";
@@ -1571,7 +1535,7 @@ function renderHand(p1) {
 
     div.innerHTML = `
       <div class="gem-cost">${card.cost}</div>
-      <div class="minion-art">${icon}</div>
+      ${CardArt.renderArt(card, name, "hand")}
       <div class="minion-name">${name}</div>
       <div class="kw-badges">${kws}</div>
       ${card.type === "spell" ? `<div class="pool-desc">${spellDesc(card, true)}</div>` : ""}

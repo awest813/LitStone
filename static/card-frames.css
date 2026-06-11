@@ -1,0 +1,341 @@
+/* ============================================================
+   LitStone — Card art layers & illustrated frames
+   ============================================================ */
+
+/* ---- Shared art window ---- */
+.card-art {
+  position: relative;
+  overflow: hidden;
+  border-radius: 7px;
+  isolation: isolate;
+  flex-shrink: 0;
+}
+
+.card-art__rim,
+.card-art__bg,
+.card-art__motif,
+.card-art__vignette,
+.card-art__shine {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.card-art__rim {
+  border-radius: inherit;
+  border: 1px solid rgba(255, 255, 255, .14);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35);
+  z-index: 4;
+}
+
+.card-art__bg {
+  background:
+    radial-gradient(ellipse at 50% 115%, var(--art-accent, #4a9edd) 0%, transparent 58%),
+    radial-gradient(ellipse at 18% 12%, rgba(255, 255, 255, .14) 0%, transparent 42%),
+    linear-gradient(155deg, var(--art-bg1, #0c1830) 0%, var(--art-bg2, #1a3050) 100%);
+  z-index: 0;
+}
+
+.card-art__motif {
+  opacity: .32;
+  mix-blend-mode: screen;
+  z-index: 1;
+  background-size: cover;
+  background-position: center;
+}
+
+.card-art__vignette {
+  background: radial-gradient(ellipse at 50% 50%, transparent 35%, rgba(0, 0, 0, .72) 100%);
+  z-index: 2;
+}
+
+.card-art__shine {
+  background: linear-gradient(125deg, rgba(255, 255, 255, .22) 0%, transparent 38%, transparent 62%, rgba(255, 255, 255, .06) 100%);
+  z-index: 3;
+}
+
+.card-art__glyph {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .65)) drop-shadow(0 0 12px var(--art-accent, rgba(74, 158, 221, .4)));
+  line-height: 1;
+}
+
+/* Variant hue shifts for neutral variety */
+.card-art[data-variant="0"] .card-art__bg { filter: hue-rotate(0deg); }
+.card-art[data-variant="1"] .card-art__bg { filter: hue-rotate(18deg); }
+.card-art[data-variant="2"] .card-art__bg { filter: hue-rotate(-22deg); }
+.card-art[data-variant="3"] .card-art__bg { filter: hue-rotate(35deg); }
+.card-art[data-variant="4"] .card-art__bg { filter: hue-rotate(-35deg); }
+.card-art[data-variant="5"] .card-art__bg { filter: hue-rotate(55deg); }
+.card-art[data-variant="6"] .card-art__bg { filter: hue-rotate(-48deg); }
+.card-art[data-variant="7"] .card-art__bg { filter: hue-rotate(72deg); }
+.card-art[data-variant="8"] .card-art__bg { filter: hue-rotate(-65deg); }
+.card-art[data-variant="9"] .card-art__bg { filter: hue-rotate(95deg); }
+.card-art[data-variant="10"] .card-art__bg { filter: hue-rotate(-88deg); }
+.card-art[data-variant="11"] .card-art__bg { filter: hue-rotate(120deg); }
+
+/* Motif patterns (inline SVG) */
+.card-art[data-motif="arcane"] .card-art__motif {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cpath fill='%23c8a0ff' fill-opacity='.55' d='M40 4l4 12h12l-10 8 4 12-10-8-10 8 4-12-10-8h12z'/%3E%3Ccircle cx='40' cy='40' r='18' fill='none' stroke='%23a070e0' stroke-width='1.5' stroke-opacity='.5'/%3E%3C/svg%3E");
+  background-size: 56px 56px;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.card-art[data-motif="creature"] .card-art__motif {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cellipse cx='40' cy='48' rx='28' ry='18' fill='%2380b0d0' fill-opacity='.35'/%3E%3Ccircle cx='40' cy='28' r='14' fill='%23a0c8e8' fill-opacity='.3'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center bottom;
+}
+
+.card-art[data-motif="steel"] .card-art__motif {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, .08) 0px,
+    rgba(255, 255, 255, .08) 2px,
+    transparent 2px,
+    transparent 7px
+  );
+  opacity: .45;
+}
+
+.card-art[data-motif="iron"] .card-art__motif,
+.card-art[data-motif="shadow"] .card-art__motif {
+  background-image: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, .12) 0%, transparent 55%);
+  opacity: .4;
+}
+
+.card-art[data-motif="holy"] .card-art__motif {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cpath fill='%23ffe080' fill-opacity='.45' d='M30 6v48M6 30h48M12 12l36 36M48 12L12 48' stroke='%23ffe080' stroke-width='1' stroke-opacity='.25'/%3E%3C/svg%3E");
+  background-size: 50px 50px;
+  background-position: center;
+}
+
+.card-art[data-motif="storm"] .card-art__motif {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cpath fill='%2340d8ff' fill-opacity='.4' d='M44 8L28 44h12l-8 28 24-36H44z'/%3E%3C/svg%3E");
+  background-size: 44px 44px;
+  background-position: 60% 40%;
+  background-repeat: no-repeat;
+}
+
+.card-art[data-motif="legendary"] .card-art__motif {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cpath fill='%23ffd060' fill-opacity='.5' d='M40 8l5 14h15l-12 9 5 14-13-10-13 10 5-14-12-9h15z'/%3E%3Cpath fill='none' stroke='%23ffd060' stroke-opacity='.35' stroke-width='1' d='M40 20v40M20 40h40'/%3E%3C/svg%3E");
+  background-size: 64px 64px;
+  background-position: center;
+  opacity: .42;
+}
+
+.card-art[data-motif="coin"] .card-art__bg {
+  background: radial-gradient(circle at 50% 40%, #ffe890 0%, #e8a020 45%, #a06010 100%);
+}
+.card-art[data-motif="coin"] .card-art__motif { opacity: 0; }
+.card-art--coin .card-art__glyph { filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .5)); }
+
+.card-art--legendary .card-art__rim {
+  border-color: rgba(255, 208, 96, .55);
+  box-shadow: inset 0 0 8px rgba(255, 208, 96, .2), 0 0 10px rgba(232, 160, 32, .25);
+}
+
+/* Size presets */
+.card-art--pool   { width: 100%; height: 52px; margin-bottom: 4px; }
+.card-art--pool .card-art__glyph { font-size: 26px; }
+
+.card-art--hand   { width: 100%; height: 40px; margin-bottom: 3px; }
+.card-art--hand .card-art__glyph { font-size: 22px; }
+
+.card-art--board  { width: 100%; height: 48px; margin-bottom: 3px; }
+.card-art--board .card-art__glyph { font-size: 28px; }
+
+.card-art--mulligan { width: 100%; height: 72px; margin: 4px 0; }
+.card-art--mulligan .card-art__glyph { font-size: 38px; }
+
+.card-art--tooltip { width: 100%; height: 88px; margin-bottom: 10px; border-radius: 10px; }
+.card-art--tooltip .card-art__glyph { font-size: 42px; }
+
+.card-art--fly { width: 54px; height: 68px; border-radius: 8px; }
+.card-art--fly .card-art__glyph { font-size: 30px; }
+
+/* ---- Frame modifiers (applied to card containers) ---- */
+.card-frame--minion { --frame-face: #e8dcc8; --frame-edge: #a09070; --frame-stripe: var(--col-mana-bright); }
+.card-frame--spell  { --frame-face: #e0d0ee; --frame-edge: #9060b8; --frame-stripe: var(--col-purple-bright); }
+.card-frame--weapon { --frame-face: #ddd0b8; --frame-edge: #c07020; --frame-stripe: #e67e22; }
+.card-frame--coin   { --frame-face: #ffe890; --frame-edge: #ffe080; --frame-stripe: var(--col-gold-bright); }
+
+.card-frame--legendary {
+  --frame-face: #f4e8c8;
+  --frame-edge: var(--col-gold);
+}
+
+.card-frame--class-mage    { --frame-accent: var(--mage-col); }
+.card-frame--class-warrior { --frame-accent: var(--warrior-col); }
+.card-frame--class-priest  { --frame-accent: var(--priest-col); }
+.card-frame--class-rogue   { --frame-accent: var(--rogue-col); }
+.card-frame--class-paladin { --frame-accent: var(--paladin-col); }
+.card-frame--class-shaman  { --frame-accent: var(--shaman-col); }
+
+[class*="card-frame--class-"] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--frame-accent, transparent) 35%, transparent);
+}
+
+/* Pool cards — illustrated frame */
+.pool-card {
+  background: linear-gradient(175deg, var(--frame-face, var(--col-surface)), color-mix(in srgb, var(--frame-face, #d8c8b0) 70%, #000));
+  border-color: var(--frame-edge, var(--col-border));
+}
+
+.pool-card::after {
+  background: var(--frame-stripe, var(--col-border));
+  height: 3px;
+}
+
+.pool-card::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.pool-card--legendary {
+  border-color: var(--col-gold);
+  box-shadow: 0 0 12px rgba(232, 160, 32, .3), inset 0 0 12px rgba(232, 160, 32, .08);
+}
+
+.pool-card--legendary::before {
+  border-color: rgba(255, 208, 96, .25);
+}
+
+/* Board minions */
+.minion-card {
+  background: linear-gradient(175deg, var(--frame-face, #e8dcc8), color-mix(in srgb, var(--frame-face, #d8c8b0) 75%, #a89070));
+  border-color: var(--frame-edge, #a09070);
+}
+
+.hand-card--spell {
+  background: linear-gradient(175deg, var(--frame-face, #d8c0f0), #b890d8);
+  border-color: var(--frame-edge, #9060b8);
+}
+
+.hand-card--weapon {
+  background: linear-gradient(175deg, var(--frame-face, #d8ccc0), #c0b0a0);
+  border-color: var(--frame-edge, #c07020);
+}
+
+.minion-card.legendary,
+.hand-card.legendary {
+  background: linear-gradient(175deg, var(--frame-face, #f4e8c8), #e8d490);
+  border-color: var(--col-gold);
+}
+
+/* Name plate banner */
+.minion-name,
+.pool-name {
+  background: linear-gradient(180deg, rgba(0, 0, 0, .06), rgba(0, 0, 0, .12));
+  border-radius: 3px;
+  padding: 1px 2px;
+}
+
+/* Mulligan — full illustrated cards */
+.mulligan-card {
+  background: linear-gradient(175deg, var(--frame-face, var(--col-card-face)), color-mix(in srgb, var(--frame-face, #e8dcc8) 80%, #a89070));
+  border-color: var(--frame-edge, var(--col-border));
+  color: #2a1e0a;
+  padding: 6px 6px 10px;
+  width: 118px;
+  min-height: 168px;
+}
+
+.mulligan-card::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 7px;
+  border: 1px solid rgba(120, 90, 50, .18);
+  pointer-events: none;
+}
+
+.mulligan-card-type {
+  font-family: 'Cinzel', serif;
+  font-size: 8px;
+  color: #5a4830;
+  letter-spacing: .08em;
+}
+
+.mulligan-card-name {
+  color: #2a1e0a;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .35);
+}
+
+.mulligan-card-cost {
+  z-index: 6;
+  background: radial-gradient(circle at 35% 35%, var(--col-mana-bright), var(--col-mana));
+  border: 1.5px solid rgba(255, 255, 255, .25);
+}
+
+/* Tooltip art preview */
+.tooltip-art-wrap {
+  margin: -2px -2px 10px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .5);
+}
+
+.card-tooltip {
+  width: 210px;
+  padding: 12px;
+}
+
+/* Flying card ghost */
+.fx-fly-card {
+  position: absolute;
+  width: 54px;
+  height: 72px;
+  border-radius: 8px;
+  border: 2px solid;
+  padding: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 650;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .75);
+  border-color: var(--frame-edge, #a09070);
+  background: linear-gradient(175deg, var(--frame-face, #e8dcc8), #d8c8b0);
+}
+
+.fx-fly-card .card-art--fly {
+  width: 100%;
+  height: 100%;
+}
+
+.fx-fly-card.card-frame--spell { border-color: #9060b8; }
+.fx-fly-card.card-frame--weapon { border-color: #c07020; }
+.fx-fly-card.card-frame--legendary {
+  border-color: var(--col-gold);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .75), 0 0 16px rgba(232, 160, 32, .4);
+}
+
+/* Legacy class aliases — art windows replaced by .card-art */
+.pool-art, .minion-art, .mulligan-card-art { display: none; }
+
+@media (max-width: 900px) {
+  .card-art--board { height: 40px; }
+  .card-art--board .card-art__glyph { font-size: 24px; }
+  .card-art--hand { height: 34px; }
+  .card-art--hand .card-art__glyph { font-size: 20px; }
+  .mulligan-card { width: 100px; min-height: 150px; }
+  .card-art--mulligan { height: 58px; }
+  .card-art--mulligan .card-art__glyph { font-size: 32px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-art--legendary .card-art__shine { display: none; }
+}
