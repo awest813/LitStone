@@ -40,6 +40,8 @@ const TUTORIAL_DONE_KEY = "litstoneTutorialDone";
 // Deck-builder constants
 const MANA_CURVE_MAX_COST   = 7;   // buckets 1-7; costs ≥7 are grouped under "7+"
 const MAX_AUTOFILL_ATTEMPTS = 500; // safety cap for the random auto-fill loop
+// Ideal curve targets (mirrors game_logic.CURVE_TARGETS + 7+ bucket for 6+ mana)
+const IDEAL_CURVE = { 1: 4, 2: 8, 3: 8, 4: 6, 5: 3, 6: 1 };
 
 // UI state
 let isActing          = false; // prevents double-submit during server round-trips
@@ -542,11 +544,15 @@ function renderCampaignMap() {
     div.disabled = !unlocked;
     const status = done ? "completed" : (unlocked ? "unlocked" : "locked");
     div.setAttribute("aria-label", `${node.name}, ${node.difficulty}, ${status}`);
+    const oppLabel = node.boss_id
+      ? "Boss encounter"
+      : (node.ai_class ? `${node.ai_class} opponent` : "Duel");
     div.innerHTML = `
       <span class="campaign-node-index">${i + 1}</span>
       <span class="campaign-node-body">
         <div class="campaign-node-name">${node.name}</div>
         <div class="campaign-node-sub">${node.subtitle || ""}</div>
+        <div class="campaign-node-meta">${oppLabel}</div>
       </span>
       <span class="campaign-node-badge">${done ? "✓ Done" : node.difficulty}</span>
     `;
@@ -876,34 +882,22 @@ function cardMatchesCostFilter(card) {
   return String(c) === filterCost;
 }
 
-function loadStarterDeck() {
+async function loadStarterDeck() {
   if (!selectedClass) return;
-  const classCards = Object.entries(CARD_DB)
-    .filter(([, c]) => c.classes?.includes(selectedClass) && !c.legendary && !c.uncollectible)
-    .sort((a, b) => a[1].cost - b[1].cost || a[0].localeCompare(b[0]));
-  const neutrals = Object.entries(CARD_DB)
-    .filter(([, c]) => (!c.classes || c.classes.length === 0) && !c.legendary && !c.uncollectible)
-    .sort((a, b) => a[1].cost - b[1].cost || a[0].localeCompare(b[0]));
-
-  draftDeck = [];
-  classCards.slice(0, 6).forEach(([name]) => {
-    for (let i = 0; i < 2 && draftDeck.length < DECK_SIZE; i++) draftDeck.push(name);
-  });
-  let guard = 0;
-  let ni = 0;
-  while (draftDeck.length < DECK_SIZE && neutrals.length > 0 && guard < 600) {
-    guard++;
-    const [name] = neutrals[ni % neutrals.length];
-    const max = CARD_DB[name]?.legendary ? 1 : 2;
-    if (draftDeck.filter(c => c === name).length < max) draftDeck.push(name);
-    ni++;
+  try {
+    const data = await apiFetch(`/api/starter_deck?hero_class=${encodeURIComponent(selectedClass)}`);
+    if (Array.isArray(data.deck) && data.deck.length === DECK_SIZE) {
+      draftDeck = [...data.deck];
+      renderCardPool();
+      updateDeckSidebar();
+      showStatusToast("Curved starter loaded — matches AI deck shape");
+      return;
+    }
+  } catch (_) {
+    /* fall through to local fill */
   }
-  if (draftDeck.length < DECK_SIZE) autoFillDeck();
-  else {
-    renderCardPool();
-    updateDeckSidebar();
-  }
-  showStatusToast("Starter deck loaded — tweak it or play!");
+  autoFillDeck();
+  showStatusToast("Starter filled randomly — tweak the curve before you play");
 }
 
 function updateDeckValidation() {
@@ -1110,33 +1104,75 @@ function updateDeckSidebar() {
     }
   }
   renderManaCurve();
+  updateDeckStrategyHints();
   updateDeckValidation();
+}
+
+function deckCurveCounts(deck = draftDeck) {
+  const counts = {};
+  for (let i = 1; i <= MANA_CURVE_MAX_COST; i++) counts[i] = 0;
+  deck.forEach(name => {
+    const cost = CARD_DB[name]?.cost ?? 0;
+    if (cost <= 0) return;
+    const bucket = cost >= 6 ? MANA_CURVE_MAX_COST : cost;
+    counts[bucket] = (counts[bucket] || 0) + 1;
+  });
+  return counts;
 }
 
 function renderManaCurve() {
   const curveEl = document.getElementById("mana-curve");
   if (!curveEl) return;
 
-  const counts = {};
-  for (let i = 1; i <= MANA_CURVE_MAX_COST; i++) counts[i] = 0;
-  draftDeck.forEach(name => {
-    const cost   = CARD_DB[name]?.cost ?? 0;
-    const bucket = Math.min(cost, MANA_CURVE_MAX_COST);
-    // Cards with cost 0 are excluded from the curve (none exist in the current DB)
-    if (bucket > 0) counts[bucket] = (counts[bucket] || 0) + 1;
-  });
+  const counts = deckCurveCounts();
+  const idealMax = Math.max(...Object.values(IDEAL_CURVE), IDEAL_CURVE[6] || 1, 1);
+  const maxCount = Math.max(...Object.values(counts), idealMax, 1);
 
-  const maxCount = Math.max(...Object.values(counts), 1);
-  curveEl.innerHTML = Object.entries(counts).map(([cost, count]) => {
-    const pct   = Math.round((count / maxCount) * 100);
-    const label = Number(cost) === MANA_CURVE_MAX_COST ? `${cost}+` : cost;
+  curveEl.innerHTML = Object.keys(counts).map(costKey => {
+    const cost = Number(costKey);
+    const count = counts[cost] || 0;
+    const pct = Math.round((count / maxCount) * 100);
+    const ideal = cost === MANA_CURVE_MAX_COST
+      ? (IDEAL_CURVE[6] || 0)
+      : (IDEAL_CURVE[cost] || 0);
+    const idealPct = Math.round((ideal / maxCount) * 100);
+    const label = cost === MANA_CURVE_MAX_COST ? `${cost}+` : cost;
     return `<div class="curve-bar-wrap">
       <div class="curve-bar-inner">
+        <div class="curve-bar-target" style="height:${idealPct}%" title="Ideal ~${ideal}"></div>
         <div class="curve-bar" style="height:${pct}%" title="${count} card${count !== 1 ? "s" : ""}"></div>
       </div>
       <div class="curve-label">${label}</div>
     </div>`;
   }).join("");
+}
+
+function updateDeckStrategyHints() {
+  const el = document.getElementById("deck-strategy-hints");
+  if (!el) return;
+  if (!draftDeck.length) {
+    el.textContent = "";
+    el.className = "deck-strategy-hints";
+    return;
+  }
+
+  const hints = [];
+  const counts = deckCurveCounts();
+  const early = (counts[1] || 0) + (counts[2] || 0);
+  const late = (counts[5] || 0) + (counts[6] || 0) + (counts[7] || 0);
+  if (early < 6) hints.push("Light early curve — add more 1–2 drops");
+  else if (early > 14) hints.push("Very aggressive curve — consider more mid-game cards");
+  if (late > 10) hints.push("Top-heavy — trim expensive cards");
+
+  const taunts = draftDeck.filter(n => CARD_DB[n]?.taunt).length;
+  const spells = draftDeck.filter(n => CARD_DB[n]?.type === "spell").length;
+  const minions = draftDeck.filter(n => CARD_DB[n]?.type === "minion").length;
+  if (taunts >= 6) hints.push(`${taunts} taunts — strong defensive shell`);
+  if (spells >= 12) hints.push(`${spells} spells — control/burn heavy`);
+  if (minions >= 22 && spells <= 6) hints.push("Board-focused — pack early minions");
+
+  el.textContent = hints.slice(0, 2).join(" · ") || "Balanced curve — good to go";
+  el.className = `deck-strategy-hints${hints.length ? " deck-strategy-hints--active" : ""}`;
 }
 
 function autoFillDeck() {

@@ -610,22 +610,32 @@ def give_coin(player: dict) -> None:
 
 
 def ai_choose_mulligan(player: dict) -> list[int]:
-    """Heuristic mulligan: replace expensive cards and weak early hands."""
+    """Heuristic mulligan: keep early curve, replace expensive dead cards."""
     swap: list[int] = []
-    costs = []
+    costs: list[int] = []
     for i, card_name in enumerate(player["hand"]):
         card = CARD_DB[card_name]
         cost = card.get("cost", 0)
         costs.append(cost)
-        if cost >= 5:
+        if cost >= 6:
+            swap.append(i)
+        elif cost == 5:
             swap.append(i)
         elif cost == 4 and len(player["hand"]) >= 4:
             swap.append(i)
+
     kept = [c for j, c in enumerate(costs) if j not in swap]
-    if kept and max(kept) >= 4 and not any(c <= 2 for c in kept):
-        for i, cost in enumerate(costs):
-            if cost >= 3 and i not in swap:
-                swap.append(i)
+    if kept:
+        has_early = any(c <= 2 for c in kept)
+        if not has_early and max(kept) >= 3:
+            for i, cost in enumerate(costs):
+                if cost >= 3 and i not in swap:
+                    swap.append(i)
+        # Two or more 5+ cards is too greedy for an opener.
+        if sum(1 for c in kept if c >= 5) >= 2:
+            for i, cost in enumerate(costs):
+                if cost >= 5 and i not in swap:
+                    swap.append(i)
     return sorted(set(swap))
 
 
@@ -1069,6 +1079,19 @@ def check_win(p1: dict, p2: dict) -> str | None:
 # 4. AI
 # ---------------------------------------------------------------------------
 
+def _hero_missing_hp(player: dict) -> int:
+    cap = player.get("max_hp", 30)
+    return max(0, cap - player["hp"])
+
+
+def _ai_should_pass_turn(legal: list, move: tuple, score: float, p2: dict, p1: dict) -> bool:
+    """Stop the AI turn when the chosen move is a wasteful hero power."""
+    del legal, p2, p1  # signature kept for future lookahead
+    if move[0] == "hero_power" and score <= 0:
+        return True
+    return False
+
+
 def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
     action, idx, target = move
     score = 0.0
@@ -1105,9 +1128,7 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
                     score += 1
 
             elif card["effect"] == "heal":
-                # Score proportionally to how much healing is actually needed;
-                # small penalty if the AI is already close to full health.
-                hp_missing = 30 - p2["hp"]
+                hp_missing = _hero_missing_hp(p2)
                 effective_heal = min(card["val"], hp_missing)
                 score += effective_heal if effective_heal > 0 else -3
 
@@ -1138,7 +1159,7 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
 
             elif card["effect"] == "heal_all":
                 heal_val = card["val"]
-                score += 3 if p2["hp"] < 20 else 0
+                score += 3 if _hero_missing_hp(p2) >= 10 else 0
                 score += sum(
                     min(heal_val, m.get("max_hp", m["hp"]) - m["hp"])
                     for m in p2["board"]
@@ -1169,6 +1190,11 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
             def_dmg = 0 if attacker.get("divine_shield") else defender["atk"]
             if def_dmg > 0 and defender.get("poisonous"): def_dmg = attacker["hp"]
 
+            if defender.get("taunt") and sum(
+                m["atk"] for m in p2["board"] if m.get("can_attack")
+            ) > attacker["atk"]:
+                score += 4
+
             if def_dmg < attacker["hp"] and atk_dmg >= defender["hp"]: score += 15
             elif atk_dmg >= defender["hp"]:                              score += 5
             else:                                                         score -= 5
@@ -1192,7 +1218,13 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
     elif action == "hero_power":
         cls = p2["hero_class"]
         if cls == "Warrior":
-            score += 2
+            missing = _hero_missing_hp(p2)
+            if missing == 0 and p2.get("armor", 0) >= 8:
+                score -= 8
+            elif missing == 0:
+                score -= 3
+            else:
+                score += min(4, missing)
         elif cls == "Mage":
             if target != "hero":
                 tm = p1["board"][target]
@@ -1204,11 +1236,13 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
                 score += 1
         elif cls == "Priest":
             if target == "hero":
-                score += 3 if p2["hp"] <= 28 else -5
+                healable = clamp_heal(p2, 2)
+                score += healable * 2 if healable > 0 else -6
             else:
                 tm = p2["board"][target]
                 max_hp = tm.get("max_hp", tm["hp"])
-                score += 4 if tm["hp"] < max_hp else -5
+                missing = max(0, max_hp - tm["hp"])
+                score += min(4, missing) if missing > 0 else -5
         elif cls == "Rogue":
             # Dagger Mastery: equip 1/2 weapon — worth it if no weapon already
             score += 4 if not p2.get("weapon") else -2
@@ -1243,6 +1277,9 @@ def run_ai_turn(
             break
         best = select_ai_move(legal, p2, p1, difficulty)
         if best is None:
+            break
+        best_score = evaluate_ai_move(p2, p1, best)
+        if _ai_should_pass_turn(legal, best, best_score, p2, p1):
             break
         execute_move(p2, p1, best)
         moves_made.append(best)

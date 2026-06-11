@@ -23,7 +23,7 @@ from game_logic import (
     ai_choose_mulligan, ai_do_mulligan,
     card_allowed_for_class, cards_for_class,
     clamp_practice_hp, apply_practice_options, effective_mana,
-    clamp_heal,
+    clamp_heal, _ai_should_pass_turn, _hero_missing_hp, CURVE_TARGETS,
 )
 
 
@@ -862,6 +862,34 @@ class TestEvaluateAiMove(unittest.TestCase):
         score = evaluate_ai_move(p2, p1, move)
         self.assertGreaterEqual(score, 1000)
 
+    def test_warrior_hero_power_negative_at_full_hp(self):
+        p1, p2 = self._setup_ai_game()
+        p2["hero_class"] = "Warrior"
+        p2["hp"] = p2["max_hp"] = 30
+        p2["armor"] = 10
+        score = evaluate_ai_move(p2, p1, ("hero_power", None, None))
+        self.assertLess(score, 0)
+
+    def test_priest_hero_power_scores_by_healable_amount(self):
+        p1, p2_hurt = self._setup_ai_game()
+        _, p2_full = self._setup_ai_game()
+        p2_hurt["hero_class"] = "Priest"
+        p2_full["hero_class"] = "Priest"
+        p2_hurt["hp"] = 20
+        score_hurt = evaluate_ai_move(p2_hurt, p1, ("hero_power", None, "hero"))
+        score_full = evaluate_ai_move(p2_full, p1, ("hero_power", None, "hero"))
+        self.assertGreater(score_hurt, score_full)
+
+    def test_ai_passes_wasteful_hero_power(self):
+        p1 = create_player("P1", "Mage")
+        p2 = create_player("AI", "Warrior")
+        p2["hp"] = 30
+        p2["armor"] = 10
+        legal = [("hero_power", None, None)]
+        move = ("hero_power", None, None)
+        score = evaluate_ai_move(p2, p1, move)
+        self.assertTrue(_ai_should_pass_turn(legal, move, score, p2, p1))
+
 
 class TestExecuteMoveCleanup(unittest.TestCase):
     """Tests for cleanup_dead being called even in error paths."""
@@ -1269,6 +1297,13 @@ class TestAiMulligan(unittest.TestCase):
         swap = ai_choose_mulligan(p)
         self.assertEqual(swap, [])
 
+    def test_ai_mulligans_two_expensive_cards(self):
+        p = create_player("AI", "Mage", shuffle=False)
+        p["hand"] = ["King Arthur", "Meteor Manuscript", "Town Crier", "Castle Guard"]
+        swap = ai_choose_mulligan(p)
+        self.assertIn(0, swap)
+        self.assertIn(1, swap)
+
     def test_ai_do_mulligan_preserves_hand_size(self):
         p = create_player("AI", "Mage", shuffle=False)
         for _ in range(4):
@@ -1531,6 +1566,21 @@ class TestServerApi(unittest.TestCase):
         end = client.post("/api/action", json={"game_id": gid, "action": "end_turn"})
         self.assertEqual(end.status_code, 200)
         self.assertNotIn("card_db", end.get_json())
+
+    def test_starter_deck_endpoint(self):
+        from server import app
+        client = app.test_client()
+        res = client.get("/api/starter_deck?hero_class=Mage")
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertEqual(len(data["deck"]), DECK_SIZE)
+        self.assertEqual({int(k): v for k, v in data["curve_targets"].items()}, CURVE_TARGETS)
+
+    def test_starter_deck_rejects_bad_class(self):
+        from server import app
+        client = app.test_client()
+        res = client.get("/api/starter_deck?hero_class=Invalid")
+        self.assertEqual(res.status_code, 400)
 
 
 if __name__ == "__main__":

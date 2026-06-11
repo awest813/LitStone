@@ -20,8 +20,10 @@ from game_logic import (
     OPENING_HAND_SECOND,
     ai_do_mulligan,
     apply_practice_options,
+    build_curved_ai_deck,
     card_allowed_for_class,
     cards_for_class,
+    CURVE_TARGETS,
     check_win,
     clamp_practice_hp,
     create_ai_opponent,
@@ -287,6 +289,20 @@ def _resolve_match_setup(data: dict) -> dict:
 @app.route("/api/campaign", methods=["GET"])
 def campaign_info():
     return jsonify({"nodes": CAMPAIGN_NODES, "deck_size": DECK_SIZE})
+
+
+@app.route("/api/starter_deck", methods=["GET"])
+def starter_deck():
+    """Return a curved 30-card starter list for deck builder (mirrors AI curve)."""
+    hero_class = request.args.get("hero_class", "Mage")
+    if hero_class not in HERO_CLASSES:
+        return jsonify({"error": f"Unknown hero class: {hero_class}"}), 400
+    return jsonify({
+        "hero_class": hero_class,
+        "deck": build_curved_ai_deck(hero_class),
+        "deck_size": DECK_SIZE,
+        "curve_targets": CURVE_TARGETS,
+    })
 
 
 @app.route("/api/new_game", methods=["POST"])

@@ -273,8 +273,9 @@
 
       <!-- Mana curve -->
       <div class="mana-curve-box">
-        <div class="mana-curve-title">Mana Curve</div>
+        <div class="mana-curve-title">Mana Curve <span class="mana-curve-legend">· gold = ideal</span></div>
         <div class="mana-curve" id="mana-curve"></div>
+        <p class="deck-strategy-hints" id="deck-strategy-hints" aria-live="polite"></p>
       </div>
 
       <ul class="deck-list" id="deck-list"></ul>
@@ -297,11 +298,12 @@
       </div>
 
       <div class="match-options">
-        <label class="match-option-label" for="match-difficulty">AI difficulty</label>
-        <select id="match-difficulty" class="setting-select match-difficulty-select" aria-label="AI difficulty">
-          <option value="easy">Easy</option>
-          <option value="normal" selected>Normal</option>
-          <option value="hard">Hard</option>
+        <label class="match-option-label" for="match-difficulty" title="How aggressively the AI values trades and lethal">AI difficulty</label>
+        <select id="match-difficulty" class="setting-select match-difficulty-select" aria-label="AI difficulty"
+                title="Easy: random &amp; forgiving · Normal: solid trades · Hard: punishes mistakes">
+          <option value="easy" title="40% random plays; picks from the top half of scored moves">Easy — learning</option>
+          <option value="normal" selected title="Picks strong trades and near-lethal lines">Normal — standard</option>
+          <option value="hard" title="Consistently picks the best heuristic line">Hard — ruthless</option>
         </select>
       </div>
       <div class="deck-start-wrap">

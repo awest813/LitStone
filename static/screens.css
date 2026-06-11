@@ -503,6 +503,15 @@
   line-height: 1.35;
 }
 
+.campaign-node-meta {
+  font-size: 9px;
+  color: var(--col-mana-bright);
+  margin-top: 4px;
+  font-family: 'Cinzel', serif;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
 .campaign-node-badge {
   font-size: 9px;
   font-family: 'Cinzel', serif;
