@@ -11,7 +11,7 @@ A lightweight, browser-based card game inspired by Hearthstone. Play against an 
 - **Rich card mechanics** — Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle
 - **Mulligan phase** — Select any opening-hand cards to redraw before each game starts
 - **Literary Legends** — Legendary minions inspired by Sherlock Holmes, Dr. John Watson, Professor Moriarty, Van Helsing, Victor Frankenstein, Frankenstein's Monster, Alice, The Mad Hatter, The White Rabbit, The Queen of Hearts, The Cheshire Cat, Snow White, Rapunzel, Sleeping Beauty, Little Red Riding Hood, Rumpelstiltskin, The Big Bad Wolf, Pied Piper, Baba Yaga, Bluebeard, King Arthur, Merlin, Lancelot, Guinevere, Morgan le Fay, Mordred, Gawain, Robin Hood, Maid Marian, Friar Tuck, Little John, Will Scarlet, Ebenezer Scrooge, Oliver Twist, Ivanhoe, Quasimodo, and Don Quixote (max 1 copy per deck)
-- **Deck Builder** — Build a custom 15-card deck (max 2 copies per card; max 1 copy of Legendary cards) before each game
+- **Deck Builder** — Build a custom 30-card deck (max 2 copies per card; max 1 copy of Legendary cards) before each game
 - **AI opponent** — Heuristic-driven AI that evaluates board state and plays competitively
 - **Combat log** — Real-time log of every action taken during the game
 - **Fatigue system** — Players take increasing damage when their deck runs out
@@ -56,7 +56,7 @@ python3 -m unittest test_game_logic -v
 ## How to Play
 
 1. **Choose a Hero Class** on the main menu.
-2. **Build your deck** — select 15 cards from the card pool (up to 2 copies each).
+2. **Build your deck** — select 30 cards from the card pool (up to 2 copies each).
 3. Click **Play vs AI** to start the game.
 4. On your turn, play cards from your hand, attack with minions or your hero, and use your hero power.
 5. Click **End Turn** to let the AI take its turn.

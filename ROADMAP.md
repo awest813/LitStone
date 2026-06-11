@@ -31,8 +31,9 @@ The current state of the project establishes the core gameplay loop.
 Goals: make the game feel complete and production-ready for single-player use.
 
 - [ ] **Persistent game state** — survive server restarts using a lightweight store (e.g. SQLite or JSON file)
-- [ ] **Per-session game IDs** — support multiple concurrent games (replace global `GAME_STATE`)
-- [ ] **Improved AI** — smarter target selection, mulligan, difficulty tiers, reduced random noise
+- [x] **Per-session game IDs** — UUID-keyed game sessions (`GAMES` dict)
+- [x] **AI mulligan** — heuristic opening-hand swaps for the AI opponent
+- [ ] **Improved AI** — smarter target selection, difficulty tiers, reduced random noise
 - [x] **Partial card animations** — summon flash, damage float, buff glow, turn banner, hero flash
 - [ ] **Full card animations** — play-from-hand arc, attack lunge, death removal
 - [ ] **Sound effects** — basic audio feedback for card play, attacks, and victory
@@ -52,8 +53,9 @@ Goals: deepen the card pool and hero variety.
 - [x] **Additional hero classes** — Rogue and Paladin added; Shaman remains planned
 - [ ] **Class-specific cards** — some cards restricted to certain hero classes
 - [x] **Legendary minions** — 37 high-impact unique cards (one copy per deck)
-- [ ] **30-card decks** — standard CCG deck size (see Hearthstone Lite plan)
-- [ ] **The Coin** — second-player compensation
+- [x] **30-card decks** — standard CCG deck size
+- [x] **The Coin** — second-player gains +1 mana crystal (once)
+- [x] **First-player randomization** — coin flip for who goes first
 - [ ] **Adventure / campaign mode** — scripted encounters against bosses with predefined decks
 
 ---

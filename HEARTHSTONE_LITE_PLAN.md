@@ -24,7 +24,7 @@ LitStone is a **solid prototype** with a working single-player loop, a rich lite
 
 | Gap | Impact |
 |-----|--------|
-| 15-card decks (HS uses 30) | Games feel swingy and short |
+| ~~15-card decks~~ → 30-card decks | ✅ Addressed in Phase 1 |
 | No class-specific cards | Heroes feel interchangeable |
 | Emoji art, no audio | Low immersion |
 | AI doesn't mulligan; random scoring noise | Inconsistent challenge |
@@ -237,13 +237,14 @@ Add new mechanics in Python with tests **before** wiring UI.
 
 ---
 
-## Immediate Next Steps (this week)
+## Immediate Next Steps
 
-1. **Phase 1 kickoff:** Design doc for 30-card migration (constants, UI labels, AI decks).
-2. **Implement `game_id` sessions** in `server.py` (smallest change: UUID keyed dict).
-3. **AI mulligan** in `game_logic.py` — heuristic keep curve.
-4. **Animation spike:** one play-from-hand arc in `game.js` as template for others.
-5. **Class card schema:** add `"classes": ["Mage"]` field to `CARD_DB` entries.
+1. ~~**30-card migration**~~ — ✅ `DECK_SIZE = 30`, builder UI, AI decks updated.
+2. ~~**`game_id` sessions**~~ — ✅ UUID-keyed `GAMES` dict in `server.py`.
+3. ~~**AI mulligan**~~ — ✅ `ai_choose_mulligan` / `ai_do_mulligan`.
+4. ~~**The Coin + first player**~~ — ✅ random first player, coin to second.
+5. **Animation spike:** one play-from-hand arc in `game.js` as template for others.
+6. **Class card schema:** add `"classes": ["Mage"]` field to `CARD_DB` entries.
 
 ---
 

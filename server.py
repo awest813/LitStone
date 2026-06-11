@@ -5,21 +5,46 @@ Serves the browser-based UI and exposes a JSON REST API for all game actions.
 
 import os
 import random
+import uuid
 from flask import Flask, jsonify, request, render_template
 
 from game_logic import (
-    CARD_DB, HERO_CLASSES, GAME_LOG,
+    CARD_DB, HERO_CLASSES, GAME_LOG, DECK_SIZE,
+    OPENING_HAND_FIRST, OPENING_HAND_SECOND, COIN_CARD,
     create_player, draw_card, start_turn, do_mulligan,
     get_legal_moves, execute_move, check_win,
-    run_ai_turn, log_action,
+    run_ai_turn, log_action, give_coin, ai_do_mulligan,
+    set_active_log,
 )
 
 app = Flask(__name__)
 
 # ---------------------------------------------------------------------------
-# Single-session game state (one game at a time — fine for a local demo)
+# Per-session game state (keyed by game_id UUID)
 # ---------------------------------------------------------------------------
-GAME_STATE: dict = {}
+GAMES: dict[str, dict] = {}
+
+
+def _resolve_game_id() -> str | None:
+    data = request.get_json(silent=True) or {}
+    gid = (data.get("game_id") or request.args.get("game_id") or "").strip()
+    return gid or None
+
+
+def _get_game(game_id: str | None) -> dict | None:
+    if not game_id:
+        return None
+    return GAMES.get(game_id)
+
+
+def _validate_deck(deck: list) -> bool:
+    valid_cards = {k for k, c in CARD_DB.items() if not c.get("uncollectible")}
+    return (
+        isinstance(deck, list) and
+        len(deck) == DECK_SIZE and
+        all(c in valid_cards for c in deck) and
+        all(deck.count(c) <= (1 if CARD_DB[c].get("legendary") else 2) for c in deck)
+    )
 
 
 def _serialize(player: dict) -> dict:
@@ -32,30 +57,82 @@ def _serialize(player: dict) -> dict:
 def _serialize_opponent(player: dict) -> dict:
     """Return a JSON-safe copy of an opponent player dict with hidden information masked."""
     p = _serialize(player)
-    # Hide the AI's hand contents and deck order to prevent cheating via
-    # browser dev-tools / network inspection.  The frontend only needs the
-    # *count* of cards, not their identities.
     p["hand"] = ["?"] * len(player["hand"])
     p["deck"] = ["?"] * len(player["deck"])
     return p
 
 
-def _state_response() -> dict:
-    gs = GAME_STATE
-    winner = check_win(gs["p1"], gs["p2"]) if gs else None
+def _state_response(gs: dict) -> dict:
+    winner = check_win(gs["p1"], gs["p2"])
     mulligan = gs.get("mulligan_phase", False)
-    legal  = get_legal_moves(gs["p1"], gs["p2"]) if gs and not winner and not mulligan else []
+    legal = get_legal_moves(gs["p1"], gs["p2"]) if not winner and not mulligan else []
     return {
-        "p1":             _serialize(gs["p1"]),
-        "p2":             _serialize_opponent(gs["p2"]),
-        "is_player_turn": gs.get("is_player_turn", True),
-        "turn_number":    gs.get("turn_number", 1),
-        "log":            list(GAME_LOG[-60:]),
-        "winner":         winner,
-        "card_db":        CARD_DB,
-        "_legal_moves":   legal,
-        "mulligan_phase": mulligan,
+        "game_id":          gs["game_id"],
+        "p1":               _serialize(gs["p1"]),
+        "p2":               _serialize_opponent(gs["p2"]),
+        "is_player_turn":   gs.get("is_player_turn", True),
+        "player_goes_first": gs.get("player_goes_first", True),
+        "turn_number":      gs.get("turn_number", 1),
+        "log":              list(gs.get("log", [])[-60:]),
+        "winner":           winner,
+        "card_db":          CARD_DB,
+        "_legal_moves":     legal,
+        "mulligan_phase":   mulligan,
     }
+
+
+def _with_game_log(gs: dict):
+    """Context manager helper — activate per-game logging for rule engine calls."""
+    class _LogCtx:
+        def __enter__(self):
+            set_active_log(gs.setdefault("log", []))
+            return gs
+
+        def __exit__(self, *args):
+            set_active_log(None)
+
+    return _LogCtx()
+
+
+def _deal_opening_hands(gs: dict) -> None:
+    """Deal opening hands based on who goes first."""
+    first, second = (gs["p1"], gs["p2"]) if gs["player_goes_first"] else (gs["p2"], gs["p1"])
+    for _ in range(OPENING_HAND_FIRST):
+        draw_card(first)
+    for _ in range(OPENING_HAND_SECOND):
+        draw_card(second)
+
+
+def _finish_mulligan(gs: dict) -> None:
+    """AI mulligan, grant The Coin, and begin the first turn."""
+    ai_do_mulligan(gs["p2"])
+
+    if gs["player_goes_first"]:
+        give_coin(gs["p2"])
+    else:
+        give_coin(gs["p1"])
+
+    gs["mulligan_phase"] = False
+
+    if gs["player_goes_first"]:
+        gs["is_player_turn"] = True
+        gs["turn_number"] = 1
+        start_turn(gs["p1"], draw=False)
+        log_action("--- Your Turn (Turn 1) ---")
+        return
+
+    gs["is_player_turn"] = False
+    gs["turn_number"] = 1
+    log_action("--- AI goes first ---")
+    run_ai_turn(gs["p2"], gs["p1"], draw=False)
+    winner = check_win(gs["p1"], gs["p2"])
+    if winner:
+        log_action(f"=== {winner} wins! ===")
+        return
+    gs["is_player_turn"] = True
+    gs["turn_number"] = 2
+    start_turn(gs["p1"])
+    log_action("--- Your Turn (Turn 2) ---")
 
 
 # ---------------------------------------------------------------------------
@@ -70,87 +147,91 @@ def index():
 @app.route("/api/cards", methods=["GET"])
 def cards():
     """Return the card database and hero class list — available before any game starts."""
-    return jsonify({"card_db": CARD_DB, "hero_classes": HERO_CLASSES})
+    collectibles = {k: v for k, v in CARD_DB.items() if not v.get("uncollectible")}
+    return jsonify({
+        "card_db": collectibles,
+        "hero_classes": HERO_CLASSES,
+        "deck_size": DECK_SIZE,
+    })
 
 
 @app.route("/api/new_game", methods=["POST"])
 def new_game():
-    data       = request.get_json()
+    data       = request.get_json() or {}
     player_cls = data.get("hero_class", "Mage")
     deck       = data.get("deck", [])
 
-    # Sanitise inputs
     if player_cls not in HERO_CLASSES:
         player_cls = "Mage"
 
-    valid_cards = set(CARD_DB.keys())
-    deck_valid  = (
-        isinstance(deck, list) and
-        len(deck) == 15 and
-        all(c in valid_cards for c in deck) and
-        all(deck.count(c) <= (1 if CARD_DB[c].get("legendary") else 2) for c in deck)
-    )
+    deck_valid = _validate_deck(deck)
 
+    game_id = str(uuid.uuid4())
     GAME_LOG.clear()
-    log_action("--- NEW GAME STARTED ---")
 
-    ai_class = random.choice(HERO_CLASSES)
-    gs = GAME_STATE
-    gs["p1"] = create_player("Player", player_cls, deck if deck_valid else None)
-    gs["p2"] = create_player("AI", ai_class)
+    player_goes_first = random.choice([True, False])
+    gs = {
+        "game_id":           game_id,
+        "p1":                create_player("Player", player_cls, deck if deck_valid else None),
+        "p2":                create_player("AI", random.choice(HERO_CLASSES)),
+        "turn_number":       1,
+        "is_player_turn":    True,
+        "mulligan_phase":    True,
+        "player_goes_first": player_goes_first,
+        "log":               [],
+    }
+    GAMES[game_id] = gs
 
-    # Deal opening hands (mulligan phase — player sees these before game begins)
-    for _ in range(3):
-        draw_card(gs["p1"])
-    for _ in range(4):
-        draw_card(gs["p2"])
+    with _with_game_log(gs):
+        log_action("--- NEW GAME STARTED ---")
+        order = "You go first." if player_goes_first else "AI goes first — you'll receive The Coin."
+        log_action(order)
+        _deal_opening_hands(gs)
+        log_action("--- Mulligan Phase: choose cards to replace ---")
 
-    gs["turn_number"]    = 1
-    gs["is_player_turn"] = True
-    gs["mulligan_phase"] = True
-    log_action("--- Mulligan Phase: choose cards to replace ---")
-
-    return jsonify(_state_response())
+    return jsonify(_state_response(gs))
 
 
 @app.route("/api/mulligan", methods=["POST"])
 def do_mulligan_route():
-    if not GAME_STATE:
+    game_id = _resolve_game_id()
+    gs = _get_game(game_id)
+    if not gs:
         return jsonify({"error": "No game in progress"}), 400
-    gs = GAME_STATE
     if not gs.get("mulligan_phase"):
         return jsonify({"error": "Not in mulligan phase"}), 400
 
-    data    = request.get_json()
+    data    = request.get_json() or {}
     indices = data.get("indices", [])
     if not isinstance(indices, list):
         indices = []
-    # Validate indices
     indices = [i for i in indices if isinstance(i, int) and 0 <= i < len(gs["p1"]["hand"])]
 
-    do_mulligan(gs["p1"], indices)
-    gs["mulligan_phase"] = False
-    start_turn(gs["p1"])
-    log_action("--- Your Turn (Turn 1) ---")
+    with _with_game_log(gs):
+        do_mulligan(gs["p1"], indices)
+        _finish_mulligan(gs)
 
-    return jsonify(_state_response())
+    return jsonify(_state_response(gs))
 
 
 @app.route("/api/state", methods=["GET"])
 def get_state():
-    if not GAME_STATE:
+    game_id = _resolve_game_id()
+    gs = _get_game(game_id)
+    if not gs:
         return jsonify({"error": "No game in progress"}), 400
-    return jsonify(_state_response())
+    return jsonify(_state_response(gs))
 
 
 @app.route("/api/action", methods=["POST"])
 def do_action():
-    if not GAME_STATE:
+    game_id = _resolve_game_id()
+    gs = _get_game(game_id)
+    if not gs:
         return jsonify({"error": "No game in progress"}), 400
 
-    gs  = GAME_STATE
-    p1  = gs["p1"]
-    p2  = gs["p2"]
+    p1 = gs["p1"]
+    p2 = gs["p2"]
 
     if gs.get("mulligan_phase"):
         return jsonify({"error": "Mulligan phase in progress"}), 400
@@ -158,61 +239,65 @@ def do_action():
     if not gs.get("is_player_turn"):
         return jsonify({"error": "Not your turn"}), 400
 
-    data   = request.get_json()
+    data   = request.get_json() or {}
     action = data.get("action")
-    idx    = data.get("idx")      # None is fine for hero actions
-    target = data.get("target")   # May be "hero" or an int index
+    idx    = data.get("idx")
+    target = data.get("target")
 
-    # Normalise target type (JSON sends numbers as int, "hero" as string)
     if isinstance(target, int):
-        pass  # already correct
+        pass
     elif target == "hero":
         pass
     else:
         target = None
 
-    if action == "end_turn":
-        gs["is_player_turn"] = False
-        log_action("--- AI's Turn ---")
-        run_ai_turn(p2, p1)
-        gs["turn_number"] += 1
-        # Only start the player's turn if nobody has won
+    with _with_game_log(gs):
+        if action == "end_turn":
+            gs["is_player_turn"] = False
+            log_action("--- AI's Turn ---")
+            run_ai_turn(p2, p1)
+            gs["turn_number"] += 1
+            winner = check_win(p1, p2)
+            if not winner:
+                gs["is_player_turn"] = True
+                start_turn(p1)
+                log_action(f"--- Your Turn (Turn {gs['turn_number']}) ---")
+            else:
+                log_action(f"=== {winner} wins! ===")
+            return jsonify(_state_response(gs))
+
+        move  = (action, idx, target)
+        legal = get_legal_moves(p1, p2)
+        if move not in legal:
+            return jsonify({"error": "Illegal move", "legal": legal}), 400
+
+        execute_move(p1, p2, move)
+
         winner = check_win(p1, p2)
-        if not winner:
-            gs["is_player_turn"] = True
-            start_turn(p1)
-            log_action(f"--- Your Turn (Turn {gs['turn_number']}) ---")
-        return jsonify(_state_response())
+        if winner:
+            log_action(f"=== {winner} wins! ===")
 
-    # Validate and execute player move
-    move   = (action, idx, target)
-    legal  = get_legal_moves(p1, p2)
-    if move not in legal:
-        return jsonify({"error": "Illegal move", "legal": legal}), 400
-
-    execute_move(p1, p2, move)
-
-    winner = check_win(p1, p2)
-    if winner:
-        log_action(f"=== {winner} wins! ===")
-
-    return jsonify(_state_response())
+    return jsonify(_state_response(gs))
 
 
 @app.route("/api/legal_moves", methods=["GET"])
 def legal_moves():
-    if not GAME_STATE:
+    game_id = _resolve_game_id()
+    gs = _get_game(game_id)
+    if not gs:
         return jsonify({"error": "No game in progress"}), 400
-    gs = GAME_STATE
     moves = get_legal_moves(gs["p1"], gs["p2"])
     return jsonify({"moves": moves})
 
 
 @app.route("/api/resign", methods=["POST"])
 def resign():
-    """Clear the in-memory game so a new match can start cleanly."""
-    GAME_STATE.clear()
-    GAME_LOG.clear()
+    """Remove a game session so a new match can start cleanly."""
+    game_id = _resolve_game_id()
+    if game_id and game_id in GAMES:
+        del GAMES[game_id]
+    if not GAMES:
+        GAME_LOG.clear()
     return jsonify({"ok": True})
 
 

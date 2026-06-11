@@ -9,6 +9,8 @@
 // State
 // ---------------------------------------------------------------------------
 let CARD_DB   = {};          // injected on first server response
+let DECK_SIZE = 30;          // synced from /api/cards
+let gameId    = null;        // per-match session id from server
 let gameState = null;        // latest server state snapshot
 let selected  = null;        // { type: "hand"|"board"|"hero_power"|"hero_weapon", idx }
 let draftDeck = [];
@@ -50,6 +52,7 @@ const CARD_EMOJIS = {
   BW:"🐺", PP:"🎶", BY:"🧹", BB:"🔑", KA:"⚔️", ME:"🔮", LT:"🛡️", GV:"🌹",
   MF:"🧙‍♀️", MD:"🩸", GW:"🛡️", RH:"🏹", MM:"🌿", FT:"🍺", LJ:"💪", WS:"🎯",
   ES:"💰", OT:"🥣",
+  CN:"🪙",
 };
 
 // Hero class accent colors
@@ -147,7 +150,7 @@ function renderCardPool() {
     const isLegendary = !!card.legendary;
     const maxCopies  = isLegendary ? 1 : 2;
     const count  = draftDeck.filter(c => c === name).length;
-    const isFull = count >= maxCopies || draftDeck.length >= 15;
+    const isFull = count >= maxCopies || draftDeck.length >= DECK_SIZE;
     const div    = document.createElement("div");
     div.className = `pool-card pool-card--${card.type}${isFull ? " pool-card--full" : ""}${isLegendary ? " pool-card--legendary" : ""}`;
     div.dataset.name = name;
@@ -191,7 +194,7 @@ function renderCardPool() {
 }
 
 function addCardToDeck(name) {
-  if (draftDeck.length >= 15) return;
+  if (draftDeck.length >= DECK_SIZE) return;
   const maxCopies = CARD_DB[name]?.legendary ? 1 : 2;
   if (draftDeck.filter(c => c === name).length >= maxCopies) return;
   draftDeck.push(name);
@@ -209,7 +212,7 @@ function removeFromDeck(name) {
 function updateDeckSidebar() {
   const count  = draftDeck.length;
   document.getElementById("deck-count").textContent    = count;
-  document.getElementById("deck-progress").style.width = `${(count / 15) * 100}%`;
+  document.getElementById("deck-progress").style.width = `${(count / DECK_SIZE) * 100}%`;
 
   const list   = document.getElementById("deck-list");
   list.innerHTML = "";
@@ -227,7 +230,7 @@ function updateDeckSidebar() {
     list.appendChild(li);
   });
 
-  document.getElementById("btn-start-ai").disabled = count !== 15;
+  document.getElementById("btn-start-ai").disabled = count !== DECK_SIZE;
   renderManaCurve();
 }
 
@@ -260,7 +263,7 @@ function renderManaCurve() {
 function autoFillDeck() {
   const pool = Object.keys(CARD_DB);
   let tries = 0;
-  while (draftDeck.length < 15 && tries < MAX_AUTOFILL_ATTEMPTS) {
+  while (draftDeck.length < DECK_SIZE && tries < MAX_AUTOFILL_ATTEMPTS) {
     tries++;
     const name = pool[Math.floor(Math.random() * pool.length)];
     const maxCopies = CARD_DB[name]?.legendary ? 1 : 2;
@@ -306,6 +309,9 @@ function loadDeck(name) {
   if (!entry) return;
   // Filter out any cards that no longer exist in CARD_DB (e.g. after a card set update)
   draftDeck = entry.cards.filter(c => CARD_DB[c]);
+  if (draftDeck.length !== DECK_SIZE) {
+    showStatusToast(`Saved deck has ${draftDeck.length} cards — rebuild to ${DECK_SIZE}.`);
+  }
   renderCardPool();
   updateDeckSidebar();
 }
@@ -350,6 +356,13 @@ let mulliganSwapSet = new Set(); // indices of cards marked for swap
 function renderMulligan(state) {
   const hand = state.p1.hand;
   mulliganSwapSet = new Set();
+  const sub = document.querySelector(".mulligan-subtitle");
+  if (sub) {
+    const goingFirst = state.player_goes_first !== false;
+    sub.textContent = goingFirst
+      ? `You go first — ${hand.length} cards. Click to swap, then confirm.`
+      : `You go second — ${hand.length} cards. You'll receive The Coin after mulligan.`;
+  }
   const container = document.getElementById("mulligan-cards");
   container.innerHTML = "";
 
@@ -408,7 +421,7 @@ async function confirmMulligan() {
     const res  = await fetch("/api/mulligan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ indices }),
+      body: JSON.stringify({ game_id: gameId, indices }),
     });
     const data = await res.json();
     if (data.error) {
@@ -432,7 +445,7 @@ async function confirmMulligan() {
 }
 
 async function startGame() {
-  if (draftDeck.length !== 15) return;
+  if (draftDeck.length !== DECK_SIZE) return;
   const startBtn = document.getElementById("btn-start-ai");
   if (startBtn) startBtn.disabled = true;
   try {
@@ -446,6 +459,7 @@ async function startGame() {
       showStatusToast(data.error);
       return;
     }
+    gameId    = data.game_id || null;
     CARD_DB   = data.card_db;
     gameState = data;
     isActing  = false;
@@ -462,7 +476,7 @@ async function startGame() {
   } catch (err) {
     showStatusToast("Failed to start game. Check your connection and try again.");
   } finally {
-    if (startBtn) startBtn.disabled = draftDeck.length !== 15;
+    if (startBtn) startBtn.disabled = draftDeck.length !== DECK_SIZE;
   }
 }
 
@@ -484,6 +498,7 @@ function showStatusToast(message, ms = 2400) {
 // ---------------------------------------------------------------------------
 function spellDesc(card, short = false) {
   const e = card.effect, v = card.val;
+  if (e === "coin")       return short ? "+1 Mana"             : `Gain 1 Mana Crystal this turn only.`;
   if (e === "damage")     return short ? `Deal ${v} Dmg`       : `Deal ${v} damage.`;
   if (e === "heal")       return short ? `Heal ${v} HP`        : `Restore ${v} HP.`;
   if (e === "draw")       return short ? `Draw ${v} Cards`     : `Draw ${v} cards.`;
@@ -986,6 +1001,7 @@ function renderHand(p1) {
     if (!affordable)                                       cls += " unaffordable";
     if (selected?.type === "hand" && selected.idx === idx) cls += " selected";
     if (card.legendary)                                    cls += " legendary";
+    if (name === "The Coin" || card.effect === "coin")     cls += " hand-card--coin";
 
     let extra = "";
     if (card.type === "minion" || card.type === "weapon") {
@@ -1118,7 +1134,7 @@ function handleHandClick(idx, p1, name, card, affordable) {
     return;
   }
   if (card.type === "spell") {
-    if (["heal", "draw", "damage_all", "buff_all", "heal_all"].includes(card.effect)) {
+    if (["heal", "draw", "damage_all", "buff_all", "heal_all", "coin"].includes(card.effect)) {
       sendAction("play", idx, null);
       return;
     }
@@ -1265,12 +1281,13 @@ async function sendAction(action, idx, target) {
     const res = await fetch("/api/action", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, idx, target }),
+      body: JSON.stringify({ game_id: gameId, action, idx, target }),
     });
     const data = await res.json();
     if (data.error) {
       spawnFloat(data.error, "var(--col-red)", null, "normal");
     } else {
+      gameId    = data.game_id || gameId;
       CARD_DB   = data.card_db || CARD_DB;
       gameState = data;
       renderGame();
@@ -1302,7 +1319,7 @@ async function endTurn() {
     const res  = await fetch("/api/action", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "end_turn", idx: null, target: null }),
+      body: JSON.stringify({ game_id: gameId, action: "end_turn", idx: null, target: null }),
     });
     const data = await res.json();
     if (data.error) {
@@ -1316,6 +1333,7 @@ async function endTurn() {
     }
     // Guard: player may have resigned while the AI was thinking
     if (gameState === null) return;
+    gameId    = data.game_id || gameId;
     CARD_DB   = data.card_db || CARD_DB;
     gameState = data;
     setAiThinking(false);
@@ -1337,7 +1355,11 @@ async function endTurn() {
 
 async function abandonGame() {
   try {
-    await fetch("/api/resign", { method: "POST" });
+    await fetch("/api/resign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_id: gameId }),
+    });
   } catch (_) {
     // Best-effort — local UI should still reset even if the server is unreachable.
   }
@@ -1355,6 +1377,7 @@ function returnToMenu() {
 }
 
 function resetGameState() {
+  gameId           = null;
   gameState        = null;
   selected         = null;
   prevIsPlayerTurn = null;
@@ -1402,11 +1425,22 @@ function spawnFloat(text, color, el, size = "normal") {
 // ---------------------------------------------------------------------------
 // BOOT
 // ---------------------------------------------------------------------------
+function syncDeckSizeUi() {
+  const maxEl = document.getElementById("deck-size-max");
+  if (maxEl) maxEl.textContent = String(DECK_SIZE);
+  const sub = document.querySelector(".deck-subtitle");
+  if (sub) {
+    sub.textContent = `Click cards to add · Maximum 2 copies · ${DECK_SIZE} cards total`;
+  }
+}
+
 (async function init() {
   try {
     const res  = await fetch("/api/cards");
     const data = await res.json();
     if (data.card_db) CARD_DB = data.card_db;
+    if (data.deck_size) DECK_SIZE = data.deck_size;
+    syncDeckSizeUi();
   } catch (_) {}
 
   showScreen("screen-menu");

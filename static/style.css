@@ -1304,6 +1304,13 @@ body::after {
 .hand-card.unaffordable:hover { transform: rotate(var(--card-rot, 0deg)); box-shadow: 0 4px 12px rgba(0,0,0,.5); }
 
 /* Spell card face — arcane purple */
+.hand-card--coin {
+  background: linear-gradient(160deg, #ffd060 0%, #e8a020 45%, #c08010 100%);
+  border-color: #ffe080;
+  box-shadow: 0 0 16px rgba(232,160,32,.45);
+}
+.hand-card--coin .minion-name { color: #3a2800; font-weight: 700; }
+
 .hand-card--spell {
   background: linear-gradient(175deg, #d8c0f0, #b890d8);
   border-color: #9060b8;

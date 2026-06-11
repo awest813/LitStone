@@ -10,6 +10,11 @@ import random
 # 1. CARD DATABASE & CONFIGURATION
 # ---------------------------------------------------------------------------
 
+DECK_SIZE = 30
+OPENING_HAND_FIRST = 3
+OPENING_HAND_SECOND = 4
+COIN_CARD = "The Coin"
+
 CARD_DB = {
     # ---------- Standard cards ----------
     "Town Crier":       {"type": "minion", "cost": 1, "atk": 1, "hp": 2, "taunt": False, "icon": "TC"},
@@ -134,6 +139,10 @@ CARD_DB = {
                          "legendary": True, "icon": "QS"},
     "Don Quixote":      {"type": "minion", "cost": 3, "atk": 4, "hp": 2, "charge": True,
                          "legendary": True, "icon": "DQ"},
+
+    # ---------- Uncollectible ----------
+    COIN_CARD: {"type": "spell", "cost": 0, "effect": "coin", "val": 1,
+                "icon": "CN", "uncollectible": True},
 }
 
 HERO_CLASSES = ["Mage", "Warrior", "Priest", "Rogue", "Paladin"]
@@ -149,10 +158,18 @@ KW_LONG  = [("taunt","TAUNT"),("divine_shield","DIVINE SHIELD"),("charge","CHARG
             ("poisonous","POISONOUS"),("battlecry","BATTLECRY"),("deathrattle","DEATHRATTLE")]
 
 GAME_LOG: list[str] = []
+_ACTIVE_LOG: list[str] | None = None
+
+
+def set_active_log(log: list[str] | None) -> None:
+    """Route log_action output to a per-game log list (used by the server)."""
+    global _ACTIVE_LOG
+    _ACTIVE_LOG = log
 
 
 def get_spell_desc(card: dict, short: bool = False) -> str:
     e, v = card.get("effect"), card.get("val")
+    if e == "coin":       return "+1 Mana"                  if short else "Gain 1 Mana Crystal this turn only."
     if e == "damage":     return f"Deal {v} Dmg"            if short else f"Deal {v} damage."
     if e == "heal":       return f"Heal {v} HP"             if short else f"Restore {v} HP."
     if e == "draw":       return f"Draw {v} Cards"          if short else f"Draw {v} cards."
@@ -167,6 +184,8 @@ def get_spell_desc(card: dict, short: bool = False) -> str:
 
 def log_action(msg: str) -> None:
     GAME_LOG.append(msg)
+    if _ACTIVE_LOG is not None:
+        _ACTIVE_LOG.append(msg)
 
 
 # ---------------------------------------------------------------------------
@@ -180,8 +199,9 @@ def create_player(name: str, hero_class: str = "Mage",
     else:
         deck = []
         pool = list(CARD_DB.keys())
-        while len(deck) < 15:
-            c = random.choice(pool)
+        build_pool = [c for c in pool if not CARD_DB[c].get("uncollectible")]
+        while len(deck) < DECK_SIZE:
+            c = random.choice(build_pool)
             max_copies = 1 if CARD_DB[c].get("legendary") else 2
             if deck.count(c) < max_copies:
                 deck.append(c)
@@ -219,7 +239,7 @@ def draw_card(player: dict, on_event=None) -> None:
             on_event("damage", player, "hero", player["fatigue"])
 
 
-def start_turn(player: dict, on_event=None) -> None:
+def start_turn(player: dict, on_event=None, *, draw: bool = True) -> None:
     if player["max_mana"] < 10:
         player["max_mana"] += 1
     player["mana"] = player["max_mana"]
@@ -227,7 +247,45 @@ def start_turn(player: dict, on_event=None) -> None:
     player["hero_can_attack"] = bool(player["weapon"])
     for m in player["board"]:
         m["can_attack"] = True
-    draw_card(player, on_event)
+    if draw:
+        draw_card(player, on_event)
+
+
+def give_coin(player: dict) -> None:
+    """Grant The Coin to the player going second."""
+    player["hand"].append(COIN_CARD)
+    log_action(f"{player['name']} receives {COIN_CARD}!")
+
+
+def ai_choose_mulligan(player: dict) -> list[int]:
+    """Heuristic mulligan: replace expensive cards and weak early hands."""
+    swap: list[int] = []
+    costs = []
+    for i, card_name in enumerate(player["hand"]):
+        card = CARD_DB[card_name]
+        cost = card.get("cost", 0)
+        costs.append(cost)
+        if cost >= 5:
+            swap.append(i)
+        elif cost == 4 and len(player["hand"]) >= 4:
+            swap.append(i)
+    kept = [c for j, c in enumerate(costs) if j not in swap]
+    if kept and max(kept) >= 4 and not any(c <= 2 for c in kept):
+        for i, cost in enumerate(costs):
+            if cost >= 3 and i not in swap:
+                swap.append(i)
+    return sorted(set(swap))
+
+
+def ai_do_mulligan(player: dict) -> list[int]:
+    """Run the AI mulligan and return swapped indices."""
+    indices = ai_choose_mulligan(player)
+    if indices:
+        log_action(f"{player['name']} mulligans {len(indices)} card(s).")
+        do_mulligan(player, indices)
+    else:
+        log_action(f"{player['name']} keeps their opening hand.")
+    return indices
 
 
 def do_mulligan(player: dict, swap_indices: list) -> None:
@@ -290,7 +348,7 @@ def get_legal_moves(player: dict, opp: dict) -> list:
             if len(player["board"]) < 7:
                 moves.append(("play", hand_idx, None))
         elif card["type"] == "spell":
-            if card["effect"] in ("heal", "draw", "damage_all", "buff_all", "heal_all"):
+            if card["effect"] in ("heal", "draw", "damage_all", "buff_all", "heal_all", "coin"):
                 moves.append(("play", hand_idx, None))
             elif card["effect"] == "damage":
                 for t in get_valid_targets(opp, is_attack=False):
@@ -373,7 +431,12 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             log_action(f"   Equipped {card_name} ({card['atk']} Atk / {card['durability']} Durability).")
 
         elif card["type"] == "spell":
-            if card["effect"] == "heal":
+            if card["effect"] == "coin":
+                player["mana"] += card["val"]
+                log_action(f"   {player['name']} gains {card['val']} mana this turn!")
+                notify("heal", player, "hero", 0)
+
+            elif card["effect"] == "heal":
                 amt = max(0, min(card["val"], 30 - player["hp"]))
                 player["hp"] += amt
                 log_action(f"   {player['name']} heals for {amt} HP.")
@@ -674,6 +737,14 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
             elif card["effect"] == "draw":
                 score += card["val"] * 4 if len(p2["hand"]) < 9 else -10
 
+            elif card["effect"] == "coin":
+                unspent = p2["mana"]
+                playable_costs = [
+                    CARD_DB[n]["cost"] for n in p2["hand"]
+                    if CARD_DB[n].get("cost", 0) > unspent
+                ]
+                score += 3 if playable_costs else -2
+
             elif card["effect"] == "damage_all":
                 hits = sum(5 if m["hp"] <= card["val"] else 1 for m in p1["board"])
                 score += hits * 2 if hits else -10
@@ -771,9 +842,9 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
     return score
 
 
-def run_ai_turn(p2: dict, p1: dict, max_moves: int = 10) -> list[tuple]:
+def run_ai_turn(p2: dict, p1: dict, max_moves: int = 10, *, draw: bool = True) -> list[tuple]:
     """Execute AI turn synchronously. Returns the list of moves made."""
-    start_turn(p2)
+    start_turn(p2, draw=draw)
     moves_made = []
     for _ in range(max_moves):
         if check_win(p1, p2):
