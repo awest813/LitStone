@@ -968,9 +968,11 @@ def run_ai_turn(p2: dict, p1: dict, max_moves: int = 10, *, draw: bool = True) -
             break
         best, best_score = None, -9999.0
         for mv in legal:
-            s = evaluate_ai_move(p2, p1, mv) + random.uniform(0, 0.5)
+            s = evaluate_ai_move(p2, p1, mv)
             if s > best_score:
                 best_score, best = s, mv
+            elif s == best_score and random.random() < 0.5:
+                best = mv
         if best_score < 0:
             break
         execute_move(p2, p1, best)

@@ -24,6 +24,8 @@ let deckSearch  = "";
 let combatLogOpen = true;
 let isPaused    = false;
 let lastMatchDeck = null; // { heroClass, cards } for Play Again
+let logRenderedCount = 0;
+let deckSearchTimer  = null;
 
 // Deck-builder constants
 const MANA_CURVE_MAX_COST   = 7;   // buckets 1-7; costs ≥7 are grouped under "7+"
@@ -39,7 +41,7 @@ const SETTINGS_KEY    = "litstoneSettings";
 const LAST_DECK_KEY   = "litstoneLastDeck";
 
 function defaultSettings() {
-  return { sfx: true, animations: true, combatLog: true, confirmResign: true };
+  return { sfx: true, animations: true, combatLog: true, confirmResign: true, gameSpeed: "normal" };
 }
 
 function loadSettings() {
@@ -62,6 +64,24 @@ function saveSettings() {
 let settings = loadSettings();
 let sfxMuted = !settings.sfx;
 let animationsEnabled = settings.animations !== false;
+let gameSpeed = settings.gameSpeed || "normal";
+
+function animMs(ms) {
+  if (gameSpeed === "instant") return 0;
+  if (gameSpeed === "fast") return Math.max(16, Math.round(ms * 0.45));
+  return ms;
+}
+
+function aiAttackStaggerMs() {
+  if (gameSpeed === "instant") return 0;
+  if (gameSpeed === "fast") return 45;
+  return 100;
+}
+
+function applyGameSpeedClass() {
+  document.body.classList.remove("speed-normal", "speed-fast", "speed-instant");
+  document.body.classList.add(`speed-${gameSpeed}`);
+}
 
 const KW_COLORS = {
   taunt: "#c0392b", divine_shield: "#d4a800", charge: "#00a878",
@@ -198,10 +218,12 @@ function syncSettingsUi() {
   const anim = document.getElementById("setting-animations");
   const log = document.getElementById("setting-combat-log");
   const resign = document.getElementById("setting-confirm-resign");
+  const speed = document.getElementById("setting-speed");
   if (sfx) sfx.checked = settings.sfx;
   if (anim) anim.checked = settings.animations;
   if (log) log.checked = settings.combatLog;
   if (resign) resign.checked = settings.confirmResign;
+  if (speed) speed.value = gameSpeed;
 }
 
 function applySettingSfx(on) {
@@ -230,6 +252,13 @@ function applySettingCombatLog(on) {
 function applySettingConfirmResign(on) {
   settings.confirmResign = on;
   saveSettings();
+}
+
+function applySettingSpeed(speed) {
+  gameSpeed = ["normal", "fast", "instant"].includes(speed) ? speed : "normal";
+  settings.gameSpeed = gameSpeed;
+  saveSettings();
+  applyGameSpeedClass();
 }
 
 function togglePause() {
@@ -317,6 +346,7 @@ function enterDeckBuilder(cls, initialDeck) {
   filterCost = "all";
   sortBy = "cost";
   deckSearch = "";
+  clearTimeout(deckSearchTimer);
   const searchEl = document.getElementById("deck-search");
   if (searchEl) searchEl.value = "";
   document.getElementById("deck-title").textContent = `Build Your ${cls} Deck`;
@@ -365,7 +395,8 @@ function setSort(sort) {
 
 function setDeckSearch(query) {
   deckSearch = (query || "").trim().toLowerCase();
-  renderCardPool();
+  clearTimeout(deckSearchTimer);
+  deckSearchTimer = setTimeout(() => renderCardPool(), 100);
 }
 
 function setCostFilter(cost) {
@@ -445,6 +476,7 @@ function poolCardNames() {
 
 function renderCardPool() {
   const pool = document.getElementById("card-pool");
+  if (!pool) return;
   pool.innerHTML = "";
 
   let entries = Object.entries(CARD_DB).filter(([, card]) =>
@@ -479,6 +511,7 @@ function renderCardPool() {
     entries.sort((a, b) => a[0].localeCompare(b[0]));
   }
 
+  const frag = document.createDocumentFragment();
   entries.forEach(([name, card]) => {
     const isLegendary = !!card.legendary;
     const maxCopies  = isLegendary ? 1 : 2;
@@ -522,8 +555,9 @@ function renderCardPool() {
     }
     div.addEventListener("mouseenter", e => showPoolTooltip(e, name, card));
     div.addEventListener("mouseleave", () => hideTooltip("card-tooltip"));
-    pool.appendChild(div);
+    frag.appendChild(div);
   });
+  pool.appendChild(frag);
 }
 
 function addCardToDeck(name) {
@@ -966,6 +1000,7 @@ function hideTooltip(id) {
 // ---------------------------------------------------------------------------
 
 function showTurnBanner(isPlayerTurn) {
+  if (gameSpeed === "instant") return;
   const banner = document.getElementById("turn-banner");
   if (!banner) return;
   // Reset: remove active so re-triggering re-plays the animation
@@ -1093,6 +1128,7 @@ function applyHeroAnimations(prev) {
 // ---------------------------------------------------------------------------
 
 function motionEnabled() {
+  if (gameSpeed === "instant") return false;
   if (!animationsEnabled) return false;
   return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
@@ -1262,11 +1298,16 @@ function animateFlyGhost(fromRect, toRect, card, name) {
   const dx = toRect.left + toRect.width / 2 - layerRect.left - sx;
   const dy = toRect.top + toRect.height / 2 - layerRect.top - sy;
 
+  const flyDur = animMs(380);
+  if (flyDur <= 0) {
+    fly.remove();
+    return;
+  }
   fly.animate([
     { transform: "translate(-50%, -50%) scale(1.15) rotate(-6deg)", opacity: 1 },
     { transform: `translate(calc(-50% + ${dx * 0.45}px), calc(-50% + ${dy * 0.25}px)) scale(1) rotate(2deg)`, opacity: 1, offset: 0.55 },
     { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.75) rotate(0deg)`, opacity: 0 },
-  ], { duration: 380, easing: "cubic-bezier(.25, .8, .25, 1)", fill: "forwards" })
+  ], { duration: flyDur, easing: "cubic-bezier(.25, .8, .25, 1)", fill: "forwards" })
     .addEventListener("finish", () => fly.remove());
 }
 
@@ -1447,12 +1488,19 @@ function applyActionAnimations(ctx) {
   }
 
   if (action === "end_turn" || !action) {
-    parseLogAttacks(gameState.log, logFrom).forEach(({ attacker, target: tgt }, i) => {
-      setTimeout(() => {
-        if (motion) animateAttackPair(attacker, tgt);
-        else playSfx("attack");
-      }, i * 150);
-    });
+    const stagger = aiAttackStaggerMs();
+    const attacks = parseLogAttacks(gameState.log, logFrom);
+    if (stagger === 0) {
+      if (motion) attacks.forEach(({ attacker, target: tgt }) => animateAttackPair(attacker, tgt));
+      else if (attacks.length) playSfx("attack");
+    } else {
+      attacks.forEach(({ attacker, target: tgt }, i) => {
+        setTimeout(() => {
+          if (motion) animateAttackPair(attacker, tgt);
+          else playSfx("attack");
+        }, i * stagger);
+      });
+    }
   }
 
   if (motion) applyHandDrawAnimation(prevHandLen ?? 0);
@@ -1826,34 +1874,48 @@ function renderHand(p1) {
 }
 
 /* ---- Combat log ---- */
+function logEntryClass(msg) {
+  let cls = "log-entry";
+  const m = msg.toLowerCase();
+  if (m.includes("damage") || m.includes("attacks") || m.includes("fatigue") ||
+      m.includes("destroys") || m.includes("dmg") || m.includes("d.rattle")) {
+    cls += " log-dmg";
+  } else if (m.includes("heal") || m.includes("restores") || m.includes("b.cry")) {
+    cls += " log-heal";
+  } else if (m.includes("plays")) {
+    cls += " log-play";
+  } else if (m.includes("armor") || m.includes("equipped")) {
+    cls += " log-armor";
+  } else if (m.includes("draws") || m.includes("draw")) {
+    cls += " log-draw";
+  } else if (m.includes("blocks") || m.includes("shield") || m.includes("blocked")) {
+    cls += " log-block";
+  } else if (m.includes("---") || m.includes("===") || m.includes("turn")) {
+    cls += " log-system";
+  }
+  return cls;
+}
+
 function renderLog(entries) {
   const el = document.getElementById("log-entries");
+  if (!el) return;
+  const slice = entries.slice(-60);
   const wasAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30;
-  el.innerHTML = "";
-  entries.slice(-60).forEach(msg => {
+
+  if (slice.length < logRenderedCount) {
+    el.innerHTML = "";
+    logRenderedCount = 0;
+  }
+
+  const frag = document.createDocumentFragment();
+  slice.slice(logRenderedCount).forEach(msg => {
     const div = document.createElement("div");
-    let cls = "log-entry";
-    const m = msg.toLowerCase();
-    if (m.includes("damage") || m.includes("attacks") || m.includes("fatigue") ||
-        m.includes("destroys") || m.includes("dmg") || m.includes("d.rattle")) {
-      cls += " log-dmg";
-    } else if (m.includes("heal") || m.includes("restores") || m.includes("b.cry")) {
-      cls += " log-heal";
-    } else if (m.includes("plays")) {
-      cls += " log-play";
-    } else if (m.includes("armor") || m.includes("equipped")) {
-      cls += " log-armor";
-    } else if (m.includes("draws") || m.includes("draw")) {
-      cls += " log-draw";
-    } else if (m.includes("blocks") || m.includes("shield") || m.includes("blocked")) {
-      cls += " log-block";
-    } else if (m.includes("---") || m.includes("===") || m.includes("turn")) {
-      cls += " log-system";
-    }
-    div.className = cls;
+    div.className = logEntryClass(msg);
     div.textContent = msg;
-    el.appendChild(div);
+    frag.appendChild(div);
   });
+  logRenderedCount = slice.length;
+  el.appendChild(frag);
   if (wasAtBottom) el.scrollTop = el.scrollHeight;
 }
 
@@ -2201,6 +2263,7 @@ function resetGameState() {
   turnNumber       = 0;
   isActing         = false;
   mulliganSwapSet  = new Set();
+  logRenderedCount = 0;
   setAiThinking(false);
 }
 
@@ -2264,6 +2327,7 @@ function syncDeckSizeUi() {
 
   syncSfxButton();
   syncSettingsUi();
+  applyGameSpeedClass();
   updateHubContinue();
   const meta = document.getElementById("hub-meta");
   if (meta) meta.textContent = `6 classes · ${cardCount} cards · single-player vs AI`;

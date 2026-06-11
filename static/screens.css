@@ -297,6 +297,52 @@
   margin-top: 2px;
 }
 
+.setting-row--select {
+  align-items: flex-end;
+}
+
+.setting-select {
+  background: var(--col-surface);
+  border: 1px solid var(--col-border-bright);
+  border-radius: 8px;
+  color: var(--col-text);
+  font-family: 'Cinzel', serif;
+  font-size: 12px;
+  padding: 8px 10px;
+  min-width: 110px;
+  cursor: pointer;
+}
+
+.setting-select:focus {
+  outline: none;
+  border-color: var(--col-mana-bright);
+  box-shadow: 0 0 0 2px rgba(74, 158, 221, .25);
+}
+
+/* Game speed — shorter combat animations */
+body.speed-fast .summon-anim       { animation-duration: 0.2s !important; }
+body.speed-fast .attack-lunge,
+body.speed-fast .attack-lunge-opp  { animation-duration: 0.22s !important; }
+body.speed-fast .damage-flash      { animation-duration: 0.28s !important; }
+body.speed-fast .card-draw-anim    { animation-duration: 0.2s !important; }
+body.speed-fast .hero-weapon-swing,
+body.speed-fast .hero-weapon-swing-opp { animation-duration: 0.22s !important; }
+body.speed-fast .turn-banner.active {
+  animation-duration: 0.35s, 0.45s !important;
+}
+
+body.speed-instant .summon-anim,
+body.speed-instant .attack-lunge,
+body.speed-instant .attack-lunge-opp,
+body.speed-instant .damage-flash,
+body.speed-instant .card-draw-anim,
+body.speed-instant .hero-weapon-swing,
+body.speed-instant .hero-weapon-swing-opp,
+body.speed-instant .turn-banner.active {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+}
+
 /* Toggle switch */
 .toggle-switch {
   position: relative;

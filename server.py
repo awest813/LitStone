@@ -65,11 +65,11 @@ def _serialize_opponent(player: dict) -> dict:
     return p
 
 
-def _state_response(gs: dict) -> dict:
+def _state_response(gs: dict, *, include_card_db: bool = False) -> dict:
     winner = check_win(gs["p1"], gs["p2"])
     mulligan = gs.get("mulligan_phase", False)
     legal = get_legal_moves(gs["p1"], gs["p2"]) if not winner and not mulligan else []
-    return {
+    resp = {
         "game_id":          gs["game_id"],
         "p1":               _serialize(gs["p1"]),
         "p2":               _serialize_opponent(gs["p2"]),
@@ -78,10 +78,12 @@ def _state_response(gs: dict) -> dict:
         "turn_number":      gs.get("turn_number", 1),
         "log":              list(gs.get("log", [])[-60:]),
         "winner":           winner,
-        "card_db":          CARD_DB,
         "_legal_moves":     legal,
         "mulligan_phase":   mulligan,
     }
+    if include_card_db:
+        resp["card_db"] = CARD_DB
+    return resp
 
 
 def _with_game_log(gs: dict):
@@ -200,7 +202,7 @@ def new_game():
         _deal_opening_hands(gs)
         log_action("--- Mulligan Phase: choose cards to replace ---")
 
-    return jsonify(_state_response(gs))
+    return jsonify(_state_response(gs, include_card_db=True))
 
 
 @app.route("/api/mulligan", methods=["POST"])
@@ -222,7 +224,7 @@ def do_mulligan_route():
         do_mulligan(gs["p1"], indices)
         _finish_mulligan(gs)
 
-    return jsonify(_state_response(gs))
+    return jsonify(_state_response(gs, include_card_db=True))
 
 
 @app.route("/api/state", methods=["GET"])

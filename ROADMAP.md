@@ -20,6 +20,7 @@ The current state of the project establishes the core gameplay loop.
 - [x] Procedural card art — layered frames, class palettes, tooltip art previews
 - [x] Title hub, settings modal, in-game pause, and match loading overlay
 - [x] Deck builder — starter deck, mana cost filter, validation hints, continue last deck
+- [x] Game speed settings (Normal / Fast / Instant) and lean match API payloads
 - [x] Fatigue damage system
 - [x] Weapon system
 - [x] Mulligan phase (player)

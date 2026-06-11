@@ -1302,6 +1302,20 @@ class TestServerApi(unittest.TestCase):
         self.assertEqual(res.status_code, 400)
         self.assertIn("error", res.get_json())
 
+    def test_action_response_omits_card_db(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        start = client.post("/api/new_game", json={"hero_class": "Mage", "deck": deck})
+        self.assertEqual(start.status_code, 200)
+        data = start.get_json()
+        self.assertIn("card_db", data)
+        gid = data["game_id"]
+        client.post("/api/mulligan", json={"game_id": gid, "indices": []})
+        end = client.post("/api/action", json={"game_id": gid, "action": "end_turn"})
+        self.assertEqual(end.status_code, 200)
+        self.assertNotIn("card_db", end.get_json())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
