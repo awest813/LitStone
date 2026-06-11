@@ -507,6 +507,34 @@ def log_action(msg: str) -> None:
 # 2. STATE INITIALISATION
 # ---------------------------------------------------------------------------
 
+def clamp_practice_hp(value, default: int = 30) -> int:
+    """Clamp custom hero HP for practice sandbox (1–60)."""
+    try:
+        hp = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(1, min(60, hp))
+
+
+def apply_practice_options(player: dict, *, hp: int, infinite_mana: bool = False) -> None:
+    """Apply practice-mode sandbox flags to a player."""
+    player["hp"] = clamp_practice_hp(hp)
+    if infinite_mana:
+        player["infinite_mana"] = True
+        player["max_mana"] = 10
+        player["mana"] = 10
+
+
+def refresh_infinite_mana(player: dict) -> None:
+    if player.get("infinite_mana"):
+        player["max_mana"] = 10
+        player["mana"] = 10
+
+
+def effective_mana(player: dict) -> int:
+    return 10 if player.get("infinite_mana") else player["mana"]
+
+
 def create_player(name: str, hero_class: str = "Mage",
                   custom_deck: list | None = None, shuffle: bool = True) -> dict:
     if custom_deck is not None:
@@ -548,9 +576,13 @@ def draw_card(player: dict, on_event=None) -> None:
 
 
 def start_turn(player: dict, on_event=None, *, draw: bool = True) -> None:
-    if player["max_mana"] < 10:
-        player["max_mana"] += 1
-    player["mana"] = player["max_mana"]
+    if player.get("infinite_mana"):
+        player["max_mana"] = 10
+        player["mana"] = 10
+    else:
+        if player["max_mana"] < 10:
+            player["max_mana"] += 1
+        player["mana"] = player["max_mana"]
     player["hero_power_used"] = False
     player["hero_can_attack"] = bool(player["weapon"])
     for m in player["board"]:
@@ -650,7 +682,7 @@ def get_legal_moves(player: dict, opp: dict) -> list:
 
     for hand_idx, card_name in enumerate(player["hand"]):
         card = CARD_DB[card_name]
-        if player["mana"] < card["cost"]:
+        if effective_mana(player) < card["cost"]:
             continue
         if card["type"] == "minion":
             if len(player["board"]) < 7:
@@ -680,7 +712,7 @@ def get_legal_moves(player: dict, opp: dict) -> list:
         for t in valid_targets:
             moves.append(("hero_attack", None, t))
 
-    if player["mana"] >= 2 and not player["hero_power_used"]:
+    if effective_mana(player) >= 2 and not player["hero_power_used"]:
         cls = player["hero_class"]
         if cls == "Warrior":
             moves.append(("hero_power", None, None))
@@ -713,7 +745,8 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
     if action == "play":
         card_name = player["hand"].pop(idx)
         card = CARD_DB[card_name]
-        player["mana"] -= card["cost"]
+        if not player.get("infinite_mana"):
+            player["mana"] -= card["cost"]
         log_action(f">> {player['name']} plays {card_name}!")
         notify("play", player, None, card_name)
 
@@ -909,7 +942,8 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
 
     # ---- HERO POWER ---------------------------------------------------------
     elif action == "hero_power":
-        player["mana"] -= 2
+        if not player.get("infinite_mana"):
+            player["mana"] -= 2
         player["hero_power_used"] = True
         cls = player["hero_class"]
 
@@ -974,6 +1008,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             log_action(f">> {player['name']} uses Totemic Call! Summons {totem['name']}.")
             notify("armor", player, "hero", 0)
 
+    refresh_infinite_mana(player)
     cleanup_dead(player, opp, on_event)
 
 

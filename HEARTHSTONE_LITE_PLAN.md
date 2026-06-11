@@ -29,10 +29,10 @@ LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collec
 |-----|--------|
 | Procedural card frames (no bespoke illustrated art per card) | Good readability; less immersion than full art |
 | AI difficulty tiers; reduced random noise | Flat replay challenge |
-| No tutorial, practice, or campaign bosses | Steep for new players |
+| Practice sandbox polish (deck presets, no-AI solo) | Nice-to-have |
 | No discover / secrets / windfury / lifesteal | Missing HS texture |
 | Smallest phones (≤375px) still need tap-target tuning | Occasional mis-taps |
-| No persistence / Docker / CI | Not deploy-ready |
+| Illustrated card art (beyond procedural frames) | Less immersion |
 
 ---
 
@@ -150,7 +150,7 @@ flowchart TB
 | Boss decks (Van Helsing, Professor Moriarty) | ✅ |
 | Campaign (5 nodes) | ✅ |
 | Tutorial (3-step guided match) | ✅ |
-| Practice mode (sandbox) | ⬜ |
+| Practice mode (sandbox) | ✅ |
 
 ---
 
@@ -160,12 +160,12 @@ flowchart TB
 
 | Task | Details |
 |------|---------|
-| SQLite game store | Persist active games; survive server restart |
-| Deck storage (server) | Optional account-less deck list via browser token |
-| Environment config | `FLASK_DEBUG`, `PORT`, `SECRET_KEY` via env |
-| Docker image | `python:3.12-slim` + gunicorn |
-| CI pipeline | `unittest` + optional `ruff` on push |
-| Health endpoint | `GET /api/health` for uptime checks |
+| SQLite game store | Persist active games; survive server restart | ✅ |
+| Deck storage (server) | Optional account-less deck list via browser token | ⬜ |
+| Environment config | `FLASK_DEBUG`, `PORT`, `SECRET_KEY` via env | ✅ |
+| Docker image | `python:3.12-slim` + gunicorn | ✅ |
+| CI pipeline | `unittest` + optional `ruff` on push | ✅ |
+| Health endpoint | `GET /api/health` for uptime checks | ✅ |
 
 ---
 

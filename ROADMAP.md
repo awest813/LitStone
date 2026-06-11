@@ -34,7 +34,7 @@ The current state of the project establishes the core gameplay loop.
 
 Goals: make the game feel complete and production-ready for single-player use.
 
-- [ ] **Persistent game state** — survive server restarts using a lightweight store (e.g. SQLite or JSON file)
+- [x] **Persistent game state** — SQLite-backed game sessions survive server restarts
 - [x] **Per-session game IDs** — UUID-keyed game sessions (`GAMES` dict)
 - [x] **AI mulligan** — heuristic opening-hand swaps for the AI opponent
 - [x] **Improved AI** — difficulty tiers (Easy/Normal/Hard), curved AI decks, boss opponents
@@ -94,7 +94,7 @@ Ideas that may be incorporated into any version:
 
 - [x] AI difficulty settings (Easy / Normal / Hard)
 - [x] Tutorial match with in-game step hints
-- [ ] Practice sandbox mode (custom HP / infinite mana)
+- [x] Practice sandbox mode (custom HP / infinite mana)
 - Replay system — save and replay past games
 - Draft / Arena mode — pick cards one at a time from random sets
 - New keywords: Windfury, Lifesteal, Discover, Secrets

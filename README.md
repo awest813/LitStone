@@ -12,7 +12,9 @@ A lightweight, browser-based card game inspired by Hearthstone. Play against an 
 - **Mulligan phase** — Select any opening-hand cards to redraw before each game starts
 - **Literary Legends** — Legendary minions inspired by Sherlock Holmes, Dr. John Watson, Professor Moriarty, Van Helsing, Victor Frankenstein, Frankenstein's Monster, Alice, The Mad Hatter, The White Rabbit, The Queen of Hearts, The Cheshire Cat, Snow White, Rapunzel, Sleeping Beauty, Little Red Riding Hood, Rumpelstiltskin, The Big Bad Wolf, Pied Piper, Baba Yaga, Bluebeard, King Arthur, Merlin, Lancelot, Guinevere, Morgan le Fay, Mordred, Gawain, Robin Hood, Maid Marian, Friar Tuck, Little John, Will Scarlet, Ebenezer Scrooge, Oliver Twist, Ivanhoe, Quasimodo, and Don Quixote (max 1 copy per deck)
 - **Deck Builder** — Build a custom 30-card deck (max 2 copies per card; max 1 copy of Legendary cards) before each game
-- **AI opponent** — Heuristic-driven AI that evaluates board state and plays competitively
+- **AI opponent** — Heuristic-driven AI with Easy / Normal / Hard difficulty and curved decks
+- **Campaign & tutorial** — 5-node literary campaign, guided tutorial, and practice sandbox
+- **Session persistence** — active games saved to SQLite and restored after server restart
 - **Combat log** — Real-time log of every action taken during the game
 - **Fatigue system** — Players take increasing damage when their deck runs out
 

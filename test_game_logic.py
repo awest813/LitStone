@@ -22,6 +22,7 @@ from game_logic import (
     cleanup_dead, evaluate_ai_move, give_coin,
     ai_choose_mulligan, ai_do_mulligan,
     card_allowed_for_class, cards_for_class,
+    clamp_practice_hp, apply_practice_options, effective_mana,
 )
 
 
@@ -1317,6 +1318,50 @@ class TestAiDeckAndDifficulty(unittest.TestCase):
         self.assertEqual(normalize_difficulty("bogus"), "normal")
 
 
+class TestPracticeSandbox(unittest.TestCase):
+    def test_clamp_practice_hp(self):
+        self.assertEqual(clamp_practice_hp(5), 5)
+        self.assertEqual(clamp_practice_hp(99), 60)
+        self.assertEqual(clamp_practice_hp("bad"), 30)
+
+    def test_infinite_mana_allows_plays_at_zero_mana(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        apply_practice_options(p1, hp=40, infinite_mana=True)
+        p1["hand"] = ["Town Crier"]
+        p1["mana"] = 0
+        self.assertGreaterEqual(effective_mana(p1), 10)
+        moves = get_legal_moves(p1, p2)
+        self.assertIn(("play", 0, None), moves)
+
+    def test_infinite_mana_restored_after_play(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        apply_practice_options(p1, hp=30, infinite_mana=True)
+        p1["hand"] = ["Town Crier"]
+        p1["board"] = []
+        execute_move(p1, p2, ("play", 0, None))
+        self.assertEqual(p1["mana"], 10)
+
+
+class TestGameStore(unittest.TestCase):
+    def test_save_load_delete(self):
+        import os
+        import tempfile
+        from game_store import GameStore
+
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "test.db")
+            store = GameStore(path)
+            state = {"game_id": "g1", "turn_number": 1, "p1": {"hp": 30}}
+            store.save("g1", state)
+            self.assertEqual(store.count(), 1)
+            loaded = store.load_all()
+            self.assertEqual(loaded["g1"]["turn_number"], 1)
+            store.delete("g1")
+            self.assertEqual(store.load_all(), {})
+
+
 class TestServerApi(unittest.TestCase):
     def test_health_endpoint(self):
         from server import app
@@ -1326,6 +1371,7 @@ class TestServerApi(unittest.TestCase):
         data = res.get_json()
         self.assertEqual(data["status"], "ok")
         self.assertEqual(data["deck_size"], DECK_SIZE)
+        self.assertEqual(data["persistence"], "sqlite")
 
     def test_invalid_deck_rejected(self):
         from server import app
@@ -1358,6 +1404,25 @@ class TestServerApi(unittest.TestCase):
         self.assertEqual(data["boss_id"], "moriarty")
         self.assertEqual(data["opponent_name"], "Professor Moriarty")
         self.assertEqual(data["ai_difficulty"], "hard")
+
+    def test_new_game_practice_mode(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        res = client.post("/api/new_game", json={
+            "hero_class": "Mage",
+            "deck": deck,
+            "practice": True,
+            "p1_hp": 50,
+            "p2_hp": 15,
+            "infinite_mana": True,
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertEqual(data["mode"], "practice")
+        self.assertEqual(data["practice"]["p1_hp"], 50)
+        self.assertEqual(data["p1"]["hp"], 50)
+        self.assertTrue(data["p1"].get("infinite_mana") or data.get("practice", {}).get("infinite_mana"))
 
     def test_action_response_omits_card_db(self):
         from server import app

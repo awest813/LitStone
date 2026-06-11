@@ -30,6 +30,8 @@ let activeCampaignNode = null;
 let campaignNodes = [];
 let tutorialActive = false;
 let tutorialStep = 0;
+let practiceActive = false;
+let practiceOptions = { p1_hp: 30, p2_hp: 30, infinite_mana: false };
 const CAMPAIGN_PROGRESS_KEY = "litstoneCampaignProgress";
 const TUTORIAL_DONE_KEY = "litstoneTutorialDone";
 
@@ -181,6 +183,12 @@ function updateGameHelpBar() {
     bar.textContent = tut;
     return;
   }
+  if (gameState.mode === "practice" && gameState.practice) {
+    const p = gameState.practice;
+    const mana = p.infinite_mana ? " · ∞ mana" : "";
+    bar.textContent = `Practice — You ${p.p1_hp} HP · AI ${p.p2_hp} HP${mana}`;
+    return;
+  }
   if (gameState.mode === "campaign" && gameState.opponent_name) {
     bar.textContent = `vs ${gameState.opponent_name} · ${gameState.ai_difficulty} AI`;
     return;
@@ -207,11 +215,47 @@ function renderManaHud(p1) {
 // NAVIGATION — hub, class select, settings, pause
 // ---------------------------------------------------------------------------
 function goToHub() {
+  practiceActive = false;
+  activeCampaignNode = null;
+  tutorialActive = false;
   showScreen("screen-hub");
 }
 
 function goToClassSelect() {
   showScreen("screen-menu");
+}
+
+function startStandardPlay() {
+  practiceActive = false;
+  activeCampaignNode = null;
+  tutorialActive = false;
+  goToClassSelect();
+}
+
+function goToPractice() {
+  practiceActive = true;
+  activeCampaignNode = null;
+  tutorialActive = false;
+  showScreen("screen-practice");
+}
+
+function startPracticeFromSetup() {
+  const p1El = document.getElementById("practice-p1-hp");
+  const p2El = document.getElementById("practice-p2-hp");
+  const manaEl = document.getElementById("practice-infinite-mana");
+  practiceOptions = {
+    p1_hp: Math.max(1, Math.min(60, parseInt(p1El?.value, 10) || 30)),
+    p2_hp: Math.max(1, Math.min(60, parseInt(p2El?.value, 10) || 30)),
+    infinite_mana: !!manaEl?.checked,
+  };
+  const sub = document.getElementById("deck-subtitle");
+  if (sub) {
+    const mana = practiceOptions.infinite_mana ? " · infinite mana" : "";
+    sub.textContent = `Practice — ${practiceOptions.p1_hp} HP vs AI ${practiceOptions.p2_hp} HP${mana}`;
+  }
+  const diffEl = document.getElementById("match-difficulty");
+  if (diffEl) diffEl.value = "easy";
+  goToClassSelect();
 }
 
 function getCampaignProgress() {
@@ -1025,7 +1069,17 @@ async function startGame() {
   };
   if (activeCampaignNode) payload.campaign_node = activeCampaignNode;
   if (tutorialActive) payload.tutorial = true;
-  showLoading(activeCampaignNode ? "Starting encounter…" : "Finding opponent…");
+  if (practiceActive) {
+    payload.practice = true;
+    payload.p1_hp = practiceOptions.p1_hp;
+    payload.p2_hp = practiceOptions.p2_hp;
+    payload.infinite_mana = practiceOptions.infinite_mana;
+    payload.difficulty = "easy";
+  }
+  const loadMsg = activeCampaignNode
+    ? "Starting encounter…"
+    : (practiceActive ? "Opening practice sandbox…" : "Finding opponent…");
+  showLoading(loadMsg);
   try {
     const res  = await fetch("/api/new_game", {
       method: "POST",
@@ -1061,8 +1115,8 @@ async function startGame() {
 }
 
 function goBack() {
-  if (!tutorialActive) activeCampaignNode = null;
-  showScreen("screen-menu");
+  if (!tutorialActive && !practiceActive) activeCampaignNode = null;
+  showScreen(practiceActive ? "screen-practice" : "screen-menu");
 }
 
 async function playAgain() {

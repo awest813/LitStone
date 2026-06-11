@@ -24,10 +24,11 @@
     <h1 class="game-title">LitStone</h1>
     <p class="hub-tagline">Literary legends · Arcane duels</p>
     <div class="hub-actions">
-      <button type="button" class="btn btn-primary btn-hub-play" id="btn-hub-play" onclick="goToClassSelect()">
+      <button type="button" class="btn btn-primary btn-hub-play" id="btn-hub-play" onclick="startStandardPlay()">
         Play
       </button>
       <button type="button" class="btn btn-hub-secondary" onclick="goToCampaign()">Campaign</button>
+      <button type="button" class="btn btn-hub-secondary" onclick="goToPractice()">Practice</button>
       <button type="button" class="btn btn-hub-secondary" id="btn-hub-tutorial" onclick="startTutorial()">Tutorial</button>
       <button type="button" class="btn hub-continue hidden" id="btn-hub-continue" onclick="continueLastDeck()">
         Continue Last Deck
@@ -35,6 +36,32 @@
       <button type="button" class="btn btn-hub-secondary" onclick="openSettings()">Settings</button>
     </div>
     <p class="hub-meta" id="hub-meta">6 classes · 109 cards · single-player vs AI</p>
+  </div>
+</div>
+
+<!-- =====================  SCREEN: PRACTICE SETUP  ======================= -->
+<div id="screen-practice" class="screen">
+  <div class="menu-bg-overlay"></div>
+  <header class="menu-header">
+    <button type="button" class="btn btn-back btn-icon" onclick="goToHub()" title="Back" aria-label="Back to title">←</button>
+    <span class="menu-header-spacer"></span>
+  </header>
+  <h2 class="practice-title">Practice Sandbox</h2>
+  <p class="practice-subtitle">Tune hero health and mana, then build a deck and spar with Easy AI.</p>
+  <div class="practice-panel">
+    <label class="practice-field">
+      <span>Your hero HP</span>
+      <input type="number" id="practice-p1-hp" min="1" max="60" value="30" />
+    </label>
+    <label class="practice-field">
+      <span>AI hero HP</span>
+      <input type="number" id="practice-p2-hp" min="1" max="60" value="30" />
+    </label>
+    <label class="practice-toggle">
+      <input type="checkbox" id="practice-infinite-mana" />
+      <span>Infinite mana (both players)</span>
+    </label>
+    <button type="button" class="btn btn-primary" onclick="startPracticeFromSetup()">Choose Class &amp; Deck</button>
   </div>
 </div>
 
