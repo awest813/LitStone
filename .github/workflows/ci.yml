@@ -22,4 +22,4 @@ jobs:
         run: ruff check .
 
       - name: Pytest
-        run: pytest test_game_logic.py -q
+        run: pytest test_game_logic.py test_career_playthrough.py -q

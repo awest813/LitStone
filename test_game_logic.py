@@ -1491,7 +1491,7 @@ class TestServerApi(unittest.TestCase):
         GAMES[gid]["p1"]["deck"] = []
         GAMES[gid]["p1"]["hp"] = 2
         GAMES[gid]["p1"]["fatigue"] = 1
-        GAMES[gid]["is_player_turn"] = False
+        GAMES[gid]["is_player_turn"] = True
         GAMES[gid]["p2"]["board"] = []
         GAMES[gid]["p2"]["hand"] = []
         res = client.post("/api/action", json={"game_id": gid, "action": "end_turn"})
