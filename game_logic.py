@@ -413,7 +413,9 @@ def create_ai_opponent(
         hero_class = preset["hero_class"]
         deck = complete_deck_from_core(hero_class, preset["core"])
         player = create_player(preset["display_name"], hero_class, deck)
-        player["hp"] = preset.get("hp", 30)
+        boss_hp = preset.get("hp", 30)
+        player["hp"] = boss_hp
+        player["max_hp"] = boss_hp
         return player
 
     ai_class = hero_class or "Mage"
@@ -519,6 +521,7 @@ def clamp_practice_hp(value, default: int = 30) -> int:
 def apply_practice_options(player: dict, *, hp: int, infinite_mana: bool = False) -> None:
     """Apply practice-mode sandbox flags to a player."""
     player["hp"] = clamp_practice_hp(hp)
+    player["max_hp"] = player["hp"]
     if infinite_mana:
         player["infinite_mana"] = True
         player["max_mana"] = 10
@@ -547,6 +550,7 @@ def create_player(name: str, hero_class: str = "Mage",
         "name":            name,
         "hero_class":      hero_class,
         "hp":              30,
+        "max_hp":          30,
         "armor":           0,
         "mana":            0,
         "max_mana":        0,
@@ -678,6 +682,9 @@ def get_valid_targets(opp: dict, is_attack: bool = True) -> list:
 
 
 def get_legal_moves(player: dict, opp: dict) -> list:
+    if player["hp"] <= 0 or opp["hp"] <= 0:
+        return []
+
     moves = []
 
     for hand_idx, card_name in enumerate(player["hand"]):

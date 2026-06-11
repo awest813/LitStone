@@ -33,7 +33,7 @@
       <button type="button" class="btn hub-continue hidden" id="btn-hub-continue" onclick="continueLastDeck()">
         Continue Last Deck
       </button>
-      <button type="button" class="btn btn-hub-secondary" onclick="openSettings()">Settings</button>
+      <button type="button" class="btn btn-hub-secondary" onclick="openSettings()" aria-label="Settings">Settings</button>
     </div>
     <p class="hub-meta" id="hub-meta">6 classes · 109 cards · single-player vs AI</p>
   </div>
@@ -81,7 +81,7 @@
 <div id="screen-menu" class="screen">
   <div class="menu-bg-overlay"></div>
   <header class="menu-header">
-    <button type="button" class="btn btn-back btn-icon" onclick="goToHub()" title="Back" aria-label="Back to title">←</button>
+    <button type="button" class="btn btn-back btn-icon" onclick="goBackFromClassSelect()" title="Back" aria-label="Back">←</button>
     <span class="menu-header-spacer"></span>
     <div class="menu-header-actions">
       <button type="button" class="btn btn-icon" onclick="openSettings()" title="Settings" aria-label="Settings">⚙️</button>
@@ -177,7 +177,7 @@
 <!-- =====================  SCREEN: DECK BUILDER  ========================= -->
 <div id="screen-deck" class="screen">
   <header class="deck-header">
-    <button type="button" class="btn btn-back deck-header-back" onclick="goBack()">← Classes</button>
+    <button type="button" class="btn btn-back deck-header-back" onclick="goBack()" aria-label="Back to class select">← Classes</button>
     <div class="deck-class-emblem" id="deck-class-emblem" aria-hidden="true">🔮</div>
     <div class="deck-header-main">
       <h2 class="deck-title" id="deck-title">Build Your Deck</h2>
@@ -192,25 +192,25 @@
     <input type="search" id="deck-search" class="deck-search" placeholder="Search cards…"
            aria-label="Search cards" oninput="setDeckSearch(this.value)" autocomplete="off" />
     <div class="filter-group" role="group" aria-label="Filter by card type">
-      <button class="filter-btn active" data-filter="all"    onclick="setFilter('all')">All</button>
-      <button class="filter-btn"        data-filter="minion" onclick="setFilter('minion')">Minions</button>
-      <button class="filter-btn"        data-filter="spell"  onclick="setFilter('spell')">Spells</button>
-      <button class="filter-btn"        data-filter="weapon" onclick="setFilter('weapon')">Weapons</button>
+      <button class="filter-btn active" data-filter="all"    aria-pressed="true"  onclick="setFilter('all')">All</button>
+      <button class="filter-btn"        data-filter="minion" aria-pressed="false" onclick="setFilter('minion')">Minions</button>
+      <button class="filter-btn"        data-filter="spell"  aria-pressed="false" onclick="setFilter('spell')">Spells</button>
+      <button class="filter-btn"        data-filter="weapon" aria-pressed="false" onclick="setFilter('weapon')">Weapons</button>
     </div>
     <div class="sort-group" role="group" aria-label="Sort card pool">
       <span class="sort-label">Sort:</span>
-      <button class="sort-btn active" data-sort="cost" onclick="setSort('cost')">Cost</button>
-      <button class="sort-btn"        data-sort="name" onclick="setSort('name')">Name</button>
+      <button class="sort-btn active" data-sort="cost" aria-pressed="true"  onclick="setSort('cost')">Cost</button>
+      <button class="sort-btn"        data-sort="name" aria-pressed="false" onclick="setSort('name')">Name</button>
     </div>
     <div class="deck-cost-filters" role="group" aria-label="Filter by mana cost">
       <span class="sort-label">Cost:</span>
-      <button type="button" class="cost-filter-btn active" data-cost="all" onclick="setCostFilter('all')">All</button>
-      <button type="button" class="cost-filter-btn" data-cost="1" onclick="setCostFilter('1')">1</button>
-      <button type="button" class="cost-filter-btn" data-cost="2" onclick="setCostFilter('2')">2</button>
-      <button type="button" class="cost-filter-btn" data-cost="3" onclick="setCostFilter('3')">3</button>
-      <button type="button" class="cost-filter-btn" data-cost="4" onclick="setCostFilter('4')">4</button>
-      <button type="button" class="cost-filter-btn" data-cost="5" onclick="setCostFilter('5')">5</button>
-      <button type="button" class="cost-filter-btn" data-cost="6plus" onclick="setCostFilter('6plus')">6+</button>
+      <button type="button" class="cost-filter-btn active" data-cost="all" aria-pressed="true"  onclick="setCostFilter('all')">All</button>
+      <button type="button" class="cost-filter-btn" data-cost="1" aria-pressed="false" onclick="setCostFilter('1')">1</button>
+      <button type="button" class="cost-filter-btn" data-cost="2" aria-pressed="false" onclick="setCostFilter('2')">2</button>
+      <button type="button" class="cost-filter-btn" data-cost="3" aria-pressed="false" onclick="setCostFilter('3')">3</button>
+      <button type="button" class="cost-filter-btn" data-cost="4" aria-pressed="false" onclick="setCostFilter('4')">4</button>
+      <button type="button" class="cost-filter-btn" data-cost="5" aria-pressed="false" onclick="setCostFilter('5')">5</button>
+      <button type="button" class="cost-filter-btn" data-cost="6plus" aria-pressed="false" onclick="setCostFilter('6plus')">6+</button>
     </div>
   </div>
 
@@ -235,9 +235,9 @@
 
       <!-- Quick actions -->
       <div class="deck-quick-actions">
-        <button type="button" class="btn btn-starter-deck" onclick="loadStarterDeck()" title="Load a balanced starter list">📋 Starter</button>
-        <button type="button" class="btn btn-autofill" onclick="autoFillDeck()" title="Randomly fill remaining slots">⚡ Fill</button>
-        <button type="button" class="btn btn-clear-deck" onclick="clearDeck()" title="Remove all cards from deck">🗑</button>
+        <button type="button" class="btn btn-starter-deck" onclick="loadStarterDeck()" title="Load a balanced starter list" aria-label="Load starter deck">📋 Starter</button>
+        <button type="button" class="btn btn-autofill" onclick="autoFillDeck()" title="Randomly fill remaining slots" aria-label="Auto-fill deck">⚡ Fill</button>
+        <button type="button" class="btn btn-clear-deck" onclick="clearDeck()" title="Remove all cards from deck" aria-label="Clear deck">🗑</button>
       </div>
 
       <!-- Save / load decks (localStorage) -->
@@ -434,7 +434,7 @@
 </div>
 
 <!-- Loading overlay -->
-<div id="loading-overlay" class="loading-overlay hidden" aria-live="polite" aria-busy="true">
+<div id="loading-overlay" class="loading-overlay hidden" role="status" aria-live="polite" aria-busy="true" aria-labelledby="loading-text">
   <div class="loading-spinner" aria-hidden="true"></div>
   <p class="loading-text" id="loading-text">Loading…</p>
 </div>

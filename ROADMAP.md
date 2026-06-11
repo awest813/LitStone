@@ -26,7 +26,7 @@ The current state of the project establishes the core gameplay loop.
 - [x] Mulligan phase (player)
 - [x] Deck filter/sort, mana curve, save/load decks (localStorage)
 - [x] Legendary minions (37 literary legends)
-- [x] Unit tests — 138 tests covering game logic, AI, campaign API, and edge cases (`test_game_logic.py`)
+- [x] Unit tests — 146 tests covering game logic, AI, campaign API, and edge cases (`test_game_logic.py`)
 
 ---
 
@@ -43,7 +43,7 @@ Goals: make the game feel complete and production-ready for single-player use.
 - [x] **Sound effects** — Web Audio SFX for play, attack, damage, heal, turn, victory/defeat (mute toggle)
 - [x] **Partial responsive layout** — breakpoints at 900px / 1100px; mobile scroll fixes
 - [x] **Partial mobile polish** — sticky hand/tray, collapsible log, touch targets, board scroll
-- [ ] **Full mobile polish** — further tap-target tuning on smallest phones
+- [x] **Partial mobile polish (≤375px)** — deck-builder and in-game controls meet 44px tap targets
 - [x] **Error handling** — status toasts, illegal-move feedback, network error messages
 - [x] **Resign cleanup** — `POST /api/resign` clears server state when leaving a match
 - [x] **Unit tests** — comprehensive suite in `test_game_logic.py`

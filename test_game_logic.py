@@ -1405,6 +1405,36 @@ class TestServerApi(unittest.TestCase):
         self.assertEqual(data["opponent_name"], "Professor Moriarty")
         self.assertEqual(data["ai_difficulty"], "hard")
 
+    def test_legal_moves_empty_when_hero_dead(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p2["hp"] = 0
+        self.assertEqual(get_legal_moves(p1, p2), [])
+
+    def test_invalid_campaign_node_rejected(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        res = client.post("/api/new_game", json={
+            "hero_class": "Mage",
+            "deck": deck,
+            "campaign_node": "nonexistent",
+        })
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("error", res.get_json())
+
+    def test_action_rejected_after_game_over(self):
+        from server import app, GAMES
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        start = client.post("/api/new_game", json={"hero_class": "Mage", "deck": deck})
+        gid = start.get_json()["game_id"]
+        client.post("/api/mulligan", json={"game_id": gid, "indices": []})
+        GAMES[gid]["p2"]["hp"] = 0
+        res = client.post("/api/action", json={"game_id": gid, "action": "end_turn"})
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.get_json().get("error"), "Game over")
+
     def test_new_game_practice_mode(self):
         from server import app
         client = app.test_client()

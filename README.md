@@ -78,12 +78,14 @@ Third-party licenses: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 ## How to Play
 
-1. **Choose a Hero Class** on the main menu.
-2. **Build your deck** — select 30 cards from the card pool (up to 2 copies each).
-3. Click **Play vs AI** to start the game.
-4. On your turn, play cards from your hand, attack with minions or your hero, and use your hero power.
+1. From the **title hub**, pick **Play**, **Campaign**, **Practice**, or **Tutorial**.
+2. **Choose a hero class**, then **build a 30-card deck** (up to 2 copies each; legendaries max 1).
+3. **Mulligan** any opening-hand cards you want to replace, then confirm.
+4. On your turn, play cards, attack with minions or your hero, and use your hero power.
 5. Click **End Turn** to let the AI take its turn.
 6. Reduce the opponent's hero HP to 0 to win.
+
+**Practice sandbox:** set custom hero HP and optional infinite mana before building your deck.
 
 ### Hero Powers (cost 2 mana, once per turn)
 
@@ -182,8 +184,9 @@ These legendary minions are based on classic literature and folklore and have a 
 ```
 LitStone/
 ├── game_logic.py        # Pure Python game rules, AI, and card database
+├── game_store.py        # SQLite persistence for active sessions
 ├── server.py            # Flask server and REST API
-├── test_game_logic.py   # Unit tests (113 tests)
+├── test_game_logic.py   # Unit tests (146 tests)
 ├── requirements.txt     # Python runtime dependencies
 ├── requirements-dev.txt # pytest, Ruff, and runtime deps
 ├── THIRD_PARTY_NOTICES.md  # MIT and other OSS attributions
@@ -195,7 +198,10 @@ LitStone/
 │   └── index.html       # Single-page HTML shell
 └── static/
     ├── game.js          # All frontend game logic and rendering
-    ├── style.css        # Styling and animations
+    ├── card-art.js      # Procedural card art rendering
+    ├── style.css        # Core styling and animations
+    ├── screens.css      # Hub, modals, campaign, practice screens
+    ├── card-frames.css  # Card frame styles
     └── vendor/          # Vendored MIT JS (fuzzysort, NProgress)
 ```
 
@@ -205,6 +211,7 @@ LitStone/
 |--------|--------------------|----------------------------------|
 | GET    | `/`                | Serves the game UI               |
 | GET    | `/api/health`      | Server health check              |
+| GET    | `/api/campaign`    | Campaign node list for single-player |
 | GET    | `/api/cards`       | Returns the full card database   |
 | POST   | `/api/new_game`    | Starts a new game session        |
 | POST   | `/api/mulligan`    | Submit mulligan card swaps       |

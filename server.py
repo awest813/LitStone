@@ -295,6 +295,11 @@ def new_game():
             "error": f"Invalid deck — need {DECK_SIZE} legal cards for {player_cls} (neutrals + class cards only).",
         }), 400
 
+    campaign_node = data.get("campaign_node")
+    if campaign_node and not data.get("practice") and not data.get("tutorial"):
+        if get_campaign_node(campaign_node) is None:
+            return jsonify({"error": f"Unknown campaign node: {campaign_node}"}), 400
+
     game_id = str(uuid.uuid4())
     GAME_LOG.clear()
 
@@ -391,6 +396,9 @@ def do_action():
 
     if gs.get("mulligan_phase"):
         return jsonify({"error": "Mulligan phase in progress"}), 400
+
+    if check_win(p1, p2):
+        return jsonify({"error": "Game over"}), 400
 
     if not gs.get("is_player_turn"):
         return jsonify({"error": "Not your turn"}), 400
