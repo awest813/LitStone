@@ -2,18 +2,49 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="theme-color" content="#080f1a"/>
+  <meta name="description" content="LitStone — a literary-themed browser card game inspired by Hearthstone. Build a deck, mulligan your hand, and battle an AI opponent." />
   <title>LitStone</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/card-frames.css" />
+  <link rel="stylesheet" href="/static/screens.css" />
 </head>
 <body>
 
-<!-- =====================  SCREEN: HERO SELECT  ========================== -->
-<div id="screen-menu" class="screen active">
+<!-- =====================  SCREEN: TITLE HUB  ============================ -->
+<div id="screen-hub" class="screen active">
   <div class="menu-bg-overlay"></div>
+  <div class="hub-inner">
+    <div class="hub-emblem" aria-hidden="true">📜</div>
+    <h1 class="game-title">LitStone</h1>
+    <p class="hub-tagline">Literary legends · Arcane duels</p>
+    <div class="hub-actions">
+      <button type="button" class="btn btn-primary btn-hub-play" id="btn-hub-play" onclick="goToClassSelect()">
+        Play
+      </button>
+      <button type="button" class="btn hub-continue hidden" id="btn-hub-continue" onclick="continueLastDeck()">
+        Continue Last Deck
+      </button>
+      <button type="button" class="btn btn-hub-secondary" onclick="openSettings()">Settings</button>
+    </div>
+    <p class="hub-meta" id="hub-meta">6 classes · 109 cards · single-player vs AI</p>
+  </div>
+</div>
+
+<!-- =====================  SCREEN: HERO SELECT  ========================== -->
+<div id="screen-menu" class="screen">
+  <div class="menu-bg-overlay"></div>
+  <header class="menu-header">
+    <button type="button" class="btn btn-back btn-icon" onclick="goToHub()" title="Back" aria-label="Back to title">←</button>
+    <span class="menu-header-spacer"></span>
+    <div class="menu-header-actions">
+      <button type="button" class="btn btn-icon" onclick="openSettings()" title="Settings" aria-label="Settings">⚙️</button>
+    </div>
+  </header>
   <h1 class="game-title">LitStone</h1>
   <p class="menu-subtitle">Choose Your Class</p>
   <div class="hero-grid">
@@ -73,6 +104,17 @@
       <div class="hero-flavour">Noble crusaders who rally the faithful with endless reinforcements.</div>
     </div>
 
+    <div class="hero-card" data-class="Shaman" role="button" tabindex="0" aria-label="Choose Shaman class" onclick="selectClass('Shaman')">
+      <div class="hero-glow shaman-glow"></div>
+      <div class="hero-emblem">⚡</div>
+      <h2>Shaman</h2>
+      <div class="hero-power-badge">
+        <span class="badge-cost">2</span>
+        <span class="badge-text">Totemic Call<br><em>Summon a random Totem</em></span>
+      </div>
+      <div class="hero-flavour">Spirit callers who command lightning and ancestral totems.</div>
+    </div>
+
   </div>
 </div>
 
@@ -92,11 +134,21 @@
 
 <!-- =====================  SCREEN: DECK BUILDER  ========================= -->
 <div id="screen-deck" class="screen">
-  <h2 class="deck-title" id="deck-title">Build Your Deck</h2>
-  <p class="deck-subtitle">Click cards to add · Maximum 2 copies · 15 cards total</p>
+  <header class="deck-header">
+    <button type="button" class="btn btn-back deck-header-back" onclick="goBack()">← Classes</button>
+    <div class="deck-class-emblem" id="deck-class-emblem" aria-hidden="true">🔮</div>
+    <div class="deck-header-main">
+      <h2 class="deck-title" id="deck-title">Build Your Deck</h2>
+      <p class="deck-subtitle" id="deck-subtitle">Click cards to add · Maximum 2 copies · 30 cards total</p>
+      <p class="deck-validation" id="deck-validation" aria-live="polite"></p>
+    </div>
+    <button type="button" class="btn btn-icon" onclick="openSettings()" title="Settings" aria-label="Settings">⚙️</button>
+  </header>
 
   <!-- Filter & sort controls -->
   <div class="deck-controls">
+    <input type="search" id="deck-search" class="deck-search" placeholder="Search cards…"
+           aria-label="Search cards" oninput="setDeckSearch(this.value)" autocomplete="off" />
     <div class="filter-group" role="group" aria-label="Filter by card type">
       <button class="filter-btn active" data-filter="all"    onclick="setFilter('all')">All</button>
       <button class="filter-btn"        data-filter="minion" onclick="setFilter('minion')">Minions</button>
@@ -108,6 +160,16 @@
       <button class="sort-btn active" data-sort="cost" onclick="setSort('cost')">Cost</button>
       <button class="sort-btn"        data-sort="name" onclick="setSort('name')">Name</button>
     </div>
+    <div class="deck-cost-filters" role="group" aria-label="Filter by mana cost">
+      <span class="sort-label">Cost:</span>
+      <button type="button" class="cost-filter-btn active" data-cost="all" onclick="setCostFilter('all')">All</button>
+      <button type="button" class="cost-filter-btn" data-cost="1" onclick="setCostFilter('1')">1</button>
+      <button type="button" class="cost-filter-btn" data-cost="2" onclick="setCostFilter('2')">2</button>
+      <button type="button" class="cost-filter-btn" data-cost="3" onclick="setCostFilter('3')">3</button>
+      <button type="button" class="cost-filter-btn" data-cost="4" onclick="setCostFilter('4')">4</button>
+      <button type="button" class="cost-filter-btn" data-cost="5" onclick="setCostFilter('5')">5</button>
+      <button type="button" class="cost-filter-btn" data-cost="6plus" onclick="setCostFilter('6plus')">6+</button>
+    </div>
   </div>
 
   <div class="deck-layout">
@@ -117,7 +179,7 @@
     <!-- Sidebar -->
     <div class="deck-sidebar">
       <div class="deck-count-box">
-        <span id="deck-count">0</span><span class="deck-count-sep">/</span><span>15</span>
+        <span id="deck-count">0</span><span class="deck-count-sep">/</span><span id="deck-size-max">30</span>
         <div class="deck-progress-bar"><div id="deck-progress" class="deck-progress-fill"></div></div>
       </div>
 
@@ -131,8 +193,9 @@
 
       <!-- Quick actions -->
       <div class="deck-quick-actions">
-        <button class="btn btn-autofill"    onclick="autoFillDeck()" title="Randomly fill remaining slots">⚡ Auto-fill</button>
-        <button class="btn btn-clear-deck"  onclick="clearDeck()"    title="Remove all cards from deck">🗑 Clear</button>
+        <button type="button" class="btn btn-starter-deck" onclick="loadStarterDeck()" title="Load a balanced starter list">📋 Starter</button>
+        <button type="button" class="btn btn-autofill" onclick="autoFillDeck()" title="Randomly fill remaining slots">⚡ Fill</button>
+        <button type="button" class="btn btn-clear-deck" onclick="clearDeck()" title="Remove all cards from deck">🗑</button>
       </div>
 
       <!-- Save / load decks (localStorage) -->
@@ -145,10 +208,9 @@
         <div class="saved-decks-list" id="saved-decks-list"></div>
       </div>
 
-      <button class="btn btn-primary" id="btn-start-ai" disabled onclick="startGame()">
+      <button type="button" class="btn btn-primary" id="btn-start-ai" disabled onclick="startGame()">
         ⚔️ Play vs AI
       </button>
-      <button class="btn btn-back" onclick="goBack()">← Back</button>
     </div>
   </div>
 
@@ -162,7 +224,18 @@
   <!-- AI thinking progress bar (top of screen) -->
   <div id="ai-thinking-bar" class="ai-thinking-bar" aria-hidden="true"></div>
 
-  <div id="status-toast" class="status-toast hidden" role="status" aria-live="polite"></div>
+  <div class="game-top-bar" id="game-top-bar">
+    <button type="button" class="btn btn-pause-toggle" id="btn-pause" onclick="togglePause()"
+            title="Pause (Esc)" aria-label="Pause game">⏸</button>
+    <div class="game-mana-hud" id="game-mana-hud" aria-label="Your mana"></div>
+    <div class="game-top-bar-right">
+      <button type="button" class="btn btn-log-toggle" id="btn-log-toggle" onclick="toggleCombatLog()"
+              aria-expanded="true" aria-controls="combat-log">📜 Log</button>
+      <button type="button" class="btn btn-icon" onclick="openSettings()" title="Settings" aria-label="Settings">⚙️</button>
+    </div>
+  </div>
+
+  <div id="game-help-bar" class="game-help-bar" aria-live="polite"></div>
 
   <!-- Turn banner (centre-screen flash) -->
   <div id="turn-banner" class="turn-banner"></div>
@@ -189,6 +262,7 @@
     <div class="deck-panel" id="deck-player"></div>
     <div class="end-turn-area">
       <span id="turn-counter" class="turn-counter-badge"></span>
+      <button type="button" class="btn btn-sfx" id="btn-sfx-toggle" onclick="toggleSfx()" title="Toggle sound" aria-pressed="false" aria-label="Toggle sound">🔊</button>
       <button class="btn btn-end-turn" id="btn-end-turn" onclick="endTurn()">End Turn</button>
       <button class="btn btn-resign" onclick="resign()">Resign</button>
     </div>
@@ -214,7 +288,10 @@
     <div class="winner-box">
       <div class="winner-crown">👑</div>
       <h2 id="winner-text">Victory!</h2>
-      <button class="btn btn-primary" onclick="returnToMenu()">Return to Menu</button>
+      <div class="winner-actions">
+        <button type="button" class="btn btn-play-again" onclick="playAgain()">Play Again</button>
+        <button type="button" class="btn btn-primary" onclick="returnToMenu()">Main Menu</button>
+      </div>
     </div>
   </div>
 
@@ -222,6 +299,97 @@
   <div id="game-tooltip" class="card-tooltip hidden"></div>
 </div>
 
+<div id="status-toast" class="status-toast hidden" role="status" aria-live="polite"></div>
+
+<!-- Settings modal (global) -->
+<div id="settings-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <div class="modal-panel settings-panel">
+    <h2 id="settings-title">Settings</h2>
+    <div class="settings-group">
+      <div class="settings-group-title">Audio &amp; visuals</div>
+      <label class="setting-row">
+        <span>
+          <span class="setting-label">Sound effects</span>
+          <div class="setting-hint">Play sounds for attacks, turns, and victory</div>
+        </span>
+        <span class="toggle-switch">
+          <input type="checkbox" id="setting-sfx" onchange="applySettingSfx(this.checked)" />
+          <span class="toggle-slider"></span>
+        </span>
+      </label>
+      <label class="setting-row">
+        <span>
+          <span class="setting-label">Animations</span>
+          <div class="setting-hint">Card plays, attacks, and board effects</div>
+        </span>
+        <span class="toggle-switch">
+          <input type="checkbox" id="setting-animations" onchange="applySettingAnimations(this.checked)" />
+          <span class="toggle-slider"></span>
+        </span>
+      </label>
+      <div class="setting-row setting-row--select">
+        <span>
+          <span class="setting-label">Game speed</span>
+          <div class="setting-hint">Match pacing and AI turn animations</div>
+        </span>
+        <select id="setting-speed" class="setting-select" onchange="applySettingSpeed(this.value)"
+                aria-label="Game speed">
+          <option value="normal">Normal</option>
+          <option value="fast">Fast</option>
+          <option value="instant">Instant</option>
+        </select>
+      </div>
+    </div>
+    <div class="settings-group">
+      <div class="settings-group-title">Gameplay</div>
+      <label class="setting-row">
+        <span>
+          <span class="setting-label">Combat log on desktop</span>
+          <div class="setting-hint">Show log panel when a match starts</div>
+        </span>
+        <span class="toggle-switch">
+          <input type="checkbox" id="setting-combat-log" onchange="applySettingCombatLog(this.checked)" />
+          <span class="toggle-slider"></span>
+        </span>
+      </label>
+      <label class="setting-row">
+        <span>
+          <span class="setting-label">Confirm resign</span>
+          <div class="setting-hint">Ask before leaving a match</div>
+        </span>
+        <span class="toggle-switch">
+          <input type="checkbox" id="setting-confirm-resign" onchange="applySettingConfirmResign(this.checked)" />
+          <span class="toggle-slider"></span>
+        </span>
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-primary" onclick="closeSettings()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pause overlay (in-match) -->
+<div id="pause-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+  <div class="modal-panel pause-panel">
+    <h2 id="pause-title">Paused</h2>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-primary" onclick="closePause()">Resume</button>
+      <button type="button" class="btn btn-hub-secondary" onclick="openSettingsFromPause()">Settings</button>
+      <button type="button" class="btn btn-resign" onclick="resignFromPause()">Resign Match</button>
+      <button type="button" class="btn btn-back" onclick="quitToHubFromPause()">Quit to Menu</button>
+    </div>
+    <p class="pause-hint">Press Esc to resume</p>
+  </div>
+</div>
+
+<!-- Loading overlay -->
+<div id="loading-overlay" class="loading-overlay hidden" aria-live="polite" aria-busy="true">
+  <div class="loading-spinner" aria-hidden="true"></div>
+  <p class="loading-text" id="loading-text">Loading…</p>
+</div>
+
+<script src="/static/card-art.js"></script>
 <script src="/static/game.js"></script>
 </body>
 </html>

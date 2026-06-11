@@ -41,6 +41,7 @@
   --priest-col:       #d4820a;
   --rogue-col:        #1abc9c;
   --paladin-col:      #c0a020;
+  --shaman-col:       #0077b6;
 }
 
 body {
@@ -249,6 +250,7 @@ body::after {
 .priest-glow  { background: radial-gradient(circle, var(--priest-col), transparent); }
 .rogue-glow   { background: radial-gradient(circle, var(--rogue-col), transparent); }
 .paladin-glow { background: radial-gradient(circle, var(--paladin-col), transparent); }
+.shaman-glow  { background: radial-gradient(circle, var(--shaman-col), transparent); }
 
 .hero-emblem {
   font-size: 58px;
@@ -318,6 +320,7 @@ body::after {
 /* Filter & sort controls */
 .deck-controls {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
@@ -468,6 +471,39 @@ body::after {
   width: 0%;
   transition: width .3s;
   box-shadow: 0 0 6px rgba(0,184,148,.5);
+}
+
+.deck-count-box--ready {
+  border-color: var(--col-green);
+  box-shadow: 0 0 16px rgba(0, 184, 148, .25);
+}
+
+.deck-search {
+  flex: 1 1 180px;
+  min-width: 140px;
+  max-width: 280px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--col-border-bright);
+  background: rgba(8, 16, 28, .9);
+  color: var(--col-text);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.deck-search::placeholder { color: var(--col-text-dim); }
+.deck-search:focus {
+  outline: none;
+  border-color: var(--col-mana-bright);
+  box-shadow: 0 0 0 2px rgba(74, 158, 221, .25);
+}
+
+.pool-empty-msg {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--col-text-dim);
+  font-style: italic;
 }
 
 /* Mana curve */
@@ -710,9 +746,73 @@ body::after {
 
 #screen-game.active {
   display: grid;
-  grid-template-rows: auto 1fr auto auto;
+  grid-template-rows: auto auto auto 1fr auto auto;
   grid-template-columns: 1fr 220px;
 }
+
+.game-top-bar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: max(6px, env(safe-area-inset-top)) 12px 6px;
+  padding-left: max(12px, env(safe-area-inset-left));
+  padding-right: max(12px, env(safe-area-inset-right));
+  background: rgba(4, 10, 20, .92);
+  border-bottom: 1px solid var(--col-border);
+  z-index: 10;
+}
+
+.game-mana-hud {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Cinzel', serif;
+  color: var(--col-mana-bright);
+}
+
+.mana-hud-label {
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--col-text-dim);
+}
+
+.mana-hud-count {
+  font-size: 16px;
+  font-weight: 700;
+  min-width: 3ch;
+}
+
+.mana-gems--hud .mana-gem--hud {
+  width: 12px;
+  height: 12px;
+}
+
+.btn-log-toggle {
+  font-size: 11px;
+  padding: 8px 12px;
+  min-height: 36px;
+  background: rgba(20, 40, 64, .9);
+  border-color: var(--col-border-bright);
+  color: var(--col-text);
+}
+
+.game-help-bar {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  text-align: center;
+  font-size: 11px;
+  color: var(--col-text-dim);
+  padding: 4px 12px;
+  background: rgba(8, 16, 28, .75);
+  border-bottom: 1px solid rgba(30, 53, 80, .5);
+  z-index: 9;
+}
+
+.game-help-bar.hidden { display: none; }
 
 /* Trays */
 .tray {
@@ -726,12 +826,12 @@ body::after {
   z-index: 2;
 }
 
-.tray-opp    { grid-column: 1; grid-row: 1; border-radius: 0 0 12px 0; }
-.tray-player { grid-column: 1; grid-row: 3; border-radius: 12px 0 0 0; }
+.tray-opp    { grid-column: 1; grid-row: 3; border-radius: 0 0 12px 0; }
+.tray-player { grid-column: 1; grid-row: 5; border-radius: 12px 0 0 0; }
 
 /* Boards */
 .boards {
-  grid-column: 1; grid-row: 2;
+  grid-column: 1; grid-row: 4;
   display: flex;
   flex-direction: column;
   justify-content: space-around;
@@ -744,13 +844,18 @@ body::after {
 .board {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 10px;
   min-height: 130px;
-  padding: 8px;
+  padding: 8px 12px;
   border-radius: 14px;
   transition: background .25s;
   position: relative;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 /* Subtle zone tint */
@@ -785,7 +890,7 @@ body::after {
 
 /* Hand (player) */
 .hand-player {
-  grid-column: 1; grid-row: 4;
+  grid-column: 1; grid-row: 6;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -819,13 +924,24 @@ body::after {
 
 /* Combat log */
 .combat-log {
-  grid-column: 2; grid-row: 1 / 5;
+  grid-column: 2; grid-row: 1 / 7;
   background: rgba(4,10,20,.92);
   border-left: 2px solid var(--col-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   z-index: 2;
+  transition: min-height .25s ease, opacity .25s ease;
+}
+
+.combat-log.collapsed {
+  min-height: 0 !important;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+  pointer-events: none;
 }
 
 .log-title {
@@ -910,6 +1026,16 @@ body::after {
   background: radial-gradient(circle at 40% 35%, #003a30, #001710);
   border-color: #1abc9c;
   box-shadow: 0 0 20px rgba(26,188,156,.25), inset 0 1px 0 rgba(100,255,220,.08);
+}
+.hero-panel[data-class="Paladin"] {
+  background: radial-gradient(circle at 40% 35%, #4a3a00, #231800);
+  border-color: #c0a020;
+  box-shadow: 0 0 20px rgba(192,160,32,.25), inset 0 1px 0 rgba(255,220,120,.08);
+}
+.hero-panel[data-class="Shaman"]  {
+  background: radial-gradient(circle at 40% 35%, #003850, #001820);
+  border-color: #0077b6;
+  box-shadow: 0 0 20px rgba(0,119,182,.3), inset 0 1px 0 rgba(100,200,255,.08);
 }
 
 .hero-panel.attackable   { border-color: var(--col-green);  box-shadow: 0 0 18px rgba(0,184,148,.5); cursor: pointer; }
@@ -1114,6 +1240,17 @@ body::after {
 
 .btn-end-turn:disabled { opacity: .4; cursor: not-allowed; }
 
+.btn-sfx {
+  background: rgba(20, 40, 64, .85);
+  border-color: var(--col-border-bright);
+  color: var(--col-text);
+  font-size: 16px;
+  padding: 6px 10px;
+  line-height: 1;
+  min-width: 40px;
+}
+.btn-sfx:hover { background: rgba(35, 113, 181, .25); border-color: var(--col-mana-bright); }
+
 .btn-resign {
   background: transparent;
   border-color: #6b1a1a;
@@ -1154,7 +1291,13 @@ body::after {
 .minion-card.can-attack {
   border-color: var(--col-green);
   cursor: pointer;
-  box-shadow: 0 0 14px rgba(0,184,148,.5), inset 0 1px 0 rgba(255,255,255,.4);
+  box-shadow: 0 0 14px rgba(0,184,148,.5), inset 0 0 12px rgba(0,184,148,.12);
+  animation: readyPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes readyPulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(0,184,148,.4), inset 0 0 8px rgba(0,184,148,.08); }
+  50%       { box-shadow: 0 0 22px rgba(0,212,170,.65), inset 0 0 14px rgba(0,212,170,.15); }
 }
 .minion-card.can-attack:hover {
   transform: translateY(-10px) scale(1.04);
@@ -1230,6 +1373,48 @@ body::after {
 .damage-flash { animation: damageFlash .5s ease-out forwards; }
 .attack-lunge { animation: attackLunge .4s ease-in-out forwards; }
 
+@keyframes attackLungeOpp {
+  0%   { transform: translateY(0) scale(1); }
+  35%  { transform: translateY(18px) scale(1.08); }
+  60%  { transform: translateY(-6px) scale(0.97); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+.attack-lunge-opp { animation: attackLungeOpp .4s ease-in-out forwards; }
+
+@keyframes heroWeaponSwing {
+  0%   { transform: rotate(0deg) scale(1); }
+  35%  { transform: rotate(-14deg) scale(1.04); }
+  70%  { transform: rotate(6deg) scale(1); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+@keyframes heroWeaponSwingOpp {
+  0%   { transform: rotate(0deg) scale(1); }
+  35%  { transform: rotate(14deg) scale(1.04); }
+  70%  { transform: rotate(-6deg) scale(1); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+.hero-weapon-swing     { animation: heroWeaponSwing .38s ease-in-out; transform-origin: center bottom; }
+.hero-weapon-swing-opp { animation: heroWeaponSwingOpp .38s ease-in-out; transform-origin: center top; }
+
+@keyframes deathShard {
+  0%   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0.1); opacity: 0; }
+}
+
+.fx-death-shard {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: linear-gradient(135deg, #e8dcc8, #c0392b);
+  pointer-events: none;
+  z-index: 640;
+  box-shadow: 0 0 6px rgba(214,48,49,.6);
+}
+
 .minion-art {
   height: 44px;
   background: linear-gradient(160deg, rgba(0,0,0,.12), rgba(0,0,0,.05));
@@ -1304,6 +1489,13 @@ body::after {
 .hand-card.unaffordable:hover { transform: rotate(var(--card-rot, 0deg)); box-shadow: 0 4px 12px rgba(0,0,0,.5); }
 
 /* Spell card face — arcane purple */
+.hand-card--coin {
+  background: linear-gradient(160deg, #ffd060 0%, #e8a020 45%, #c08010 100%);
+  border-color: #ffe080;
+  box-shadow: 0 0 16px rgba(232,160,32,.45);
+}
+.hand-card--coin .minion-name { color: #3a2800; font-weight: 700; }
+
 .hand-card--spell {
   background: linear-gradient(175deg, #d8c0f0, #b890d8);
   border-color: #9060b8;
@@ -1391,6 +1583,27 @@ body::after {
 }
 .pool-card--legendary .pool-art {
   background: linear-gradient(160deg, #1a1000, #332000);
+}
+
+.pool-card--class {
+  border-color: rgba(0, 119, 182, .45);
+  box-shadow: inset 0 0 10px rgba(0, 119, 182, .08);
+}
+
+.class-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 8px;
+  font-weight: 700;
+  font-family: 'Cinzel', serif;
+  color: #7ec8e3;
+  background: rgba(0, 20, 40, .85);
+  border: 1px solid rgba(0, 119, 182, .5);
+  border-radius: 4px;
+  padding: 1px 4px;
+  pointer-events: none;
+  z-index: 6;
 }
 .pool-card--legendary:hover:not(.pool-card--full) {
   border-color: var(--col-gold-bright);
@@ -1483,19 +1696,22 @@ body::after {
 /* ---- Selection info bar ---- */
 .selection-info {
   position: absolute;
-  bottom: 130px; left: 50%; transform: translateX(-50%);
-  background: rgba(232,160,32,.14);
-  border: 1px solid var(--col-gold);
-  border-radius: 8px;
-  padding: 6px 18px;
+  bottom: 148px; left: 50%; transform: translateX(-50%);
+  background: rgba(12, 24, 40, .94);
+  border: 2px solid var(--col-gold);
+  border-radius: 10px;
+  padding: 10px 20px;
   font-family: 'Cinzel', serif;
-  font-size: 12px;
-  color: var(--col-gold);
+  font-size: 13px;
+  color: var(--col-gold-bright);
   pointer-events: none;
   z-index: 200;
   text-shadow: 0 0 10px rgba(232,160,32,.4);
-  box-shadow: 0 4px 12px rgba(0,0,0,.5);
-  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0,0,0,.6), 0 0 20px rgba(232,160,32,.15);
+  max-width: min(92vw, 520px);
+  white-space: normal;
+  text-align: center;
+  line-height: 1.35;
 }
 .selection-info.hidden { display: none; }
 
@@ -1554,8 +1770,107 @@ body::after {
 
 /* ---- Responsiveness guard ---- */
 @media (max-width: 900px) {
+  body { overflow-y: auto; overflow-x: hidden; }
+
   .hero-grid { gap: 16px; }
   .hero-card { width: 180px; }
+
+  #screen-deck.active {
+    overflow-y: auto;
+    max-height: 100vh;
+    padding-bottom: 24px;
+  }
+
+  .deck-layout { flex-direction: column; }
+  .deck-sidebar { width: 100%; max-width: 100%; }
+  .card-pool { max-height: none; }
+
+  #screen-game.active {
+    overflow-y: auto;
+    min-height: 100vh;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto minmax(100px, 1fr) auto auto auto;
+  }
+
+  .combat-log {
+    grid-column: 1;
+    grid-row: 7;
+    max-height: 28vh;
+    border-left: 0;
+    border-top: 2px solid var(--col-border);
+  }
+
+  .combat-log.collapsed {
+    display: none;
+  }
+
+  .tray-opp { flex-wrap: wrap; gap: 6px; padding: 6px 8px; }
+  .tray-player {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px;
+    background: rgba(4, 8, 16, .96);
+    backdrop-filter: blur(8px);
+  }
+
+  .end-turn-area {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .btn-end-turn, .btn-resign, .btn-sfx, .btn-log-toggle {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .minion-card {
+    width: 76px;
+    padding: 4px 4px 12px;
+    flex-shrink: 0;
+    scroll-snap-align: center;
+    touch-action: manipulation;
+  }
+  .minion-card .minion-art { height: 36px; font-size: 22px; }
+  .hand-card {
+    width: 72px;
+    touch-action: manipulation;
+  }
+  .hand-player {
+    padding: 6px 8px max(10px, env(safe-area-inset-bottom));
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+    min-height: 110px;
+    position: sticky;
+    bottom: 72px;
+    z-index: 15;
+    background: rgba(4, 8, 16, .92);
+  }
+  .hero-panel { width: 76px; height: 76px; flex-shrink: 0; }
+  .hero-power-panel { width: 56px; height: 56px; }
+
+  .mulligan-cards { flex-wrap: wrap; justify-content: center; gap: 12px; }
+  .mulligan-card { width: 100px; }
+
+  .deck-controls { flex-direction: column; align-items: stretch; }
+  .deck-search { max-width: none; width: 100%; }
+}
+
+/* Keyboard focus rings */
+.hero-card:focus-visible,
+.pool-card:focus-visible,
+.hand-card:focus-visible,
+.minion-card:focus-visible,
+.btn:focus-visible,
+.filter-btn:focus-visible,
+.sort-btn:focus-visible {
+  outline: 2px solid var(--col-gold-bright);
+  outline-offset: 2px;
 }
 
 /* ============================================================
@@ -1624,8 +1939,8 @@ body::after {
 }
 
 .status-toast {
-  position: absolute;
-  top: 20px;
+  position: fixed;
+  top: max(20px, env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
   padding: 8px 14px;
@@ -1640,15 +1955,10 @@ body::after {
 @media (max-width: 1100px) {
   #screen-game.active {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr auto auto 140px;
   }
 
-  .combat-log {
-    grid-column: 1;
-    grid-row: 5;
-    border-left: 0;
-    border-top: 2px solid var(--col-border);
-    min-height: 140px;
+  .combat-log:not(.collapsed) {
+    min-height: 120px;
   }
 }
 

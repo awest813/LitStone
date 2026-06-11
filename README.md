@@ -2,14 +2,16 @@
 
 A lightweight, browser-based card game inspired by Hearthstone. Play against an AI opponent in a turn-based battle using minions, spells, and weapons.
 
+**Roadmap:** [ROADMAP.md](ROADMAP.md) · **Hearthstone Lite plan:** [HEARTHSTONE_LITE_PLAN.md](HEARTHSTONE_LITE_PLAN.md)
+
 ## Features
 
-- **5 Hero Classes** — Mage, Warrior, Priest, Rogue, and Paladin, each with a unique hero power
-- **61-card library** — Literary-themed minions, spells, and a weapon with distinct mechanics, plus 37 Legendary storybook heroes and villains
+- **6 Hero Classes** — Mage, Warrior, Priest, Rogue, Paladin, and Shaman, each with a unique hero power
+- **109-card library** — Neutral literary cards plus 8 class-exclusive cards per hero (48 class cards), including 37 Legendary minions
 - **Rich card mechanics** — Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle
 - **Mulligan phase** — Select any opening-hand cards to redraw before each game starts
 - **Literary Legends** — Legendary minions inspired by Sherlock Holmes, Dr. John Watson, Professor Moriarty, Van Helsing, Victor Frankenstein, Frankenstein's Monster, Alice, The Mad Hatter, The White Rabbit, The Queen of Hearts, The Cheshire Cat, Snow White, Rapunzel, Sleeping Beauty, Little Red Riding Hood, Rumpelstiltskin, The Big Bad Wolf, Pied Piper, Baba Yaga, Bluebeard, King Arthur, Merlin, Lancelot, Guinevere, Morgan le Fay, Mordred, Gawain, Robin Hood, Maid Marian, Friar Tuck, Little John, Will Scarlet, Ebenezer Scrooge, Oliver Twist, Ivanhoe, Quasimodo, and Don Quixote (max 1 copy per deck)
-- **Deck Builder** — Build a custom 15-card deck (max 2 copies per card; max 1 copy of Legendary cards) before each game
+- **Deck Builder** — Build a custom 30-card deck (max 2 copies per card; max 1 copy of Legendary cards) before each game
 - **AI opponent** — Heuristic-driven AI that evaluates board state and plays competitively
 - **Combat log** — Real-time log of every action taken during the game
 - **Fatigue system** — Players take increasing damage when their deck runs out
@@ -40,15 +42,21 @@ pip install -r requirements.txt
 ### Running the server
 
 ```bash
-python server.py
+python3 server.py
 ```
 
 Open [http://localhost:5000](http://localhost:5000) in your browser.
 
+Run tests:
+
+```bash
+python3 -m unittest test_game_logic -v
+```
+
 ## How to Play
 
 1. **Choose a Hero Class** on the main menu.
-2. **Build your deck** — select 15 cards from the card pool (up to 2 copies each).
+2. **Build your deck** — select 30 cards from the card pool (up to 2 copies each).
 3. Click **Play vs AI** to start the game.
 4. On your turn, play cards from your hand, attack with minions or your hero, and use your hero power.
 5. Click **End Turn** to let the AI take its turn.
@@ -63,6 +71,7 @@ Open [http://localhost:5000](http://localhost:5000) in your browser.
 | Priest  | Lesser Heal  | Restore 2 HP to a friendly character |
 | Rogue   | Dagger Mastery | Equip a 1/2 Wicked Dagger         |
 | Paladin | Reinforce      | Summon a 1/1 Silver Hand Recruit   |
+| Shaman  | Totemic Call   | Summon a random Totem              |
 
 ### Card Types
 
@@ -151,7 +160,10 @@ These legendary minions are based on classic literature and folklore and have a 
 LitStone/
 ├── game_logic.py        # Pure Python game rules, AI, and card database
 ├── server.py            # Flask server and REST API
+├── test_game_logic.py   # Unit tests (113 tests)
 ├── requirements.txt     # Python dependencies
+├── ROADMAP.md           # Version roadmap
+├── HEARTHSTONE_LITE_PLAN.md  # Strategic plan for HS-lite quality
 ├── templates/
 │   └── index.html       # Single-page HTML shell
 └── static/
@@ -164,11 +176,13 @@ LitStone/
 | Method | Route              | Description                      |
 |--------|--------------------|----------------------------------|
 | GET    | `/`                | Serves the game UI               |
+| GET    | `/api/health`      | Server health check              |
 | GET    | `/api/cards`       | Returns the full card database   |
 | POST   | `/api/new_game`    | Starts a new game session        |
 | POST   | `/api/mulligan`    | Submit mulligan card swaps       |
 | GET    | `/api/state`       | Returns the current game state   |
 | POST   | `/api/action`      | Executes a player action         |
+| POST   | `/api/resign`      | Abandon the current game         |
 | GET    | `/api/legal_moves` | Returns all legal moves for P1   |
 
 ## License

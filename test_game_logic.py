@@ -13,11 +13,13 @@ import unittest
 sys.path.insert(0, ".")
 
 from game_logic import (
-    CARD_DB, HERO_CLASSES, GAME_LOG,
+    CARD_DB, HERO_CLASSES, GAME_LOG, DECK_SIZE, COIN_CARD,
     create_player, draw_card, start_turn, do_mulligan,
     get_legal_moves, execute_move, check_win,
     run_ai_turn, log_action, damage_hero, get_valid_targets,
-    cleanup_dead, evaluate_ai_move,
+    cleanup_dead, evaluate_ai_move, give_coin,
+    ai_choose_mulligan, ai_do_mulligan,
+    card_allowed_for_class, cards_for_class,
 )
 
 
@@ -26,6 +28,15 @@ def _make_minion(name, atk, hp, **kwargs):
     m = {"name": name, "type": "minion", "cost": 1, "atk": atk, "hp": hp,
          "max_hp": hp, "can_attack": True, **kwargs}
     return m
+
+
+def _standard_test_deck():
+    """30-card deck respecting copy limits."""
+    base = (["Town Crier"] * 2 + ["Castle Guard"] * 2 + ["Highwayman"] * 2 +
+            ["Errant Knight"] * 2 + ["Storybook Dragon"] * 2 +
+            ["Quill Bolt"] * 2 + ["Inferno Verse"] * 1 +
+            ["Restorative Hymn"] * 1 + ["Deductive Clue"] * 1)
+    return base * 2
 
 
 class TestCreatePlayer(unittest.TestCase):
@@ -37,7 +48,7 @@ class TestCreatePlayer(unittest.TestCase):
         self.assertEqual(p["armor"], 0)
         self.assertEqual(p["mana"], 0)
         self.assertEqual(p["max_mana"], 0)
-        self.assertEqual(len(p["deck"]), 15)
+        self.assertEqual(len(p["deck"]), DECK_SIZE)
         self.assertEqual(p["hand"], [])
         self.assertEqual(p["board"], [])
         self.assertFalse(p["hero_power_used"])
@@ -45,11 +56,8 @@ class TestCreatePlayer(unittest.TestCase):
         self.assertFalse(p["hero_can_attack"])
 
     def test_custom_deck_used(self):
-        deck = ["Town Crier"] * 2 + ["Castle Guard"] * 2 + ["Highwayman"] * 2 + \
-               ["Errant Knight"] * 2 + ["Storybook Dragon"] * 2 + \
-               ["Quill Bolt"] * 2 + ["Inferno Verse"] * 1 + \
-               ["Restorative Hymn"] * 1 + ["Deductive Clue"] * 1
-        self.assertEqual(len(deck), 15)
+        deck = _standard_test_deck()
+        self.assertEqual(len(deck), DECK_SIZE)
         p = create_player("P1", "Rogue", custom_deck=deck, shuffle=False)
         self.assertEqual(p["deck"], deck)
 
@@ -65,10 +73,10 @@ class TestDrawCard(unittest.TestCase):
 
     def test_normal_draw(self):
         p = create_player("P1", "Mage")
-        self.assertEqual(len(p["deck"]), 15)
+        self.assertEqual(len(p["deck"]), DECK_SIZE)
         draw_card(p)
         self.assertEqual(len(p["hand"]), 1)
-        self.assertEqual(len(p["deck"]), 14)
+        self.assertEqual(len(p["deck"]), DECK_SIZE - 1)
 
     def test_hand_overflow_burns_card(self):
         p = create_player("P1", "Mage")
@@ -103,7 +111,7 @@ class TestStartTurn(unittest.TestCase):
 
     def test_mana_capped_at_10(self):
         p = create_player("P1", "Mage")
-        p["deck"] = ["Town Crier"] * 15
+        p["deck"] = ["Town Crier"] * 2 + ["Castle Guard"] * 2  # partial refill only
         p["max_mana"] = 10
         p["mana"] = 10
         start_turn(p)
@@ -152,14 +160,14 @@ class TestDoMulligan(unittest.TestCase):
         do_mulligan(p, [0, 1, 2])
         self.assertEqual(len(p["hand"]), 3)
         # Deck shrinks by 3 (replacement draws) then grows by 3 (returned cards): net 0
-        self.assertEqual(len(p["deck"]), 12)
+        self.assertEqual(len(p["deck"]), DECK_SIZE - 3)
 
     def test_no_redeal_of_swapped_cards(self):
         """Mulligan must never give back the same cards that were just swapped."""
         p = create_player("P1", "Mage", shuffle=False)
         # Fill the deck entirely with one type of card so replacements are
         # always that type, and put a different type in the hand to swap.
-        p["deck"] = ["Storybook Dragon"] * 12
+        p["deck"] = ["Storybook Dragon"] * (DECK_SIZE - 3)
         p["hand"] = ["Town Crier"] * 3
         do_mulligan(p, [0, 1, 2])
         # All replacement draws must come from the pre-existing deck, which
@@ -171,7 +179,7 @@ class TestDoMulligan(unittest.TestCase):
     def test_partial_swap_no_redeal(self):
         """Partial swap must not redeal the swapped card."""
         p = create_player("P1", "Mage", shuffle=False)
-        p["deck"] = ["Storybook Dragon"] * 12
+        p["deck"] = ["Storybook Dragon"] * (DECK_SIZE - 3)
         p["hand"] = ["Town Crier", "Castle Guard", "Highwayman"]
         # Swap only the first card (Town Crier)
         do_mulligan(p, [0])
@@ -258,7 +266,7 @@ class TestGetLegalMoves(unittest.TestCase):
         GAME_LOG.clear()
 
     def _player_with_hand(self, hero_class, cards, mana=10):
-        p = create_player("P1", hero_class, custom_deck=cards + ["Town Crier"] * (15 - len(cards)), shuffle=False)
+        p = create_player("P1", hero_class, custom_deck=cards + ["Town Crier"] * (DECK_SIZE - len(cards)), shuffle=False)
         p["mana"] = mana
         p["max_mana"] = mana
         for _ in range(len(cards)):
@@ -743,7 +751,7 @@ class TestRunAiTurn(unittest.TestCase):
         for _ in range(3):
             draw_card(p1)
         p2 = create_player("AI", "Warrior")
-        p2["deck"] = ["Town Crier"] * 15
+        p2["deck"] = ["Town Crier"] * 2 + ["Castle Guard"] * 2
         for _ in range(4):
             draw_card(p2)
         moves = run_ai_turn(p2, p1)
@@ -782,7 +790,7 @@ class TestRunAiTurn(unittest.TestCase):
         big = _make_minion("Big", 10, 10, can_attack=True)
         p2["board"].append(big)
         p2["hand"] = []
-        p2["deck"] = ["Town Crier"] * 15
+        p2["deck"] = ["Town Crier"] * 2 + ["Castle Guard"] * 2
         # Give AI enough mana
         p2["max_mana"] = 10
         # Manually call start_turn and execute one attack to simulate
@@ -1139,6 +1147,19 @@ class TestCardDbIntegrity(unittest.TestCase):
                     self.assertIn("atk", card)
                     self.assertIn("durability", card)
 
+    def test_unique_card_icons(self):
+        seen: dict[str, str] = {}
+        for name, card in CARD_DB.items():
+            icon = card["icon"]
+            self.assertNotIn(
+                icon, seen,
+                f"Duplicate icon '{icon}' on '{seen.get(icon)}' and '{name}'",
+            )
+            seen[icon] = name
+
+    def test_standard_test_deck_is_30_cards(self):
+        self.assertEqual(len(_standard_test_deck()), DECK_SIZE)
+
     def test_legendary_max_copies(self):
         """Legendary cards should have max 1 copy in auto-generated decks."""
         p = create_player("P", "Mage")
@@ -1159,7 +1180,141 @@ class TestCardDbIntegrity(unittest.TestCase):
                 self.assertLessEqual(count, 2, f"'{name}' appears {count} times")
 
     def test_hero_classes_valid(self):
-        self.assertEqual(HERO_CLASSES, ["Mage", "Warrior", "Priest", "Rogue", "Paladin"])
+        self.assertEqual(HERO_CLASSES, ["Mage", "Warrior", "Priest", "Rogue", "Paladin", "Shaman"])
+
+
+class TestClassCards(unittest.TestCase):
+    def test_mage_card_only_for_mage(self):
+        self.assertTrue(card_allowed_for_class("Scorching Sonnet", "Mage"))
+        self.assertFalse(card_allowed_for_class("Scorching Sonnet", "Warrior"))
+
+    def test_neutral_cards_all_classes(self):
+        self.assertTrue(card_allowed_for_class("Town Crier", "Mage"))
+        self.assertTrue(card_allowed_for_class("Town Crier", "Shaman"))
+
+    def test_cards_for_class_includes_neutrals_and_class_cards(self):
+        mage_pool = cards_for_class("Mage")
+        self.assertIn("Town Crier", mage_pool)
+        self.assertIn("Scorching Sonnet", mage_pool)
+        self.assertNotIn("Lightning Limerick", mage_pool)
+
+    def test_ai_deck_respects_class(self):
+        p = create_player("AI", "Shaman")
+        for name in p["deck"]:
+            self.assertTrue(card_allowed_for_class(name, "Shaman"), f"{name} in Shaman deck")
+
+
+class TestShamanHeroPower(unittest.TestCase):
+    def setUp(self):
+        GAME_LOG.clear()
+
+    def test_shaman_in_hero_classes(self):
+        self.assertIn("Shaman", HERO_CLASSES)
+
+    def test_totemic_call_summons_totem(self):
+        p1 = create_player("P1", "Shaman", custom_deck=_standard_test_deck(), shuffle=False)
+        p2 = create_player("P2", "Mage", custom_deck=_standard_test_deck(), shuffle=False)
+        p1["mana"] = 2
+        execute_move(p1, p2, ("hero_power", None, None))
+        self.assertEqual(len(p1["board"]), 1)
+        self.assertTrue(p1["hero_power_used"])
+
+    def test_totemic_call_not_available_when_board_full(self):
+        p1 = create_player("P1", "Shaman", custom_deck=_standard_test_deck(), shuffle=False)
+        p2 = create_player("P2", "Mage", custom_deck=_standard_test_deck(), shuffle=False)
+        p1["board"] = [_make_minion(f"M{i}", 1, 1) for i in range(7)]
+        p1["mana"] = 2
+        hp_moves = [m for m in get_legal_moves(p1, p2) if m[0] == "hero_power"]
+        self.assertEqual(hp_moves, [])
+
+
+class TestTheCoin(unittest.TestCase):
+    def setUp(self):
+        GAME_LOG.clear()
+
+    def test_coin_in_card_db(self):
+        self.assertIn(COIN_CARD, CARD_DB)
+        self.assertTrue(CARD_DB[COIN_CARD].get("uncollectible"))
+
+    def test_give_coin_adds_to_hand(self):
+        p = create_player("P1", "Mage")
+        give_coin(p)
+        self.assertEqual(p["hand"], [COIN_CARD])
+
+    def test_coin_grants_mana(self):
+        p1 = create_player("P1", "Mage", custom_deck=_standard_test_deck(), shuffle=False)
+        p2 = create_player("P2", "Mage", custom_deck=_standard_test_deck(), shuffle=False)
+        p1["hand"] = [COIN_CARD]
+        p1["mana"] = 2
+        p1["max_mana"] = 2
+        execute_move(p1, p2, ("play", 0, None))
+        self.assertEqual(p1["mana"], 3)
+        self.assertEqual(p1["hand"], [])
+
+
+class TestAiMulligan(unittest.TestCase):
+    def test_ai_tosses_expensive_cards(self):
+        p = create_player("AI", "Mage", shuffle=False)
+        p["hand"] = ["King Arthur", "Town Crier", "Castle Guard", "Highwayman"]
+        swap = ai_choose_mulligan(p)
+        self.assertIn(0, swap)
+
+    def test_ai_keeps_curve(self):
+        p = create_player("AI", "Mage", shuffle=False)
+        p["hand"] = ["Town Crier", "Castle Guard", "Highwayman"]
+        swap = ai_choose_mulligan(p)
+        self.assertEqual(swap, [])
+
+    def test_ai_do_mulligan_preserves_hand_size(self):
+        p = create_player("AI", "Mage", shuffle=False)
+        for _ in range(4):
+            draw_card(p)
+        ai_do_mulligan(p)
+        self.assertEqual(len(p["hand"]), 4)
+
+
+class TestStartTurnOptions(unittest.TestCase):
+    def test_skip_draw_on_first_turn(self):
+        p = create_player("P1", "Mage", shuffle=False)
+        p["deck"] = ["Town Crier"] * 10
+        start_turn(p, draw=False)
+        self.assertEqual(p["max_mana"], 1)
+        self.assertEqual(p["mana"], 1)
+        self.assertEqual(len(p["hand"]), 0)
+
+
+class TestServerApi(unittest.TestCase):
+    def test_health_endpoint(self):
+        from server import app
+        client = app.test_client()
+        res = client.get("/api/health")
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertEqual(data["status"], "ok")
+        self.assertEqual(data["deck_size"], DECK_SIZE)
+
+    def test_invalid_deck_rejected(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        bad = deck[:29] + ["Lightning Limerick"]
+        res = client.post("/api/new_game", json={"hero_class": "Mage", "deck": bad})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("error", res.get_json())
+
+    def test_action_response_omits_card_db(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        start = client.post("/api/new_game", json={"hero_class": "Mage", "deck": deck})
+        self.assertEqual(start.status_code, 200)
+        data = start.get_json()
+        self.assertIn("card_db", data)
+        gid = data["game_id"]
+        client.post("/api/mulligan", json={"game_id": gid, "indices": []})
+        end = client.post("/api/action", json={"game_id": gid, "action": "end_turn"})
+        self.assertEqual(end.status_code, 200)
+        self.assertNotIn("card_db", end.get_json())
 
 
 if __name__ == "__main__":

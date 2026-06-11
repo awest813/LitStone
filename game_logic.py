@@ -10,6 +10,11 @@ import random
 # 1. CARD DATABASE & CONFIGURATION
 # ---------------------------------------------------------------------------
 
+DECK_SIZE = 30
+OPENING_HAND_FIRST = 3
+OPENING_HAND_SECOND = 4
+COIN_CARD = "The Coin"
+
 CARD_DB = {
     # ---------- Standard cards ----------
     "Town Crier":       {"type": "minion", "cost": 1, "atk": 1, "hp": 2, "taunt": False, "icon": "TC"},
@@ -134,10 +139,115 @@ CARD_DB = {
                          "legendary": True, "icon": "QS"},
     "Don Quixote":      {"type": "minion", "cost": 3, "atk": 4, "hp": 2, "charge": True,
                          "legendary": True, "icon": "DQ"},
+
+    # ---------- Mage class cards ----------
+    "Novice Pyromancer": {"type": "minion", "cost": 1, "atk": 1, "hp": 2, "classes": ["Mage"], "icon": "NP"},
+    "Ember Archivist":   {"type": "minion", "cost": 2, "atk": 3, "hp": 2, "classes": ["Mage"], "icon": "EA"},
+    "Mirror Maiden":     {"type": "minion", "cost": 3, "atk": 2, "hp": 3, "divine_shield": True,
+                          "classes": ["Mage"], "icon": "MK"},
+    "Sage of Sparks":    {"type": "minion", "cost": 4, "atk": 3, "hp": 5,
+                          "battlecry": {"effect": "draw_cards", "val": 1}, "classes": ["Mage"], "icon": "SK"},
+    "Scorching Sonnet":  {"type": "spell", "cost": 2, "effect": "damage", "val": 3, "classes": ["Mage"], "icon": "SN"},
+    "Arcane Lexicon":    {"type": "spell", "cost": 3, "effect": "draw", "val": 2, "classes": ["Mage"], "icon": "AX"},
+    "Arcane Mist":       {"type": "spell", "cost": 1, "effect": "damage_all", "val": 1, "classes": ["Mage"], "icon": "AM"},
+    "Meteor Manuscript": {"type": "spell", "cost": 5, "effect": "damage", "val": 7, "classes": ["Mage"], "icon": "MT"},
+
+    # ---------- Warrior class cards ----------
+    "Bulwark Bearer":      {"type": "minion", "cost": 2, "atk": 1, "hp": 4, "taunt": True,
+                            "classes": ["Warrior"], "icon": "BK"},
+    "Shieldwall Sergeant": {"type": "minion", "cost": 3, "atk": 2, "hp": 4, "taunt": True,
+                            "divine_shield": True, "classes": ["Warrior"], "icon": "WG"},
+    "Rampart Raider":      {"type": "minion", "cost": 3, "atk": 4, "hp": 3, "classes": ["Warrior"], "icon": "RR"},
+    "Berserker's Ballad":  {"type": "minion", "cost": 4, "atk": 5, "hp": 4, "charge": True,
+                            "classes": ["Warrior"], "icon": "BZ"},
+    "Ironclad Anvil":      {"type": "weapon", "cost": 3, "atk": 3, "durability": 2, "classes": ["Warrior"], "icon": "IA"},
+    "War Drums":           {"type": "spell", "cost": 3, "effect": "buff_all", "val": [1, 1],
+                            "classes": ["Warrior"], "icon": "WD"},
+    "Cleave Chronicle":    {"type": "spell", "cost": 3, "effect": "damage_all", "val": 1, "classes": ["Warrior"], "icon": "CV"},
+    "Fortify":             {"type": "spell", "cost": 2, "effect": "heal", "val": 5, "classes": ["Warrior"], "icon": "FY"},
+
+    # ---------- Priest class cards ----------
+    "Humble Acolyte":      {"type": "minion", "cost": 1, "atk": 1, "hp": 3, "classes": ["Priest"], "icon": "HA"},
+    "Blessed Bibliophile": {"type": "minion", "cost": 2, "atk": 2, "hp": 3,
+                            "battlecry": {"effect": "heal_hero", "val": 2}, "classes": ["Priest"], "icon": "BI"},
+    "Radiant Chaplain":    {"type": "minion", "cost": 3, "atk": 3, "hp": 4, "divine_shield": True,
+                            "classes": ["Priest"], "icon": "RC"},
+    "Cathedral Protector": {"type": "minion", "cost": 5, "atk": 4, "hp": 6, "taunt": True,
+                            "classes": ["Priest"], "icon": "CP"},
+    "Sacred Salve":        {"type": "spell", "cost": 2, "effect": "heal", "val": 4, "classes": ["Priest"], "icon": "SS"},
+    "Smite Scripture":     {"type": "spell", "cost": 3, "effect": "damage", "val": 4, "classes": ["Priest"], "icon": "SM"},
+    "Hymn of Hope":        {"type": "spell", "cost": 4, "effect": "heal_all", "val": 4, "classes": ["Priest"], "icon": "HH"},
+    "Greater Restoration": {"type": "spell", "cost": 5, "effect": "heal", "val": 8, "classes": ["Priest"], "icon": "GR"},
+
+    # ---------- Rogue class cards ----------
+    "Back Alley Burglar": {"type": "minion", "cost": 1, "atk": 2, "hp": 1, "charge": True,
+                          "classes": ["Rogue"], "icon": "BA"},
+    "Shadowstep Scout":   {"type": "minion", "cost": 2, "atk": 3, "hp": 2, "classes": ["Rogue"], "icon": "SC"},
+    "Venomous Valet":     {"type": "minion", "cost": 4, "atk": 3, "hp": 3, "poisonous": True,
+                          "classes": ["Rogue"], "icon": "VV"},
+    "Thief's Shiv":       {"type": "weapon", "cost": 1, "atk": 1, "durability": 2, "classes": ["Rogue"], "icon": "TV"},
+    "Assassin's Rapier":  {"type": "weapon", "cost": 5, "atk": 3, "durability": 4, "classes": ["Rogue"], "icon": "AR"},
+    "Cheap Shot":         {"type": "spell", "cost": 2, "effect": "damage", "val": 2, "classes": ["Rogue"], "icon": "KT"},
+    "Shiv Storm":         {"type": "spell", "cost": 2, "effect": "damage_all", "val": 1, "classes": ["Rogue"], "icon": "SV"},
+    "Heist Ledger":       {"type": "spell", "cost": 4, "effect": "draw", "val": 3, "classes": ["Rogue"], "icon": "HL"},
+
+    # ---------- Paladin class cards ----------
+    "Squire of Light":      {"type": "minion", "cost": 1, "atk": 1, "hp": 1, "taunt": True,
+                             "divine_shield": True, "classes": ["Paladin"], "icon": "SL"},
+    "Silver Dawn Knight":   {"type": "minion", "cost": 2, "atk": 3, "hp": 2, "divine_shield": True,
+                             "classes": ["Paladin"], "icon": "DK"},
+    "Crusader's Charge":    {"type": "minion", "cost": 3, "atk": 3, "hp": 1, "charge": True,
+                             "divine_shield": True, "classes": ["Paladin"], "icon": "CR"},
+    "Truesilver Testament": {"type": "weapon", "cost": 4, "atk": 4, "durability": 2, "classes": ["Paladin"], "icon": "TU"},
+    "Holy Wrath Scroll":    {"type": "spell", "cost": 2, "effect": "damage", "val": 3, "classes": ["Paladin"], "icon": "HS"},
+    "Kings' Decree":        {"type": "spell", "cost": 4, "effect": "buff", "val": [4, 4], "classes": ["Paladin"], "icon": "KD"},
+    "Consecration Psalm":   {"type": "spell", "cost": 3, "effect": "damage_all", "val": 2, "classes": ["Paladin"], "icon": "PS"},
+    "Lay on Hands":         {"type": "spell", "cost": 5, "effect": "heal", "val": 8, "classes": ["Paladin"], "icon": "LH"},
+
+    # ---------- Shaman class cards ----------
+    "Spirit Wolf":        {"type": "minion", "cost": 2, "atk": 2, "hp": 2, "charge": True,
+                          "classes": ["Shaman"], "icon": "WL"},
+    "Thunder Totemist":   {"type": "minion", "cost": 3, "atk": 3, "hp": 3, "classes": ["Shaman"], "icon": "TN"},
+    "Flame Totem Keeper":{"type": "minion", "cost": 2, "atk": 2, "hp": 3, "classes": ["Shaman"], "icon": "FK"},
+    "Stormhammer Saga":   {"type": "weapon", "cost": 2, "atk": 2, "durability": 3, "classes": ["Shaman"], "icon": "HM"},
+    "Lightning Limerick": {"type": "spell", "cost": 1, "effect": "damage", "val": 3, "classes": ["Shaman"], "icon": "LL"},
+    "Maelstrom Verse":    {"type": "spell", "cost": 3, "effect": "damage_all", "val": 2, "classes": ["Shaman"], "icon": "MV"},
+    "Hex of Baba":        {"type": "spell", "cost": 3, "effect": "silence", "val": 0, "classes": ["Shaman"], "icon": "HX"},
+    "Ancestral Memory":   {"type": "spell", "cost": 2, "effect": "draw", "val": 2, "classes": ["Shaman"], "icon": "AN"},
+
+    # ---------- Uncollectible ----------
+    COIN_CARD: {"type": "spell", "cost": 0, "effect": "coin", "val": 1,
+                "icon": "CN", "uncollectible": True},
 }
 
-HERO_CLASSES = ["Mage", "Warrior", "Priest", "Rogue", "Paladin"]
-HERO_ICONS   = {"Mage": "MG", "Warrior": "WR", "Priest": "PR", "Rogue": "RG", "Paladin": "PA"}
+HERO_CLASSES = ["Mage", "Warrior", "Priest", "Rogue", "Paladin", "Shaman"]
+HERO_ICONS   = {
+    "Mage": "MG", "Warrior": "WR", "Priest": "PR", "Rogue": "RG",
+    "Paladin": "PA", "Shaman": "SH",
+}
+
+SHAMAN_TOTEMS = [
+    {"name": "Searing Totem", "type": "minion", "cost": 0, "atk": 1, "hp": 1, "icon": "ST"},
+    {"name": "Healing Totem", "type": "minion", "cost": 0, "atk": 0, "hp": 2, "icon": "HE"},
+    {"name": "Stonefang Totem", "type": "minion", "cost": 0, "atk": 0, "hp": 2, "taunt": True, "icon": "SF"},
+    {"name": "Wrath of Air Totem", "type": "minion", "cost": 0, "atk": 0, "hp": 2, "icon": "WA"},
+]
+
+
+def card_allowed_for_class(card_name: str, hero_class: str) -> bool:
+    """True if a collectable card may appear in a deck for hero_class."""
+    card = CARD_DB.get(card_name)
+    if not card or card.get("uncollectible"):
+        return False
+    classes = card.get("classes")
+    if not classes:
+        return True
+    return hero_class in classes
+
+
+def cards_for_class(hero_class: str) -> list[str]:
+    """Collectable card names legal in a deck for the given hero class."""
+    return [n for n in CARD_DB if card_allowed_for_class(n, hero_class)]
 
 KW_COLORS = {
     "taunt": "#E74C3C", "divine_shield": "#F1C40F", "charge": "#2ECC71",
@@ -149,10 +259,18 @@ KW_LONG  = [("taunt","TAUNT"),("divine_shield","DIVINE SHIELD"),("charge","CHARG
             ("poisonous","POISONOUS"),("battlecry","BATTLECRY"),("deathrattle","DEATHRATTLE")]
 
 GAME_LOG: list[str] = []
+_ACTIVE_LOG: list[str] | None = None
+
+
+def set_active_log(log: list[str] | None) -> None:
+    """Route log_action output to a per-game log list (used by the server)."""
+    global _ACTIVE_LOG
+    _ACTIVE_LOG = log
 
 
 def get_spell_desc(card: dict, short: bool = False) -> str:
     e, v = card.get("effect"), card.get("val")
+    if e == "coin":       return "+1 Mana"                  if short else "Gain 1 Mana Crystal this turn only."
     if e == "damage":     return f"Deal {v} Dmg"            if short else f"Deal {v} damage."
     if e == "heal":       return f"Heal {v} HP"             if short else f"Restore {v} HP."
     if e == "draw":       return f"Draw {v} Cards"          if short else f"Draw {v} cards."
@@ -167,6 +285,8 @@ def get_spell_desc(card: dict, short: bool = False) -> str:
 
 def log_action(msg: str) -> None:
     GAME_LOG.append(msg)
+    if _ACTIVE_LOG is not None:
+        _ACTIVE_LOG.append(msg)
 
 
 # ---------------------------------------------------------------------------
@@ -179,9 +299,9 @@ def create_player(name: str, hero_class: str = "Mage",
         deck = custom_deck.copy()
     else:
         deck = []
-        pool = list(CARD_DB.keys())
-        while len(deck) < 15:
-            c = random.choice(pool)
+        build_pool = cards_for_class(hero_class)
+        while len(deck) < DECK_SIZE:
+            c = random.choice(build_pool)
             max_copies = 1 if CARD_DB[c].get("legendary") else 2
             if deck.count(c) < max_copies:
                 deck.append(c)
@@ -219,7 +339,7 @@ def draw_card(player: dict, on_event=None) -> None:
             on_event("damage", player, "hero", player["fatigue"])
 
 
-def start_turn(player: dict, on_event=None) -> None:
+def start_turn(player: dict, on_event=None, *, draw: bool = True) -> None:
     if player["max_mana"] < 10:
         player["max_mana"] += 1
     player["mana"] = player["max_mana"]
@@ -227,7 +347,45 @@ def start_turn(player: dict, on_event=None) -> None:
     player["hero_can_attack"] = bool(player["weapon"])
     for m in player["board"]:
         m["can_attack"] = True
-    draw_card(player, on_event)
+    if draw:
+        draw_card(player, on_event)
+
+
+def give_coin(player: dict) -> None:
+    """Grant The Coin to the player going second."""
+    player["hand"].append(COIN_CARD)
+    log_action(f"{player['name']} receives {COIN_CARD}!")
+
+
+def ai_choose_mulligan(player: dict) -> list[int]:
+    """Heuristic mulligan: replace expensive cards and weak early hands."""
+    swap: list[int] = []
+    costs = []
+    for i, card_name in enumerate(player["hand"]):
+        card = CARD_DB[card_name]
+        cost = card.get("cost", 0)
+        costs.append(cost)
+        if cost >= 5:
+            swap.append(i)
+        elif cost == 4 and len(player["hand"]) >= 4:
+            swap.append(i)
+    kept = [c for j, c in enumerate(costs) if j not in swap]
+    if kept and max(kept) >= 4 and not any(c <= 2 for c in kept):
+        for i, cost in enumerate(costs):
+            if cost >= 3 and i not in swap:
+                swap.append(i)
+    return sorted(set(swap))
+
+
+def ai_do_mulligan(player: dict) -> list[int]:
+    """Run the AI mulligan and return swapped indices."""
+    indices = ai_choose_mulligan(player)
+    if indices:
+        log_action(f"{player['name']} mulligans {len(indices)} card(s).")
+        do_mulligan(player, indices)
+    else:
+        log_action(f"{player['name']} keeps their opening hand.")
+    return indices
 
 
 def do_mulligan(player: dict, swap_indices: list) -> None:
@@ -290,7 +448,7 @@ def get_legal_moves(player: dict, opp: dict) -> list:
             if len(player["board"]) < 7:
                 moves.append(("play", hand_idx, None))
         elif card["type"] == "spell":
-            if card["effect"] in ("heal", "draw", "damage_all", "buff_all", "heal_all"):
+            if card["effect"] in ("heal", "draw", "damage_all", "buff_all", "heal_all", "coin"):
                 moves.append(("play", hand_idx, None))
             elif card["effect"] == "damage":
                 for t in get_valid_targets(opp, is_attack=False):
@@ -327,6 +485,9 @@ def get_legal_moves(player: dict, opp: dict) -> list:
         elif cls == "Rogue":
             moves.append(("hero_power", None, None))
         elif cls == "Paladin":
+            if len(player["board"]) < 7:
+                moves.append(("hero_power", None, None))
+        elif cls == "Shaman":
             if len(player["board"]) < 7:
                 moves.append(("hero_power", None, None))
 
@@ -373,7 +534,12 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             log_action(f"   Equipped {card_name} ({card['atk']} Atk / {card['durability']} Durability).")
 
         elif card["type"] == "spell":
-            if card["effect"] == "heal":
+            if card["effect"] == "coin":
+                player["mana"] += card["val"]
+                log_action(f"   {player['name']} gains {card['val']} mana this turn!")
+                notify("heal", player, "hero", 0)
+
+            elif card["effect"] == "heal":
                 amt = max(0, min(card["val"], 30 - player["hp"]))
                 player["hp"] += amt
                 log_action(f"   {player['name']} heals for {amt} HP.")
@@ -591,6 +757,15 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             log_action(f">> {player['name']} uses Reinforce! Summons a 1/1 Silver Hand Recruit.")
             notify("armor", player, "hero", 0)
 
+        elif cls == "Shaman":
+            totem_tpl = random.choice(SHAMAN_TOTEMS)
+            totem = dict(totem_tpl)
+            totem["max_hp"] = totem["hp"]
+            totem["can_attack"] = False
+            player["board"].append(totem)
+            log_action(f">> {player['name']} uses Totemic Call! Summons {totem['name']}.")
+            notify("armor", player, "hero", 0)
+
     cleanup_dead(player, opp, on_event)
 
 
@@ -673,6 +848,14 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
 
             elif card["effect"] == "draw":
                 score += card["val"] * 4 if len(p2["hand"]) < 9 else -10
+
+            elif card["effect"] == "coin":
+                unspent = p2["mana"]
+                playable_costs = [
+                    CARD_DB[n]["cost"] for n in p2["hand"]
+                    if CARD_DB[n].get("cost", 0) > unspent
+                ]
+                score += 3 if playable_costs else -2
 
             elif card["effect"] == "damage_all":
                 hits = sum(5 if m["hp"] <= card["val"] else 1 for m in p1["board"])
@@ -767,13 +950,15 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
         elif cls == "Paladin":
             # Reinforce: always decent if board isn't full
             score += 3 if len(p2["board"]) < 7 else -10
+        elif cls == "Shaman":
+            score += 3 if len(p2["board"]) < 7 else -10
 
     return score
 
 
-def run_ai_turn(p2: dict, p1: dict, max_moves: int = 10) -> list[tuple]:
+def run_ai_turn(p2: dict, p1: dict, max_moves: int = 10, *, draw: bool = True) -> list[tuple]:
     """Execute AI turn synchronously. Returns the list of moves made."""
-    start_turn(p2)
+    start_turn(p2, draw=draw)
     moves_made = []
     for _ in range(max_moves):
         if check_win(p1, p2):
@@ -783,9 +968,11 @@ def run_ai_turn(p2: dict, p1: dict, max_moves: int = 10) -> list[tuple]:
             break
         best, best_score = None, -9999.0
         for mv in legal:
-            s = evaluate_ai_move(p2, p1, mv) + random.uniform(0, 0.5)
+            s = evaluate_ai_move(p2, p1, mv)
             if s > best_score:
                 best_score, best = s, mv
+            elif s == best_score and random.random() < 0.5:
+                best = mv
         if best_score < 0:
             break
         execute_move(p2, p1, best)

@@ -9,14 +9,23 @@
 // State
 // ---------------------------------------------------------------------------
 let CARD_DB   = {};          // injected on first server response
+let DECK_SIZE = 30;          // synced from /api/cards
+let gameId    = null;        // per-match session id from server
 let gameState = null;        // latest server state snapshot
 let selected  = null;        // { type: "hand"|"board"|"hero_power"|"hero_weapon", idx }
 let draftDeck = [];
 let selectedClass = null;
 
 // Deck-builder UI state
-let filterType = "all";  // "all" | "minion" | "spell" | "weapon"
-let sortBy     = "cost"; // "cost" | "name"
+let filterType  = "all";  // "all" | "minion" | "spell" | "weapon"
+let filterCost  = "all";  // "all" | "1".."5" | "6plus"
+let sortBy      = "cost"; // "cost" | "name"
+let deckSearch  = "";
+let combatLogOpen = true;
+let isPaused    = false;
+let lastMatchDeck = null; // { heroClass, cards } for Play Again
+let logRenderedCount = 0;
+let deckSearchTimer  = null;
 
 // Deck-builder constants
 const MANA_CURVE_MAX_COST   = 7;   // buckets 1-7; costs ≥7 are grouped under "7+"
@@ -26,6 +35,53 @@ const MAX_AUTOFILL_ATTEMPTS = 500; // safety cap for the random auto-fill loop
 let isActing          = false; // prevents double-submit during server round-trips
 let prevIsPlayerTurn  = null;  // tracks turn transitions for banner
 let turnNumber        = 0;     // client-side turn counter
+let audioCtx          = null;
+
+const SETTINGS_KEY    = "litstoneSettings";
+const LAST_DECK_KEY   = "litstoneLastDeck";
+
+function defaultSettings() {
+  return { sfx: true, animations: true, combatLog: true, confirmResign: true, gameSpeed: "normal" };
+}
+
+function loadSettings() {
+  const legacyMuted = localStorage.getItem("litstoneMuted") === "1";
+  try {
+    const stored = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+    const s = { ...defaultSettings(), ...stored };
+    if (legacyMuted && stored.sfx === undefined) s.sfx = false;
+    return s;
+  } catch (_) {
+    return { ...defaultSettings(), sfx: !legacyMuted };
+  }
+}
+
+function saveSettings() {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  localStorage.setItem("litstoneMuted", settings.sfx ? "0" : "1");
+}
+
+let settings = loadSettings();
+let sfxMuted = !settings.sfx;
+let animationsEnabled = settings.animations !== false;
+let gameSpeed = settings.gameSpeed || "normal";
+
+function animMs(ms) {
+  if (gameSpeed === "instant") return 0;
+  if (gameSpeed === "fast") return Math.max(16, Math.round(ms * 0.45));
+  return ms;
+}
+
+function aiAttackStaggerMs() {
+  if (gameSpeed === "instant") return 0;
+  if (gameSpeed === "fast") return 45;
+  return 100;
+}
+
+function applyGameSpeedClass() {
+  document.body.classList.remove("speed-normal", "speed-fast", "speed-instant");
+  document.body.classList.add(`speed-${gameSpeed}`);
+}
 
 const KW_COLORS = {
   taunt: "#c0392b", divine_shield: "#d4a800", charge: "#00a878",
@@ -35,75 +91,287 @@ const KW_SHORT = [
   ["taunt","TAUNT"], ["divine_shield","SHIELD"], ["charge","CHARGE"],
   ["poisonous","POISON"], ["battlecry","B.CRY"], ["deathrattle","D.RATTLE"],
 ];
-const CARD_EMOJIS = {
-  // Standard cards
-  TC:"📯", CG:"🛡️", HW:"🤺", EK:"⚔️", TP:"🏰", SD:"🐉",
-  CS:"🕷️", CC:"🙏", TA:"⚗️", QB:"✒️", IV:"🔥", HY:"🎶",
-  DC:"🔍", RA:"🎯", FB:"✨", HB:"🗡️",
-  // Literary support spells
-  LW:"📖", NV:"🪶", EL:"🧪", RL:"🚩", CM:"💚", EN:"🔰", IB:"🖋️", TS:"🤫",
-  // New legendary minions
-  IH:"🏇", QS:"🔔", DQ:"🌀", SR:"⚔️",
-  // Legendary minions
-  SH:"🕵️", JW:"🩺", PM:"♟️", VH:"🏹", VF:"🔬", FM:"🧟", AL:"🗝️", MH:"🎩",
-  RB:"🐇", QH:"♥️", CH:"😼", SW:"🍎", RP:"🧵", SB:"😴", LR:"🧺", RU:"🪙",
-  BW:"🐺", PP:"🎶", BY:"🧹", BB:"🔑", KA:"⚔️", ME:"🔮", LT:"🛡️", GV:"🌹",
-  MF:"🧙‍♀️", MD:"🩸", GW:"🛡️", RH:"🏹", MM:"🌿", FT:"🍺", LJ:"💪", WS:"🎯",
-  ES:"💰", OT:"🥣",
-};
-
 // Hero class accent colors
 const HERO_COLORS = {
-  Mage: "#2980b9", Warrior: "#c0392b", Priest: "#d4820a", Rogue: "#1abc9c", Paladin: "#c0a020",
+  Mage: "#2980b9", Warrior: "#c0392b", Priest: "#d4820a", Rogue: "#1abc9c", Paladin: "#c0a020", Shaman: "#0077b6",
 };
 
 // Hero class icons (used across multiple render functions)
 const HERO_ICONS = {
-  Mage: "🔮", Warrior: "⚔️", Priest: "✨", Rogue: "🗡️", Paladin: "🛡️",
+  Mage: "🔮", Warrior: "⚔️", Priest: "✨", Rogue: "🗡️", Paladin: "🛡️", Shaman: "⚡",
 };
 
 // Hero power labels (used in renderHeroPower)
 const HERO_POWER_LABELS = {
-  Mage: "Fireblast", Warrior: "Armor Up", Priest: "Heal", Rogue: "Dagger", Paladin: "Reinforce",
+  Mage: "Fireblast", Warrior: "Armor Up", Priest: "Heal", Rogue: "Dagger", Paladin: "Reinforce", Shaman: "Totemic Call",
 };
 
 // Hero power icons
 const HERO_POWER_ICONS = {
-  Mage: "🔥", Warrior: "🛡️", Priest: "💚", Rogue: "🗡️", Paladin: "⚔️",
+  Mage: "🔥", Warrior: "🛡️", Priest: "💚", Rogue: "🗡️", Paladin: "⚔️", Shaman: "🗿",
 };
 
 // ---------------------------------------------------------------------------
 // Screen helpers
 // ---------------------------------------------------------------------------
 function showScreen(id) {
+  if (id !== "screen-game") closePause(false);
   document.querySelectorAll(".screen").forEach(s => {
-    s.classList.toggle("active", s.id === id);
-    s.style.display = s.id === id ? "" : "none";
+    const on = s.id === id;
+    s.classList.toggle("active", on);
+    if (!on) {
+      s.style.display = "none";
+      return;
+    }
+    if (id === "screen-game") s.style.display = "grid";
+    else if (id === "screen-mulligan") s.style.display = "flex";
+    else s.style.display = "";
   });
-  if (id === "screen-game") {
-    document.getElementById("screen-game").style.display = "grid";
-  }
-  if (id === "screen-mulligan") {
-    document.getElementById("screen-mulligan").style.display = "flex";
+  if (id === "screen-game") initGameScreenUi();
+  if (id === "screen-hub") updateHubContinue();
+}
+
+function isNarrowViewport() {
+  return window.matchMedia("(max-width: 900px)").matches;
+}
+
+function initGameScreenUi() {
+  combatLogOpen = isNarrowViewport() ? false : settings.combatLog !== false;
+  applyCombatLogState();
+  syncSfxButton();
+}
+
+function toggleCombatLog() {
+  combatLogOpen = !combatLogOpen;
+  applyCombatLogState();
+}
+
+function applyCombatLogState() {
+  const log = document.getElementById("combat-log");
+  const btn = document.getElementById("btn-log-toggle");
+  if (log) log.classList.toggle("collapsed", !combatLogOpen);
+  if (btn) {
+    btn.setAttribute("aria-expanded", combatLogOpen ? "true" : "false");
+    btn.textContent = combatLogOpen ? "📜 Hide Log" : "📜 Show Log";
   }
 }
 
+function updateGameHelpBar() {
+  const bar = document.getElementById("game-help-bar");
+  if (!bar || !gameState) return;
+  if (gameState.winner) {
+    bar.textContent = "";
+    bar.classList.add("hidden");
+    return;
+  }
+  bar.classList.remove("hidden");
+  if (!gameState.is_player_turn) {
+    bar.textContent = "Opponent is thinking…";
+    return;
+  }
+  if (selected) return; // selection-info takes over
+  bar.textContent = "Play from hand · Attack glowing minions · Esc or right-click to cancel";
+}
+
+function renderManaHud(p1) {
+  const hud = document.getElementById("game-mana-hud");
+  if (!hud || !p1) return;
+  let gems = "";
+  for (let i = 0; i < 10; i++) {
+    const filled = i < p1.mana ? " filled" : (i < p1.max_mana ? "" : " empty");
+    gems += `<div class="mana-gem mana-gem--hud${filled}" aria-hidden="true"></div>`;
+  }
+  hud.innerHTML = `
+    <span class="mana-hud-label">Mana</span>
+    <span class="mana-hud-count">${p1.mana}/${p1.max_mana}</span>
+    <div class="mana-gems mana-gems--hud">${gems}</div>
+  `;
+}
+
 // ---------------------------------------------------------------------------
-// MENU
+// NAVIGATION — hub, class select, settings, pause
 // ---------------------------------------------------------------------------
-function selectClass(cls) {
+function goToHub() {
+  showScreen("screen-hub");
+}
+
+function goToClassSelect() {
+  showScreen("screen-menu");
+}
+
+function openSettings() {
+  syncSettingsUi();
+  const modal = document.getElementById("settings-modal");
+  if (modal) modal.classList.remove("hidden");
+}
+
+function closeSettings() {
+  document.getElementById("settings-modal")?.classList.add("hidden");
+}
+
+function openSettingsFromPause() {
+  openSettings();
+}
+
+function syncSettingsUi() {
+  const sfx = document.getElementById("setting-sfx");
+  const anim = document.getElementById("setting-animations");
+  const log = document.getElementById("setting-combat-log");
+  const resign = document.getElementById("setting-confirm-resign");
+  const speed = document.getElementById("setting-speed");
+  if (sfx) sfx.checked = settings.sfx;
+  if (anim) anim.checked = settings.animations;
+  if (log) log.checked = settings.combatLog;
+  if (resign) resign.checked = settings.confirmResign;
+  if (speed) speed.value = gameSpeed;
+}
+
+function applySettingSfx(on) {
+  settings.sfx = on;
+  sfxMuted = !on;
+  saveSettings();
+  syncSfxButton();
+  if (on) playSfx("turn");
+}
+
+function applySettingAnimations(on) {
+  settings.animations = on;
+  animationsEnabled = on;
+  saveSettings();
+}
+
+function applySettingCombatLog(on) {
+  settings.combatLog = on;
+  saveSettings();
+  if (document.getElementById("screen-game")?.classList.contains("active") && !isNarrowViewport()) {
+    combatLogOpen = on;
+    applyCombatLogState();
+  }
+}
+
+function applySettingConfirmResign(on) {
+  settings.confirmResign = on;
+  saveSettings();
+}
+
+function applySettingSpeed(speed) {
+  gameSpeed = ["normal", "fast", "instant"].includes(speed) ? speed : "normal";
+  settings.gameSpeed = gameSpeed;
+  saveSettings();
+  applyGameSpeedClass();
+}
+
+function togglePause() {
+  if (isPaused) closePause();
+  else openPause();
+}
+
+function openPause() {
+  if (!gameState || gameState.winner) return;
+  if (document.getElementById("screen-game")?.classList.contains("active") === false) return;
+  isPaused = true;
+  clearSelection();
+  document.getElementById("screen-game")?.classList.add("is-paused");
+  document.getElementById("pause-overlay")?.classList.remove("hidden");
+}
+
+function closePause(focusGame = true) {
+  isPaused = false;
+  document.getElementById("screen-game")?.classList.remove("is-paused");
+  document.getElementById("pause-overlay")?.classList.add("hidden");
+  if (focusGame) document.getElementById("btn-pause")?.focus();
+}
+
+function resignFromPause() {
+  closePause(false);
+  resign();
+}
+
+function quitToHubFromPause() {
+  closePause(false);
+  if (settings.confirmResign && !confirm("Leave match and return to menu?")) return;
+  abandonGame().then(() => goToHub());
+}
+
+function showLoading(text) {
+  const el = document.getElementById("loading-overlay");
+  const msg = document.getElementById("loading-text");
+  if (msg) msg.textContent = text || "Loading…";
+  el?.classList.remove("hidden");
+}
+
+function hideLoading() {
+  document.getElementById("loading-overlay")?.classList.add("hidden");
+}
+
+function saveLastDeck() {
+  if (!selectedClass || draftDeck.length !== DECK_SIZE) return;
+  localStorage.setItem(LAST_DECK_KEY, JSON.stringify({
+    heroClass: selectedClass,
+    cards: [...draftDeck],
+    savedAt: Date.now(),
+  }));
+}
+
+function getLastDeck() {
+  try {
+    return JSON.parse(localStorage.getItem(LAST_DECK_KEY) || "null");
+  } catch (_) {
+    return null;
+  }
+}
+
+function updateHubContinue() {
+  const btn = document.getElementById("btn-hub-continue");
+  const last = getLastDeck();
+  if (!btn) return;
+  if (last?.heroClass && last.cards?.length === DECK_SIZE) {
+    btn.textContent = `Continue — ${last.heroClass} Deck`;
+    btn.classList.remove("hidden");
+  } else {
+    btn.classList.add("hidden");
+  }
+}
+
+function continueLastDeck() {
+  const last = getLastDeck();
+  if (!last?.heroClass || !last.cards) return;
+  enterDeckBuilder(last.heroClass, last.cards);
+}
+
+function enterDeckBuilder(cls, initialDeck) {
   selectedClass = cls;
-  draftDeck  = [];
+  draftDeck = initialDeck ? [...initialDeck] : [];
   filterType = "all";
-  sortBy     = "cost";
-  showScreen("screen-deck");
+  filterCost = "all";
+  sortBy = "cost";
+  deckSearch = "";
+  clearTimeout(deckSearchTimer);
+  const searchEl = document.getElementById("deck-search");
+  if (searchEl) searchEl.value = "";
   document.getElementById("deck-title").textContent = `Build Your ${cls} Deck`;
-  // Reset filter/sort button states
+  const sub = document.getElementById("deck-subtitle");
+  if (sub) {
+    sub.textContent = `${cls} + neutral cards · Max 2 copies · ${DECK_SIZE} cards total`;
+  }
+  const emblem = document.getElementById("deck-class-emblem");
+  if (emblem) {
+    emblem.textContent = HERO_ICONS[cls] || "?";
+    emblem.style.borderColor = HERO_COLORS[cls] || "var(--col-border-bright)";
+    emblem.style.boxShadow = `0 0 14px ${HERO_COLORS[cls] || "#333"}55`;
+  }
   document.querySelectorAll(".filter-btn").forEach(b => b.classList.toggle("active", b.dataset.filter === "all"));
   document.querySelectorAll(".sort-btn").forEach(b => b.classList.toggle("active", b.dataset.sort === "cost"));
+  document.querySelectorAll(".cost-filter-btn").forEach(b => b.classList.toggle("active", b.dataset.cost === "all"));
+  showScreen("screen-deck");
   renderCardPool();
   updateDeckSidebar();
   renderSavedDecks();
+  updateDeckValidation();
+}
+
+function selectClass(cls) {
+  enterDeckBuilder(cls, []);
 }
 
 // ---------------------------------------------------------------------------
@@ -125,15 +393,115 @@ function setSort(sort) {
   renderCardPool();
 }
 
+function setDeckSearch(query) {
+  deckSearch = (query || "").trim().toLowerCase();
+  clearTimeout(deckSearchTimer);
+  deckSearchTimer = setTimeout(() => renderCardPool(), 100);
+}
+
+function setCostFilter(cost) {
+  filterCost = cost;
+  document.querySelectorAll(".cost-filter-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.cost === cost)
+  );
+  renderCardPool();
+}
+
+function cardMatchesCostFilter(card) {
+  if (filterCost === "all") return true;
+  const c = card.cost ?? 0;
+  if (filterCost === "6plus") return c >= 6;
+  return String(c) === filterCost;
+}
+
+function loadStarterDeck() {
+  if (!selectedClass) return;
+  const classCards = Object.entries(CARD_DB)
+    .filter(([, c]) => c.classes?.includes(selectedClass) && !c.legendary && !c.uncollectible)
+    .sort((a, b) => a[1].cost - b[1].cost || a[0].localeCompare(b[0]));
+  const neutrals = Object.entries(CARD_DB)
+    .filter(([, c]) => (!c.classes || c.classes.length === 0) && !c.legendary && !c.uncollectible)
+    .sort((a, b) => a[1].cost - b[1].cost || a[0].localeCompare(b[0]));
+
+  draftDeck = [];
+  classCards.slice(0, 6).forEach(([name]) => {
+    for (let i = 0; i < 2 && draftDeck.length < DECK_SIZE; i++) draftDeck.push(name);
+  });
+  let guard = 0;
+  let ni = 0;
+  while (draftDeck.length < DECK_SIZE && neutrals.length > 0 && guard < 600) {
+    guard++;
+    const [name] = neutrals[ni % neutrals.length];
+    const max = CARD_DB[name]?.legendary ? 1 : 2;
+    if (draftDeck.filter(c => c === name).length < max) draftDeck.push(name);
+    ni++;
+  }
+  if (draftDeck.length < DECK_SIZE) autoFillDeck();
+  else {
+    renderCardPool();
+    updateDeckSidebar();
+  }
+  showStatusToast("Starter deck loaded — tweak it or play!");
+}
+
+function updateDeckValidation() {
+  const el = document.getElementById("deck-validation");
+  if (!el) return;
+  const n = draftDeck.length;
+  const need = DECK_SIZE - n;
+  el.className = "deck-validation";
+  if (n === DECK_SIZE) {
+    el.textContent = "✓ Deck ready — good luck!";
+    el.classList.add("deck-validation--ok");
+  } else if (n === 0) {
+    el.textContent = `Add ${DECK_SIZE} cards or tap Starter / Fill`;
+    el.classList.add("deck-validation--warn");
+  } else {
+    el.textContent = `Need ${need} more card${need === 1 ? "" : "s"}`;
+    el.classList.add("deck-validation--warn");
+  }
+}
+
+function cardAllowedForClass(card, heroClass) {
+  if (card.uncollectible) return false;
+  if (!card.classes || card.classes.length === 0) return true;
+  return card.classes.includes(heroClass);
+}
+
+function poolCardNames() {
+  return Object.entries(CARD_DB)
+    .filter(([, card]) => cardAllowedForClass(card, selectedClass))
+    .map(([name]) => name);
+}
+
 function renderCardPool() {
   const pool = document.getElementById("card-pool");
+  if (!pool) return;
   pool.innerHTML = "";
 
-  let entries = Object.entries(CARD_DB);
+  let entries = Object.entries(CARD_DB).filter(([, card]) =>
+    cardAllowedForClass(card, selectedClass)
+  );
 
   // Apply type filter
   if (filterType !== "all") {
     entries = entries.filter(([, card]) => card.type === filterType);
+  }
+
+  if (filterCost !== "all") {
+    entries = entries.filter(([, card]) => cardMatchesCostFilter(card));
+  }
+
+  if (deckSearch) {
+    entries = entries.filter(([name, card]) => {
+      const hay = `${name} ${card.type} ${spellDesc(card, true)}`.toLowerCase();
+      return hay.includes(deckSearch);
+    });
+  }
+
+  if (entries.length === 0) {
+    pool.innerHTML = `<div class="pool-empty-msg">No cards match your filters.</div>`;
+    return;
   }
 
   // Apply sort
@@ -143,16 +511,16 @@ function renderCardPool() {
     entries.sort((a, b) => a[0].localeCompare(b[0]));
   }
 
+  const frag = document.createDocumentFragment();
   entries.forEach(([name, card]) => {
     const isLegendary = !!card.legendary;
     const maxCopies  = isLegendary ? 1 : 2;
     const count  = draftDeck.filter(c => c === name).length;
-    const isFull = count >= maxCopies || draftDeck.length >= 15;
+    const isFull = count >= maxCopies || draftDeck.length >= DECK_SIZE;
     const div    = document.createElement("div");
-    div.className = `pool-card pool-card--${card.type}${isFull ? " pool-card--full" : ""}${isLegendary ? " pool-card--legendary" : ""}`;
+    const isClass = card.classes?.length > 0;
+    div.className = `pool-card pool-card--${card.type}${isFull ? " pool-card--full" : ""}${isLegendary ? " pool-card--legendary" : ""}${isClass ? " pool-card--class" : ""} ${CardArt.frameClasses(card, name)}`;
     div.dataset.name = name;
-
-    const icon = CARD_EMOJIS[card.icon] || card.icon;
 
     let statsHtml = "";
     if (card.type === "minion") {
@@ -177,7 +545,8 @@ function renderCardPool() {
       <div class="gem-cost">${card.cost}</div>
       ${count > 0 ? `<div class="gem-count">${count}</div>` : ""}
       ${isLegendary ? `<div class="legendary-crown" title="Legendary — only 1 copy per deck">♦</div>` : ""}
-      <div class="pool-art">${icon}</div>
+      ${isClass ? `<div class="class-badge" title="${card.classes.join(", ")} only">${card.classes[0].slice(0,3)}</div>` : ""}
+      ${CardArt.renderArt(card, name, "pool")}
       <div class="pool-name">${name}</div>
       ${statsHtml}
     `;
@@ -186,12 +555,15 @@ function renderCardPool() {
     }
     div.addEventListener("mouseenter", e => showPoolTooltip(e, name, card));
     div.addEventListener("mouseleave", () => hideTooltip("card-tooltip"));
-    pool.appendChild(div);
+    frag.appendChild(div);
   });
+  pool.appendChild(frag);
 }
 
 function addCardToDeck(name) {
-  if (draftDeck.length >= 15) return;
+  if (draftDeck.length >= DECK_SIZE) return;
+  const card = CARD_DB[name];
+  if (!card || !cardAllowedForClass(card, selectedClass)) return;
   const maxCopies = CARD_DB[name]?.legendary ? 1 : 2;
   if (draftDeck.filter(c => c === name).length >= maxCopies) return;
   draftDeck.push(name);
@@ -208,8 +580,10 @@ function removeFromDeck(name) {
 
 function updateDeckSidebar() {
   const count  = draftDeck.length;
+  const countBox = document.querySelector(".deck-count-box");
   document.getElementById("deck-count").textContent    = count;
-  document.getElementById("deck-progress").style.width = `${(count / 15) * 100}%`;
+  document.getElementById("deck-progress").style.width = `${(count / DECK_SIZE) * 100}%`;
+  if (countBox) countBox.classList.toggle("deck-count-box--ready", count === DECK_SIZE);
 
   const list   = document.getElementById("deck-list");
   list.innerHTML = "";
@@ -227,8 +601,13 @@ function updateDeckSidebar() {
     list.appendChild(li);
   });
 
-  document.getElementById("btn-start-ai").disabled = count !== 15;
+  document.getElementById("btn-start-ai").disabled = count !== DECK_SIZE;
+  const startBtn = document.getElementById("btn-start-ai");
+  if (startBtn) {
+    startBtn.textContent = count === DECK_SIZE ? "⚔️ Play vs AI" : `Need ${DECK_SIZE - count} cards`;
+  }
   renderManaCurve();
+  updateDeckValidation();
 }
 
 function renderManaCurve() {
@@ -258,9 +637,9 @@ function renderManaCurve() {
 }
 
 function autoFillDeck() {
-  const pool = Object.keys(CARD_DB);
+  const pool = poolCardNames();
   let tries = 0;
-  while (draftDeck.length < 15 && tries < MAX_AUTOFILL_ATTEMPTS) {
+  while (draftDeck.length < DECK_SIZE && tries < MAX_AUTOFILL_ATTEMPTS) {
     tries++;
     const name = pool[Math.floor(Math.random() * pool.length)];
     const maxCopies = CARD_DB[name]?.legendary ? 1 : 2;
@@ -304,8 +683,16 @@ function loadDeck(name) {
   const saved = getSavedDecks();
   const entry = saved[name];
   if (!entry) return;
-  // Filter out any cards that no longer exist in CARD_DB (e.g. after a card set update)
-  draftDeck = entry.cards.filter(c => CARD_DB[c]);
+  if (entry.heroClass && entry.heroClass !== selectedClass) {
+    showStatusToast(`That deck is for ${entry.heroClass} — pick that class first.`);
+    return;
+  }
+  draftDeck = entry.cards.filter(c => CARD_DB[c] && cardAllowedForClass(CARD_DB[c], selectedClass));
+  if (draftDeck.length !== DECK_SIZE) {
+    showStatusToast(`Loaded ${draftDeck.length}/${DECK_SIZE} cards — fill the rest.`);
+  } else {
+    showStatusToast(`Loaded "${name}"`);
+  }
   renderCardPool();
   updateDeckSidebar();
 }
@@ -326,20 +713,25 @@ function renderSavedDecks() {
     return;
   }
   el.innerHTML = "";
-  entries.forEach(([name, data]) => {
-    const div = document.createElement("div");
-    div.className = "saved-deck-entry";
-    const cls = data.heroClass || "";
-    div.innerHTML = `
-      <span class="saved-deck-name" title="${name}">${name}</span>
-      <span class="saved-deck-class">${cls}</span>
-      <button class="btn-load-deck">Load</button>
-      <button class="btn-delete-deck">✕</button>
-    `;
-    div.querySelector(".btn-load-deck").addEventListener("click", () => loadDeck(name));
-    div.querySelector(".btn-delete-deck").addEventListener("click", () => deleteSavedDeck(name));
-    el.appendChild(div);
-  });
+  entries
+    .filter(([, data]) => !data.heroClass || data.heroClass === selectedClass)
+    .forEach(([name, data]) => {
+      const div = document.createElement("div");
+      div.className = "saved-deck-entry";
+      const count = data.cards?.length ?? 0;
+      div.innerHTML = `
+        <span class="saved-deck-name" title="${name}">${name}</span>
+        <span class="saved-deck-class">${count}/${DECK_SIZE}</span>
+        <button type="button" class="btn-load-deck">Load</button>
+        <button type="button" class="btn-delete-deck" aria-label="Delete">✕</button>
+      `;
+      div.querySelector(".btn-load-deck").addEventListener("click", () => loadDeck(name));
+      div.querySelector(".btn-delete-deck").addEventListener("click", () => deleteSavedDeck(name));
+      el.appendChild(div);
+    });
+  if (el.children.length === 0) {
+    el.innerHTML = `<div class="saved-decks-empty">No saved ${selectedClass} decks</div>`;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -350,14 +742,20 @@ let mulliganSwapSet = new Set(); // indices of cards marked for swap
 function renderMulligan(state) {
   const hand = state.p1.hand;
   mulliganSwapSet = new Set();
+  const sub = document.querySelector(".mulligan-subtitle");
+  if (sub) {
+    const goingFirst = state.player_goes_first !== false;
+    sub.textContent = goingFirst
+      ? `You go first — ${hand.length} cards. Click to swap, then confirm.`
+      : `You go second — ${hand.length} cards. You'll receive The Coin after mulligan.`;
+  }
   const container = document.getElementById("mulligan-cards");
   container.innerHTML = "";
 
   hand.forEach((name, idx) => {
     const card = CARD_DB[name] || {};
-    const icon = CARD_EMOJIS[card.icon] || card.icon || "?";
     const div  = document.createElement("div");
-    div.className = "mulligan-card marked-keep";
+    div.className = `mulligan-card marked-keep ${CardArt.frameClasses(card, name)}`;
     div.dataset.idx = idx;
 
     let statsHtml = "";
@@ -371,7 +769,7 @@ function renderMulligan(state) {
 
     div.innerHTML = `
       <div class="mulligan-card-cost">${card.cost}</div>
-      <div class="mulligan-card-art">${icon}</div>
+      ${CardArt.renderArt(card, name, "mulligan")}
       <div class="mulligan-card-name">${name}</div>
       <div class="mulligan-card-type">${card.type}</div>
       ${statsHtml}
@@ -404,11 +802,12 @@ async function confirmMulligan() {
   const indices = Array.from(mulliganSwapSet);
   const btn = document.getElementById("btn-mulligan-confirm");
   if (btn) btn.disabled = true;
+  showLoading("Entering match…");
   try {
     const res  = await fetch("/api/mulligan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ indices }),
+      body: JSON.stringify({ game_id: gameId, indices }),
     });
     const data = await res.json();
     if (data.error) {
@@ -416,23 +815,33 @@ async function confirmMulligan() {
       if (btn) btn.disabled = false;
       return;
     }
+    lastMatchDeck = { heroClass: selectedClass, cards: [...draftDeck] };
+    gameId           = data.game_id || gameId;
     CARD_DB          = data.card_db || CARD_DB;
     gameState        = data;
     selected         = null;
     prevIsPlayerTurn = null;
     turnNumber       = data.turn_number || 1;
     isActing         = false;
+    initGameScreenUi();
     showScreen("screen-game");
     showTurnBanner(true);
     renderGame();
   } catch (err) {
     showStatusToast("Network error during mulligan.");
     if (btn) btn.disabled = false;
+  } finally {
+    hideLoading();
   }
 }
 
 async function startGame() {
-  if (draftDeck.length !== 15) return;
+  if (draftDeck.length !== DECK_SIZE) return;
+  saveLastDeck();
+  lastMatchDeck = { heroClass: selectedClass, cards: [...draftDeck] };
+  const startBtn = document.getElementById("btn-start-ai");
+  if (startBtn) startBtn.disabled = true;
+  showLoading("Finding opponent…");
   try {
     const res  = await fetch("/api/new_game", {
       method: "POST",
@@ -440,6 +849,11 @@ async function startGame() {
       body: JSON.stringify({ hero_class: selectedClass, deck: draftDeck }),
     });
     const data = await res.json();
+    if (data.error) {
+      showStatusToast(data.error);
+      return;
+    }
+    gameId    = data.game_id || null;
     CARD_DB   = data.card_db;
     gameState = data;
     isActing  = false;
@@ -449,17 +863,29 @@ async function startGame() {
       selected         = null;
       prevIsPlayerTurn = null;
       turnNumber       = data.turn_number || 1;
+      initGameScreenUi();
       showScreen("screen-game");
       showTurnBanner(true);
       renderGame();
     }
   } catch (err) {
     showStatusToast("Failed to start game. Check your connection and try again.");
+  } finally {
+    hideLoading();
+    updateDeckSidebar();
   }
 }
 
 function goBack() {
   showScreen("screen-menu");
+}
+
+async function playAgain() {
+  if (!lastMatchDeck?.cards?.length) return;
+  document.getElementById("winner-overlay")?.classList.add("hidden");
+  await abandonGame();
+  enterDeckBuilder(lastMatchDeck.heroClass, lastMatchDeck.cards);
+  await startGame();
 }
 
 function showStatusToast(message, ms = 2400) {
@@ -476,6 +902,7 @@ function showStatusToast(message, ms = 2400) {
 // ---------------------------------------------------------------------------
 function spellDesc(card, short = false) {
   const e = card.effect, v = card.val;
+  if (e === "coin")       return short ? "+1 Mana"             : `Gain 1 Mana Crystal this turn only.`;
   if (e === "damage")     return short ? `Deal ${v} Dmg`       : `Deal ${v} damage.`;
   if (e === "heal")       return short ? `Heal ${v} HP`        : `Restore ${v} HP.`;
   if (e === "draw")       return short ? `Draw ${v} Cards`     : `Draw ${v} cards.`;
@@ -524,11 +951,15 @@ function buildTooltipHtml(name, card) {
 
   const legendaryBadge = isLegendary
     ? `<div class="tooltip-legendary">♦ LEGENDARY</div>` : "";
+  const classBadge = card.classes?.length
+    ? `<div class="tooltip-desc" style="color:var(--col-gold)">${card.classes.join(", ")} class</div>` : "";
 
   return `
+    <div class="tooltip-art-wrap">${CardArt.renderArt(card, name, "tooltip")}</div>
     <div class="tooltip-name">${name}</div>
     <div class="tooltip-type">${card.type.toUpperCase()} · ${card.cost} Mana</div>
     ${legendaryBadge}
+    ${classBadge}
     ${stats}
     ${kws}
     ${abilities}
@@ -569,6 +1000,7 @@ function hideTooltip(id) {
 // ---------------------------------------------------------------------------
 
 function showTurnBanner(isPlayerTurn) {
+  if (gameSpeed === "instant") return;
   const banner = document.getElementById("turn-banner");
   if (!banner) return;
   // Reset: remove active so re-triggering re-plays the animation
@@ -577,6 +1009,7 @@ function showTurnBanner(isPlayerTurn) {
   // Force reflow so animation restarts cleanly
   void banner.offsetWidth;
   banner.classList.add("active");
+  playSfx("turn");
 }
 
 function setAiThinking(active) {
@@ -686,6 +1119,421 @@ function applyHeroAnimations(prev) {
   if (p2ArmorGain > 0) {
     spawnFloat(`+${p2ArmorGain}🛡`, "var(--col-gold)", document.getElementById("hero-opp"), "normal");
   }
+  if (gameState.p1.hp < prev.p1.hp || gameState.p2.hp < prev.p2.hp) playSfx("damage");
+  if (gameState.p1.hp > prev.p1.hp) playSfx("heal");
+}
+
+// ---------------------------------------------------------------------------
+// SOUND FX (Web Audio — no asset files)
+// ---------------------------------------------------------------------------
+
+function motionEnabled() {
+  if (gameSpeed === "instant") return false;
+  if (!animationsEnabled) return false;
+  return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function getAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioCtx;
+}
+
+function tone(freq, duration, type = "sine", volume = 0.07) {
+  const ctx = getAudioCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(volume, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + duration);
+}
+
+function playSfx(kind) {
+  if (sfxMuted) return;
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === "suspended") ctx.resume();
+    switch (kind) {
+      case "play":
+        tone(392, 0.1);
+        setTimeout(() => tone(523, 0.12), 60);
+        break;
+      case "attack":
+        tone(160, 0.14, "square", 0.05);
+        break;
+      case "damage":
+        tone(110, 0.18, "sawtooth", 0.045);
+        break;
+      case "heal":
+        tone(440, 0.14);
+        setTimeout(() => tone(554, 0.16), 80);
+        break;
+      case "turn":
+        tone(330, 0.2);
+        setTimeout(() => tone(440, 0.15), 100);
+        break;
+      case "victory":
+        tone(523, 0.18);
+        setTimeout(() => tone(659, 0.18), 140);
+        setTimeout(() => tone(784, 0.22), 280);
+        break;
+      case "defeat":
+        tone(220, 0.25, "triangle", 0.06);
+        setTimeout(() => tone(165, 0.35, "triangle", 0.05), 200);
+        break;
+      default:
+        break;
+    }
+  } catch (_) {
+    /* Audio unavailable */
+  }
+}
+
+function toggleSfx() {
+  sfxMuted = !sfxMuted;
+  settings.sfx = !sfxMuted;
+  saveSettings();
+  const btn = document.getElementById("btn-sfx-toggle");
+  if (btn) {
+    btn.textContent = sfxMuted ? "🔇" : "🔊";
+    btn.title = sfxMuted ? "Unmute sound" : "Mute sound";
+    btn.setAttribute("aria-pressed", sfxMuted ? "true" : "false");
+  }
+  if (!sfxMuted) playSfx("turn");
+}
+
+function syncSfxButton() {
+  const btn = document.getElementById("btn-sfx-toggle");
+  if (!btn) return;
+  btn.textContent = sfxMuted ? "🔇" : "🔊";
+  btn.title = sfxMuted ? "Unmute sound" : "Mute sound";
+  btn.setAttribute("aria-pressed", sfxMuted ? "true" : "false");
+}
+
+// ---------------------------------------------------------------------------
+// ACTION ANIMATIONS (play arc, attack lunge, death burst)
+// ---------------------------------------------------------------------------
+
+function snapshotBoardRects() {
+  function grab(boardId) {
+    const board = document.getElementById(boardId);
+    if (!board) return [];
+    return Array.from(board.querySelectorAll(".minion-card")).map(el => ({
+      name: el.querySelector(".minion-name")?.textContent || "",
+      rect: el.getBoundingClientRect(),
+    }));
+  }
+  return { p1: grab("board-player"), p2: grab("board-opp") };
+}
+
+function snapshotHandRects() {
+  const hand = document.getElementById("hand-player");
+  if (!hand) return [];
+  return Array.from(hand.querySelectorAll(".hand-card")).map(el => ({
+    name: el.querySelector(".minion-name")?.textContent || "",
+    rect: el.getBoundingClientRect(),
+  }));
+}
+
+function countMinionsByName(board) {
+  const counts = {};
+  board.forEach(m => { counts[m.name] = (counts[m.name] || 0) + 1; });
+  return counts;
+}
+
+function minionsLost(prevBoard, currBoard) {
+  const prevC = countMinionsByName(prevBoard);
+  const currC = countMinionsByName(currBoard);
+  const lost = [];
+  Object.keys(prevC).forEach(name => {
+    const diff = prevC[name] - (currC[name] || 0);
+    for (let i = 0; i < diff; i++) lost.push(name);
+  });
+  return lost;
+}
+
+function consumeRectForName(rects, name) {
+  const idx = rects.findIndex(r => r.name === name);
+  if (idx === -1) return null;
+  return rects.splice(idx, 1)[0].rect;
+}
+
+function findMinionEl(boardId, name) {
+  const board = document.getElementById(boardId);
+  if (!board) return null;
+  for (const el of board.querySelectorAll(".minion-card")) {
+    if (el.querySelector(".minion-name")?.textContent === name) return el;
+  }
+  return null;
+}
+
+function findHeroElByName(name) {
+  if (name === "Player") return document.getElementById("hero-player");
+  if (name === "AI") return document.getElementById("hero-opp");
+  return null;
+}
+
+function animateFlyGhost(fromRect, toRect, card, name) {
+  if (!motionEnabled() || !fromRect || !toRect) return;
+  const layer = document.getElementById("fx-layer");
+  if (!layer) return;
+  const layerRect = layer.getBoundingClientRect();
+  const el = document.createElement("div");
+  el.innerHTML = CardArt.renderFlyCard(card || {}, name);
+  const fly = el.firstElementChild;
+  if (!fly) return;
+
+  const sx = fromRect.left + fromRect.width / 2 - layerRect.left;
+  const sy = fromRect.top + fromRect.height / 2 - layerRect.top;
+  fly.style.left = `${sx}px`;
+  fly.style.top  = `${sy}px`;
+  layer.appendChild(fly);
+
+  const dx = toRect.left + toRect.width / 2 - layerRect.left - sx;
+  const dy = toRect.top + toRect.height / 2 - layerRect.top - sy;
+
+  const flyDur = animMs(380);
+  if (flyDur <= 0) {
+    fly.remove();
+    return;
+  }
+  fly.animate([
+    { transform: "translate(-50%, -50%) scale(1.15) rotate(-6deg)", opacity: 1 },
+    { transform: `translate(calc(-50% + ${dx * 0.45}px), calc(-50% + ${dy * 0.25}px)) scale(1) rotate(2deg)`, opacity: 1, offset: 0.55 },
+    { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.75) rotate(0deg)`, opacity: 0 },
+  ], { duration: flyDur, easing: "cubic-bezier(.25, .8, .25, 1)", fill: "forwards" })
+    .addEventListener("finish", () => fly.remove());
+}
+
+function animateDeathBurst(rect) {
+  if (!motionEnabled() || !rect) return;
+  const layer = document.getElementById("fx-layer");
+  if (!layer) return;
+  const layerRect = layer.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2 - layerRect.left;
+  const cy = rect.top + rect.height / 2 - layerRect.top;
+
+  for (let i = 0; i < 6; i++) {
+    const shard = document.createElement("div");
+    shard.className = "fx-death-shard";
+    shard.style.left = `${cx}px`;
+    shard.style.top = `${cy}px`;
+    const angle = (i / 6) * Math.PI * 2;
+    const dist = 28 + Math.random() * 22;
+    layer.appendChild(shard);
+    shard.animate([
+      { transform: "translate(-50%, -50%) scale(1)", opacity: 1 },
+      { transform: `translate(calc(-50% + ${Math.cos(angle) * dist}px), calc(-50% + ${Math.sin(angle) * dist}px)) scale(0.2)`, opacity: 0 },
+    ], { duration: 420, easing: "ease-out", fill: "forwards" })
+      .addEventListener("finish", () => shard.remove());
+  }
+}
+
+function animateLunge(attackerEl, targetEl, fromPlayerBoard) {
+  if (!motionEnabled() || !attackerEl) return;
+  const cls = fromPlayerBoard ? "attack-lunge" : "attack-lunge-opp";
+  attackerEl.classList.remove(cls);
+  void attackerEl.offsetWidth;
+  attackerEl.classList.add(cls);
+  attackerEl.addEventListener("animationend", () => attackerEl.classList.remove(cls), { once: true });
+  if (targetEl) {
+    targetEl.classList.add("damage-flash");
+    targetEl.addEventListener("animationend", () => targetEl.classList.remove("damage-flash"), { once: true });
+  }
+}
+
+function animateHeroWeaponSwing(heroEl, targetEl, isPlayerHero) {
+  if (!motionEnabled() || !heroEl) return;
+  heroEl.classList.add(isPlayerHero ? "hero-weapon-swing" : "hero-weapon-swing-opp");
+  heroEl.addEventListener("animationend", () => {
+    heroEl.classList.remove("hero-weapon-swing", "hero-weapon-swing-opp");
+  }, { once: true });
+  if (targetEl) {
+    targetEl.classList.add("damage-flash");
+    targetEl.addEventListener("animationend", () => targetEl.classList.remove("damage-flash"), { once: true });
+  }
+}
+
+function flashSpellBoard(boardId) {
+  const board = document.getElementById(boardId);
+  if (!board || !motionEnabled()) return;
+  const flash = document.createElement("div");
+  flash.className = "board-spell-flash";
+  board.style.position = "relative";
+  board.appendChild(flash);
+  flash.addEventListener("animationend", () => flash.remove());
+}
+
+function parseLogAttacks(log, fromIndex) {
+  const attacks = [];
+  (log || []).slice(fromIndex).forEach(line => {
+    const m = line.match(/^>> (.+?) attacks (.+?)(?: for | with )/);
+    if (m) attacks.push({ attacker: m[1], target: m[2] });
+  });
+  return attacks;
+}
+
+function resolveAttackTarget(targetName) {
+  const hero = findHeroElByName(targetName);
+  if (hero) return { el: hero, isHero: true };
+  const onPlayer = findMinionEl("board-player", targetName);
+  if (onPlayer) return { el: onPlayer, isHero: false, onPlayerBoard: true };
+  const onOpp = findMinionEl("board-opp", targetName);
+  if (onOpp) return { el: onOpp, isHero: false, onPlayerBoard: false };
+  return null;
+}
+
+function resolveAttacker(attackerName) {
+  const onPlayer = findMinionEl("board-player", attackerName);
+  if (onPlayer) return { el: onPlayer, fromPlayerBoard: true, isHero: false };
+  const onOpp = findMinionEl("board-opp", attackerName);
+  if (onOpp) return { el: onOpp, fromPlayerBoard: false, isHero: false };
+  if (attackerName === "Player") return { el: document.getElementById("hero-player"), fromPlayerBoard: true, isHero: true };
+  if (attackerName === "AI") return { el: document.getElementById("hero-opp"), fromPlayerBoard: false, isHero: true };
+  return null;
+}
+
+function animateAttackPair(attackerName, targetName) {
+  const atk = resolveAttacker(attackerName);
+  const tgt = resolveAttackTarget(targetName);
+  if (!atk?.el || !tgt?.el) return;
+  playSfx("attack");
+  if (atk.isHero) {
+    animateHeroWeaponSwing(atk.el, tgt.el, atk.fromPlayerBoard);
+  } else {
+    animateLunge(atk.el, tgt.el, atk.fromPlayerBoard);
+  }
+}
+
+function applyHandDrawAnimation(prevHandLen) {
+  if (!gameState || gameState.p1.hand.length <= prevHandLen) return;
+  const hand = document.getElementById("hand-player");
+  if (!hand) return;
+  const cards = hand.querySelectorAll(".hand-card");
+  const newest = cards[cards.length - 1];
+  if (!newest) return;
+  newest.classList.add("card-draw-anim");
+  newest.addEventListener("animationend", () => newest.classList.remove("card-draw-anim"), { once: true });
+}
+
+/**
+ * Orchestrate play / attack / death animations after a state update.
+ * @param {object} ctx - snapshots captured before the server round-trip
+ */
+function applyActionAnimations(ctx) {
+  if (!ctx || !gameState) return;
+
+  const motion = motionEnabled();
+  const { prevSnap, prevRects, prevHandRects, action, idx, target, logFrom, prevHandLen, playedCardName } = ctx;
+  const p1Rects = [...(prevRects?.p1 || [])];
+  const p2Rects = [...(prevRects?.p2 || [])];
+
+  if (motion) {
+    minionsLost(prevSnap.p2, gameState.p2.board).forEach(name => {
+      animateDeathBurst(consumeRectForName(p2Rects, name));
+    });
+    minionsLost(prevSnap.p1, gameState.p1.board).forEach(name => {
+      animateDeathBurst(consumeRectForName(p1Rects, name));
+    });
+  }
+
+  if (action === "play" && playedCardName) {
+    const card = CARD_DB[playedCardName] || {};
+    const handRect = prevHandRects?.[idx]?.rect;
+    if (card.type === "minion") {
+      const played = findMinionEl("board-player", playedCardName);
+      if (motion && handRect && played) {
+        animateFlyGhost(handRect, played.getBoundingClientRect(), card, playedCardName);
+      }
+      playSfx("play");
+    } else if (card.type === "spell") {
+      if (motion) {
+        flashSpellBoard(card.effect === "damage_all" || card.effect === "silence" ? "board-opp" : "board-player");
+      }
+      playSfx("play");
+    } else if (card.type === "weapon") {
+      playSfx("play");
+    }
+  }
+
+  if (action === "attack" && prevSnap?.p1?.[idx]) {
+    const atkName = prevSnap.p1[idx].name;
+    let tgtName = "AI";
+    if (target !== "hero" && typeof target === "number" && prevSnap.p2[target]) {
+      tgtName = prevSnap.p2[target].name;
+    }
+    if (motion) animateAttackPair(atkName, tgtName);
+    else playSfx("attack");
+  }
+
+  if (action === "hero_attack") {
+    let tgtName = "AI";
+    if (target !== "hero" && typeof target === "number" && prevSnap?.p2?.[target]) {
+      tgtName = prevSnap.p2[target].name;
+    }
+    playSfx("attack");
+    if (motion) {
+      animateHeroWeaponSwing(
+        document.getElementById("hero-player"),
+        resolveAttackTarget(tgtName)?.el,
+        true
+      );
+    }
+  }
+
+  if (action === "end_turn" || !action) {
+    const stagger = aiAttackStaggerMs();
+    const attacks = parseLogAttacks(gameState.log, logFrom);
+    if (stagger === 0) {
+      if (motion) attacks.forEach(({ attacker, target: tgt }) => animateAttackPair(attacker, tgt));
+      else if (attacks.length) playSfx("attack");
+    } else {
+      attacks.forEach(({ attacker, target: tgt }, i) => {
+        setTimeout(() => {
+          if (motion) animateAttackPair(attacker, tgt);
+          else playSfx("attack");
+        }, i * stagger);
+      });
+    }
+  }
+
+  if (motion) applyHandDrawAnimation(prevHandLen ?? 0);
+}
+
+function buildAnimContext(action, idx, target) {
+  return {
+    action,
+    idx,
+    target,
+    prevSnap: snapshotBoards(),
+    prevRects: snapshotBoardRects(),
+    prevHandRects: snapshotHandRects(),
+    prevHandLen: gameState?.p1?.hand?.length ?? 0,
+    logFrom: gameState?.log?.length ?? 0,
+    playedCardName: (action === "play" && idx != null) ? gameState?.p1?.hand?.[idx] : null,
+    prevHeroSnap: {
+      p1: { hp: gameState.p1.hp, armor: gameState.p1.armor || 0 },
+      p2: { hp: gameState.p2.hp, armor: gameState.p2.armor || 0 },
+    },
+  };
+}
+
+function onGameStateUpdated(data, animCtx) {
+  gameId    = data.game_id || gameId;
+  CARD_DB   = data.card_db || CARD_DB;
+  gameState = data;
+  renderGame();
+  if (animCtx) {
+    applyActionAnimations(animCtx);
+    applyPostRenderAnimations(animCtx.prevSnap);
+    applyHeroAnimations(animCtx.prevHeroSnap);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -709,6 +1557,8 @@ function renderGame() {
   renderBoard("board-player", p1, false);
   renderHand(p1);
   renderLog(log);
+  renderManaHud(p1);
+  updateGameHelpBar();
 
   // Your-turn highlight
   document.getElementById("tray-player").classList.toggle("your-turn", !!is_player_turn && !winner);
@@ -732,11 +1582,16 @@ function renderGame() {
   const overlay = document.getElementById("winner-overlay");
   if (winner) {
     overlay.classList.remove("hidden");
+    const isWin = winner === "Player";
     document.getElementById("winner-text").textContent =
-      winner === "DRAW"   ? "It's a Draw!" :
-      winner === "Player" ? "Victory!"      : "Defeat!";
+      winner === "DRAW" ? "It's a Draw!" : isWin ? "Victory!" : "Defeat!";
+    if (!overlay.dataset.sfxPlayed) {
+      playSfx(winner === "DRAW" ? "turn" : isWin ? "victory" : "defeat");
+      overlay.dataset.sfxPlayed = "1";
+    }
   } else {
     overlay.classList.add("hidden");
+    delete overlay.dataset.sfxPlayed;
   }
 
   updateSelectionInfo();
@@ -916,9 +1771,8 @@ function renderBoard(elId, player, isOpp) {
 
   player.board.forEach((minion, idx) => {
     const card = CARD_DB[minion.name] || {};
-    const icon = CARD_EMOJIS[card.icon] || card.icon || "?";
 
-    let cls = "minion-card";
+    let cls = `minion-card ${CardArt.frameClasses(card, minion.name)}`;
     if (!isOpp && minion.can_attack && !selected)                      cls += " can-attack";
     if (!isOpp && selected?.type === "board" && selected.idx === idx)  cls += " selected";
     if (minion.taunt)                                                   cls += " taunt";
@@ -939,7 +1793,7 @@ function renderBoard(elId, player, isOpp) {
     const div = document.createElement("div");
     div.className = cls;
     div.innerHTML = `
-      <div class="minion-art">${icon}</div>
+      ${CardArt.renderArt(card, minion.name, "board")}
       <div class="minion-name">${minion.name}</div>
       <div class="kw-badges">${kws}</div>
       <div class="stat-badge atk">${minion.atk}</div>
@@ -972,12 +1826,12 @@ function renderHand(p1) {
   p1.hand.forEach((name, idx) => {
     const card       = CARD_DB[name] || {};
     const affordable = p1.mana >= card.cost;
-    const icon       = CARD_EMOJIS[card.icon] || card.icon || "?";
 
-    let cls = `hand-card hand-card--${card.type}`;
+    let cls = `hand-card hand-card--${card.type} ${CardArt.frameClasses(card, name)}`;
     if (!affordable)                                       cls += " unaffordable";
     if (selected?.type === "hand" && selected.idx === idx) cls += " selected";
     if (card.legendary)                                    cls += " legendary";
+    if (name === "The Coin" || card.effect === "coin")     cls += " hand-card--coin";
 
     let extra = "";
     if (card.type === "minion" || card.type === "weapon") {
@@ -1005,7 +1859,7 @@ function renderHand(p1) {
 
     div.innerHTML = `
       <div class="gem-cost">${card.cost}</div>
-      <div class="minion-art">${icon}</div>
+      ${CardArt.renderArt(card, name, "hand")}
       <div class="minion-name">${name}</div>
       <div class="kw-badges">${kws}</div>
       ${card.type === "spell" ? `<div class="pool-desc">${spellDesc(card, true)}</div>` : ""}
@@ -1020,34 +1874,48 @@ function renderHand(p1) {
 }
 
 /* ---- Combat log ---- */
+function logEntryClass(msg) {
+  let cls = "log-entry";
+  const m = msg.toLowerCase();
+  if (m.includes("damage") || m.includes("attacks") || m.includes("fatigue") ||
+      m.includes("destroys") || m.includes("dmg") || m.includes("d.rattle")) {
+    cls += " log-dmg";
+  } else if (m.includes("heal") || m.includes("restores") || m.includes("b.cry")) {
+    cls += " log-heal";
+  } else if (m.includes("plays")) {
+    cls += " log-play";
+  } else if (m.includes("armor") || m.includes("equipped")) {
+    cls += " log-armor";
+  } else if (m.includes("draws") || m.includes("draw")) {
+    cls += " log-draw";
+  } else if (m.includes("blocks") || m.includes("shield") || m.includes("blocked")) {
+    cls += " log-block";
+  } else if (m.includes("---") || m.includes("===") || m.includes("turn")) {
+    cls += " log-system";
+  }
+  return cls;
+}
+
 function renderLog(entries) {
   const el = document.getElementById("log-entries");
+  if (!el) return;
+  const slice = entries.slice(-60);
   const wasAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30;
-  el.innerHTML = "";
-  entries.slice(-60).forEach(msg => {
+
+  if (slice.length < logRenderedCount) {
+    el.innerHTML = "";
+    logRenderedCount = 0;
+  }
+
+  const frag = document.createDocumentFragment();
+  slice.slice(logRenderedCount).forEach(msg => {
     const div = document.createElement("div");
-    let cls = "log-entry";
-    const m = msg.toLowerCase();
-    if (m.includes("damage") || m.includes("attacks") || m.includes("fatigue") ||
-        m.includes("destroys") || m.includes("dmg") || m.includes("d.rattle")) {
-      cls += " log-dmg";
-    } else if (m.includes("heal") || m.includes("restores") || m.includes("b.cry")) {
-      cls += " log-heal";
-    } else if (m.includes("plays")) {
-      cls += " log-play";
-    } else if (m.includes("armor") || m.includes("equipped")) {
-      cls += " log-armor";
-    } else if (m.includes("draws") || m.includes("draw")) {
-      cls += " log-draw";
-    } else if (m.includes("blocks") || m.includes("shield") || m.includes("blocked")) {
-      cls += " log-block";
-    } else if (m.includes("---") || m.includes("===") || m.includes("turn")) {
-      cls += " log-system";
-    }
-    div.className = cls;
+    div.className = logEntryClass(msg);
     div.textContent = msg;
-    el.appendChild(div);
+    frag.appendChild(div);
   });
+  logRenderedCount = slice.length;
+  el.appendChild(frag);
   if (wasAtBottom) el.scrollTop = el.scrollHeight;
 }
 
@@ -1062,12 +1930,28 @@ function clearSelection() {
 
 function updateSelectionInfo() {
   const el = document.getElementById("selection-info");
-  if (!selected) { el.classList.add("hidden"); return; }
+  const help = document.getElementById("game-help-bar");
+  if (!selected) {
+    el.classList.add("hidden");
+    if (help) help.classList.remove("hidden");
+    return;
+  }
   el.classList.remove("hidden");
-  if (selected.type === "hand")        el.textContent = `Playing: ${gameState.p1.hand[selected.idx]} — click a target`;
-  if (selected.type === "board")       el.textContent = `Attacking with: ${gameState.p1.board[selected.idx].name} — click a target`;
-  if (selected.type === "hero_power")  el.textContent = "Hero Power — click a target";
-  if (selected.type === "hero_weapon") el.textContent = "Hero Attack — click a target";
+  if (help) help.classList.add("hidden");
+  let msg = "";
+  if (selected.type === "hand") {
+    const card = CARD_DB[gameState.p1.hand[selected.idx]] || {};
+    const needsTarget = ["damage", "buff", "add_shield", "silence"].includes(card.effect);
+    msg = needsTarget
+      ? `Target for ${gameState.p1.hand[selected.idx]} — click a highlighted target (Esc to cancel)`
+      : `Confirm ${gameState.p1.hand[selected.idx]} — click again to cancel`;
+  }
+  if (selected.type === "board") {
+    msg = `Attacking with ${gameState.p1.board[selected.idx].name} — click enemy or minion`;
+  }
+  if (selected.type === "hero_power")  msg = "Hero Power — click a valid target";
+  if (selected.type === "hero_weapon") msg = "Hero attack — click a valid target";
+  el.textContent = msg;
 }
 
 function getLegalMoves() {
@@ -1078,7 +1962,7 @@ function getLegalMoves() {
 // CLICK HANDLERS
 // ---------------------------------------------------------------------------
 function handleHandClick(idx, p1, name, card, affordable) {
-  if (!gameState.is_player_turn || gameState.winner) return;
+  if (isPaused || !gameState.is_player_turn || gameState.winner) return;
   if (!affordable) {
     const handEl = document.getElementById("hand-player");
     const cards  = handEl ? handEl.querySelectorAll(".hand-card") : [];
@@ -1110,7 +1994,7 @@ function handleHandClick(idx, p1, name, card, affordable) {
     return;
   }
   if (card.type === "spell") {
-    if (["heal", "draw", "damage_all", "buff_all", "heal_all"].includes(card.effect)) {
+    if (["heal", "draw", "damage_all", "buff_all", "heal_all", "coin"].includes(card.effect)) {
       sendAction("play", idx, null);
       return;
     }
@@ -1142,7 +2026,7 @@ function shakeElement(el) {
 }
 
 function handleMinionClick(idx, isOpp, player, minion) {
-  if (!gameState.is_player_turn || gameState.winner) return;
+  if (isPaused || !gameState.is_player_turn || gameState.winner) return;
 
   if (selected) {
     const targetValid = isValidMinionTarget(idx, isOpp);
@@ -1178,7 +2062,7 @@ function handleMinionClick(idx, isOpp, player, minion) {
 }
 
 function handleHeroClick(isOpp, player) {
-  if (!gameState.is_player_turn || gameState.winner) return;
+  if (isPaused || !gameState.is_player_turn || gameState.winner) return;
 
   if (selected) {
     if (!isValidHeroTarget(isOpp)) {
@@ -1204,7 +2088,7 @@ function handleHeroClick(isOpp, player) {
 }
 
 function handleHeroPowerClick(player, canUse) {
-  if (!gameState.is_player_turn || gameState.winner) return;
+  if (isPaused || !gameState.is_player_turn || gameState.winner) return;
   if (!canUse) {
     const msg = player.hero_power_used ? "Already used!" : "Not enough mana!";
     spawnFloat(msg, "var(--col-purple-bright)", null, "small");
@@ -1214,15 +2098,35 @@ function handleHeroPowerClick(player, canUse) {
   if (selected?.type === "hero_power") { clearSelection(); return; }
   clearSelection();
 
-  if (["Warrior", "Rogue", "Paladin"].includes(player.hero_class)) {
+  if (["Warrior", "Rogue", "Paladin", "Shaman"].includes(player.hero_class)) {
     sendAction("hero_power", null, null); return;
   }
   selected = { type: "hero_power" };
   renderGame();
 }
 
-// Right-click / Escape to cancel
-document.addEventListener("keydown", e => { if (e.key === "Escape") clearSelection(); });
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  const settingsOpen = !document.getElementById("settings-modal")?.classList.contains("hidden");
+  const pauseOpen = !document.getElementById("pause-overlay")?.classList.contains("hidden");
+  if (settingsOpen) {
+    closeSettings();
+    return;
+  }
+  if (pauseOpen) {
+    closePause();
+    return;
+  }
+  if (document.getElementById("screen-game")?.classList.contains("active") && gameState && !gameState.winner) {
+    if (selected) {
+      clearSelection();
+      return;
+    }
+    openPause();
+    return;
+  }
+  if (selected) clearSelection();
+});
 document.addEventListener("contextmenu", e => {
   if (document.getElementById("screen-game")?.classList.contains("active")) {
     e.preventDefault();
@@ -1239,35 +2143,41 @@ document.querySelectorAll(".hero-card").forEach(card => {
   });
 });
 
+let resizeUiTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeUiTimer);
+  resizeUiTimer = setTimeout(() => {
+    if (!document.getElementById("screen-game")?.classList.contains("active")) return;
+    if (isNarrowViewport() && combatLogOpen) {
+      combatLogOpen = false;
+      applyCombatLogState();
+    }
+  }, 150);
+});
+
 // ---------------------------------------------------------------------------
 // API CALLS
 // ---------------------------------------------------------------------------
 async function sendAction(action, idx, target) {
-  if (isActing || !gameState?.is_player_turn) return;
+  if (isPaused || isActing || !gameState?.is_player_turn) return;
   isActing = true;
 
   const etBtn = document.getElementById("btn-end-turn");
   etBtn.disabled = true;
 
-  const prevSnap     = snapshotBoards();
-  const prevHeroSnap = { p1: { hp: gameState.p1.hp, armor: gameState.p1.armor || 0 },
-                         p2: { hp: gameState.p2.hp, armor: gameState.p2.armor || 0 } };
+  const animCtx = buildAnimContext(action, idx, target);
 
   try {
     const res = await fetch("/api/action", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, idx, target }),
+      body: JSON.stringify({ game_id: gameId, action, idx, target }),
     });
     const data = await res.json();
     if (data.error) {
       spawnFloat(data.error, "var(--col-red)", null, "normal");
     } else {
-      CARD_DB   = data.card_db || CARD_DB;
-      gameState = data;
-      renderGame();
-      applyPostRenderAnimations(prevSnap);
-      applyHeroAnimations(prevHeroSnap);
+      onGameStateUpdated(data, animCtx);
     }
   } catch (err) {
     spawnFloat("Network error!", "var(--col-red)", null, "normal");
@@ -1278,7 +2188,7 @@ async function sendAction(action, idx, target) {
 }
 
 async function endTurn() {
-  if (isActing || !gameState?.is_player_turn) return;
+  if (isPaused || isActing || !gameState?.is_player_turn) return;
   isActing = true;
   clearSelection();
 
@@ -1286,15 +2196,13 @@ async function endTurn() {
   etBtn.disabled = true;
   setAiThinking(true);
 
-  const prevSnap     = snapshotBoards();
-  const prevHeroSnap = { p1: { hp: gameState.p1.hp, armor: gameState.p1.armor || 0 },
-                         p2: { hp: gameState.p2.hp, armor: gameState.p2.armor || 0 } };
+  const animCtx = buildAnimContext("end_turn", null, null);
 
   try {
     const res  = await fetch("/api/action", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "end_turn", idx: null, target: null }),
+      body: JSON.stringify({ game_id: gameId, action: "end_turn", idx: null, target: null }),
     });
     const data = await res.json();
     if (data.error) {
@@ -1308,15 +2216,10 @@ async function endTurn() {
     }
     // Guard: player may have resigned while the AI was thinking
     if (gameState === null) return;
-    CARD_DB   = data.card_db || CARD_DB;
-    gameState = data;
     setAiThinking(false);
-    // Sync turn counter from server; fall back to client increment for resilience.
-    if (!gameState.winner) turnNumber = gameState.turn_number || (turnNumber + 1);
-    renderGame();
+    if (!data.winner) turnNumber = data.turn_number || (turnNumber + 1);
+    onGameStateUpdated(data, animCtx);
     if (!gameState.winner) showTurnBanner(true);
-    applyPostRenderAnimations(prevSnap);
-    applyHeroAnimations(prevHeroSnap);
   } catch (err) {
     spawnFloat("Network error!", "var(--col-red)", null, "normal");
     setAiThinking(false);
@@ -1327,24 +2230,40 @@ async function endTurn() {
   }
 }
 
-function resign() {
-  if (!confirm("Resign and return to menu?")) return;
+async function abandonGame() {
+  closePause(false);
+  try {
+    if (gameId) {
+      await fetch("/api/resign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ game_id: gameId }),
+      });
+    }
+  } catch (_) {
+    // Best-effort — local UI should still reset even if the server is unreachable.
+  }
   resetGameState();
-  showScreen("screen-menu");
+}
+
+function resign() {
+  if (settings.confirmResign && !confirm("Resign and return to menu?")) return;
+  abandonGame().then(() => goToHub());
 }
 
 function returnToMenu() {
-  resetGameState();
-  showScreen("screen-menu");
+  abandonGame().then(() => goToHub());
 }
 
 function resetGameState() {
+  gameId           = null;
   gameState        = null;
   selected         = null;
   prevIsPlayerTurn = null;
   turnNumber       = 0;
   isActing         = false;
   mulliganSwapSet  = new Set();
+  logRenderedCount = 0;
   setAiThinking(false);
 }
 
@@ -1386,12 +2305,35 @@ function spawnFloat(text, color, el, size = "normal") {
 // ---------------------------------------------------------------------------
 // BOOT
 // ---------------------------------------------------------------------------
+function syncDeckSizeUi() {
+  const maxEl = document.getElementById("deck-size-max");
+  if (maxEl) maxEl.textContent = String(DECK_SIZE);
+  const sub = document.querySelector(".deck-subtitle");
+  if (sub) {
+    sub.textContent = `Click cards to add · Maximum 2 copies · ${DECK_SIZE} cards total`;
+  }
+}
+
 (async function init() {
+  let cardCount = 109;
   try {
     const res  = await fetch("/api/cards");
     const data = await res.json();
     if (data.card_db) CARD_DB = data.card_db;
+    if (data.deck_size) DECK_SIZE = data.deck_size;
+    cardCount = Object.keys(data.card_db || {}).filter(k => !data.card_db[k].uncollectible).length;
+    syncDeckSizeUi();
   } catch (_) {}
 
-  showScreen("screen-menu");
+  syncSfxButton();
+  syncSettingsUi();
+  applyGameSpeedClass();
+  updateHubContinue();
+  const meta = document.getElementById("hub-meta");
+  if (meta) meta.textContent = `6 classes · ${cardCount} cards · single-player vs AI`;
+  showScreen("screen-hub");
 })();
+
+document.getElementById("settings-modal")?.addEventListener("click", e => {
+  if (e.target.id === "settings-modal") closeSettings();
+});
