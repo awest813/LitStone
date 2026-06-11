@@ -176,6 +176,7 @@ LitStone/
 | Method | Route              | Description                      |
 |--------|--------------------|----------------------------------|
 | GET    | `/`                | Serves the game UI               |
+| GET    | `/api/health`      | Server health check              |
 | GET    | `/api/cards`       | Returns the full card database   |
 | POST   | `/api/new_game`    | Starts a new game session        |
 | POST   | `/api/mulligan`    | Submit mulligan card swaps       |

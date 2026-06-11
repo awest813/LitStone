@@ -1672,6 +1672,18 @@ body::after {
   .deck-layout { flex-direction: column; }
   .deck-sidebar { width: 100%; max-width: 100%; }
   .card-pool { max-height: none; }
+
+  #screen-game.active {
+    overflow-y: auto;
+    min-height: 100vh;
+    grid-template-rows: auto minmax(120px, 1fr) auto auto 120px;
+  }
+
+  .minion-card { width: 72px; padding: 3px 3px 10px; }
+  .minion-card .minion-art { height: 34px; font-size: 20px; }
+  .hand-card { width: 68px; }
+  .hand-player { padding: 4px 8px 8px; }
+  .hero-panel { min-width: 120px; }
 }
 
 /* ============================================================

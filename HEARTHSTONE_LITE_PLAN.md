@@ -4,9 +4,9 @@ This document defines what **Hearthstone Lite** means for LitStone and lays out 
 
 ---
 
-## Audit Summary (June 2026)
+## Audit Summary (June 2026 — updated)
 
-LitStone is a **solid prototype** with a working single-player loop, a rich literary card pool, and strong rules-engine test coverage (113 unit tests). The foundation is real — not vaporware.
+LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collectable cards, session-based multiplayer-ready API, animations, SFX, and **127 unit tests**.
 
 ### What already feels good
 
@@ -14,24 +14,23 @@ LitStone is a **solid prototype** with a working single-player loop, a rich lite
 |------|--------|
 | Core turn loop (mana, play, attack, hero power, end turn) | ✅ Complete |
 | Keywords (Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle, Silence) | ✅ Complete |
-| Mulligan phase | ✅ Player only |
-| Deck builder (filter, sort, curve, save/load) | ✅ Complete |
-| AI opponent | ✅ Heuristic, playable |
-| UI juice (turn banner, float text, summon/damage flashes, legendary frames) | ✅ Partial |
-| Rules tests | ✅ 113 tests in `test_game_logic.py` |
+| Mulligan (player + AI), The Coin, first-player randomization | ✅ Complete |
+| 30-card decks, per-session `game_id` | ✅ Complete |
+| Class identity — 8 cards per hero + neutrals | ✅ Complete |
+| Deck builder (filter, sort, curve, save/load, class pool) | ✅ Complete |
+| Animations + Web Audio SFX (mute toggle) | ✅ Complete |
+| Rules tests | ✅ 127 tests in `test_game_logic.py` |
 
-### Gaps vs. a credible Hearthstone Lite
+### Remaining gaps vs. Shippable Lite
 
 | Gap | Impact |
 |-----|--------|
-| ~~15-card decks~~ → 30-card decks | ✅ Addressed in Phase 1 |
-| No class-specific cards | Heroes feel interchangeable |
-| Emoji art, no audio | Low immersion |
-| AI doesn't mulligan; random scoring noise | Inconsistent challenge |
-| Single global game session | Can't share/deploy easily |
-| No tutorial, practice, or campaign | Steep for new players |
-| No discover / secrets / overload / windfury | Missing HS texture |
-| Mobile layout is partial | Unplayable on phones |
+| Emoji art (no illustrated card frames) | Lower immersion |
+| AI difficulty tiers; reduced random noise | Flat replay challenge |
+| No tutorial, practice, or campaign bosses | Steep for new players |
+| No discover / secrets / windfury / lifesteal | Missing HS texture |
+| Mobile board still cramped on small phones | Hard to tap targets |
+| No persistence / Docker / CI | Not deploy-ready |
 
 ---
 

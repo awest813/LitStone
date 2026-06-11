@@ -10,10 +10,10 @@ For the strategic plan to reach **Hearthstone Lite** quality, see [HEARTHSTONE_L
 
 The current state of the project establishes the core gameplay loop.
 
-- [x] Literary-themed card library (61 cards: minions, spells, weapon, support spells)
-- [x] 5 hero classes with unique hero powers (Mage, Warrior, Priest, Rogue, Paladin)
+- [x] Literary-themed card library (109 collectable cards + The Coin)
+- [x] 6 hero classes with unique hero powers (Mage, Warrior, Priest, Rogue, Paladin, Shaman)
 - [x] Full keyword system: Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle, Silence
-- [x] Deck builder (15 cards, max 2 copies; legendaries max 1)
+- [x] Deck builder (30 cards, max 2 copies; legendaries max 1)
 - [x] Heuristic AI opponent
 - [x] Flask REST API backend
 - [x] Browser-based UI with combat log
@@ -22,7 +22,7 @@ The current state of the project establishes the core gameplay loop.
 - [x] Mulligan phase (player)
 - [x] Deck filter/sort, mana curve, save/load decks (localStorage)
 - [x] Legendary minions (37 literary legends)
-- [x] Unit tests — 113 tests covering game logic, AI, and edge cases (`test_game_logic.py`)
+- [x] Unit tests — 127+ tests covering game logic, AI, class cards, and edge cases (`test_game_logic.py`)
 
 ---
 
@@ -49,7 +49,7 @@ Goals: make the game feel complete and production-ready for single-player use.
 
 Goals: deepen the card pool and hero variety.
 
-- [x] **More cards** — 61-card library with broad literary themes
+- [x] **More cards** — 109-card library (61 neutral + 48 class-exclusive)
 - [x] **Additional hero classes** — Rogue, Paladin, and Shaman (Totemic Call)
 - [x] **Class-specific cards** — 8 cards per class; neutrals usable by all heroes
 - [x] **Legendary minions** — 37 high-impact unique cards (one copy per deck)

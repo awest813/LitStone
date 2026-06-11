@@ -147,6 +147,11 @@ def index():
     return render_template("index.html", card_db=CARD_DB, hero_classes=HERO_CLASSES)
 
 
+@app.route("/api/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok", "heroes": len(HERO_CLASSES), "deck_size": DECK_SIZE})
+
+
 @app.route("/api/cards", methods=["GET"])
 def cards():
     """Return the card database and hero class list — available before any game starts."""
@@ -167,7 +172,10 @@ def new_game():
     if player_cls not in HERO_CLASSES:
         player_cls = "Mage"
 
-    deck_valid = _validate_deck(deck, player_cls)
+    if not _validate_deck(deck, player_cls):
+        return jsonify({
+            "error": f"Invalid deck — need {DECK_SIZE} legal cards for {player_cls} (neutrals + class cards only).",
+        }), 400
 
     game_id = str(uuid.uuid4())
     GAME_LOG.clear()
@@ -175,7 +183,7 @@ def new_game():
     player_goes_first = random.choice([True, False])
     gs = {
         "game_id":           game_id,
-        "p1":                create_player("Player", player_cls, deck if deck_valid else None),
+        "p1":                create_player("Player", player_cls, deck),
         "p2":                create_player("AI", random.choice(HERO_CLASSES)),
         "turn_number":       1,
         "is_player_turn":    True,

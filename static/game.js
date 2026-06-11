@@ -58,13 +58,13 @@ const CARD_EMOJIS = {
   // Mage class
   NP:"🔥", EA:"📚", MK:"🪞", SK:"✨", SN:"🌋", AX:"📖", AM:"💨", MT:"☄️",
   // Warrior class
-  BB:"🛡️", WG:"🏰", RR:"⚔️", BZ:"🪓", IA:"🔨", WD:"🥁", CV:"⚔️", FY:"🧱",
+  BK:"🛡️", WG:"🏰", RR:"⚔️", BZ:"🪓", IA:"🔨", WD:"🥁", CV:"⚔️", FY:"🧱",
   // Priest class
   HA:"🙏", BI:"📿", RC:"💫", CP:"⛪", SS:"💧", SM:"⚡", HH:"🎵", GR:"💖",
   // Rogue class
   BA:"🥷", SC:"👤", VV:"🐍", TV:"🔪", AR:"🗡️", KT:"💉", SV:"🌪️", HL:"💰",
   // Paladin class
-  SL:"✝️", DK:"🌅", CR:"🏇", TU:"🗡️", HW:"📜", KD:"👑", PS:"☀️", LH:"🤲",
+  SL:"✝️", DK:"🌅", CR:"🏇", TU:"🗡️", HS:"📜", KD:"👑", PS:"☀️", LH:"🤲",
   // Shaman class
   WL:"🐺", TN:"🗿", FK:"🔥", HM:"🔱", LL:"⚡", MV:"🌊", HX:"🧿", AN:"👻",
   // Totems
@@ -117,6 +117,10 @@ function selectClass(cls) {
   sortBy     = "cost";
   showScreen("screen-deck");
   document.getElementById("deck-title").textContent = `Build Your ${cls} Deck`;
+  const sub = document.querySelector(".deck-subtitle");
+  if (sub) {
+    sub.textContent = `${cls} + neutral cards · Max 2 copies · ${DECK_SIZE} cards total`;
+  }
   // Reset filter/sort button states
   document.querySelectorAll(".filter-btn").forEach(b => b.classList.toggle("active", b.dataset.filter === "all"));
   document.querySelectorAll(".sort-btn").forEach(b => b.classList.toggle("active", b.dataset.sort === "cost"));
@@ -463,6 +467,7 @@ async function confirmMulligan() {
       if (btn) btn.disabled = false;
       return;
     }
+    gameId           = data.game_id || gameId;
     CARD_DB          = data.card_db || CARD_DB;
     gameState        = data;
     selected         = null;

@@ -154,7 +154,7 @@ CARD_DB = {
 
     # ---------- Warrior class cards ----------
     "Bulwark Bearer":      {"type": "minion", "cost": 2, "atk": 1, "hp": 4, "taunt": True,
-                            "classes": ["Warrior"], "icon": "BB"},
+                            "classes": ["Warrior"], "icon": "BK"},
     "Shieldwall Sergeant": {"type": "minion", "cost": 3, "atk": 2, "hp": 4, "taunt": True,
                             "divine_shield": True, "classes": ["Warrior"], "icon": "WG"},
     "Rampart Raider":      {"type": "minion", "cost": 3, "atk": 4, "hp": 3, "classes": ["Warrior"], "icon": "RR"},
@@ -199,7 +199,7 @@ CARD_DB = {
     "Crusader's Charge":    {"type": "minion", "cost": 3, "atk": 3, "hp": 1, "charge": True,
                              "divine_shield": True, "classes": ["Paladin"], "icon": "CR"},
     "Truesilver Testament": {"type": "weapon", "cost": 4, "atk": 4, "durability": 2, "classes": ["Paladin"], "icon": "TU"},
-    "Holy Wrath Scroll":    {"type": "spell", "cost": 2, "effect": "damage", "val": 3, "classes": ["Paladin"], "icon": "HW"},
+    "Holy Wrath Scroll":    {"type": "spell", "cost": 2, "effect": "damage", "val": 3, "classes": ["Paladin"], "icon": "HS"},
     "Kings' Decree":        {"type": "spell", "cost": 4, "effect": "buff", "val": [4, 4], "classes": ["Paladin"], "icon": "KD"},
     "Consecration Psalm":   {"type": "spell", "cost": 3, "effect": "damage_all", "val": 2, "classes": ["Paladin"], "icon": "PS"},
     "Lay on Hands":         {"type": "spell", "cost": 5, "effect": "heal", "val": 8, "classes": ["Paladin"], "icon": "LH"},

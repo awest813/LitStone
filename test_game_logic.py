@@ -1147,6 +1147,19 @@ class TestCardDbIntegrity(unittest.TestCase):
                     self.assertIn("atk", card)
                     self.assertIn("durability", card)
 
+    def test_unique_card_icons(self):
+        seen: dict[str, str] = {}
+        for name, card in CARD_DB.items():
+            icon = card["icon"]
+            self.assertNotIn(
+                icon, seen,
+                f"Duplicate icon '{icon}' on '{seen.get(icon)}' and '{name}'",
+            )
+            seen[icon] = name
+
+    def test_standard_test_deck_is_30_cards(self):
+        self.assertEqual(len(_standard_test_deck()), DECK_SIZE)
+
     def test_legendary_max_copies(self):
         """Legendary cards should have max 1 copy in auto-generated decks."""
         p = create_player("P", "Mage")
@@ -1268,6 +1281,26 @@ class TestStartTurnOptions(unittest.TestCase):
         self.assertEqual(p["max_mana"], 1)
         self.assertEqual(p["mana"], 1)
         self.assertEqual(len(p["hand"]), 0)
+
+
+class TestServerApi(unittest.TestCase):
+    def test_health_endpoint(self):
+        from server import app
+        client = app.test_client()
+        res = client.get("/api/health")
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertEqual(data["status"], "ok")
+        self.assertEqual(data["deck_size"], DECK_SIZE)
+
+    def test_invalid_deck_rejected(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        bad = deck[:29] + ["Lightning Limerick"]
+        res = client.post("/api/new_game", json={"hero_class": "Mage", "deck": bad})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("error", res.get_json())
 
 
 if __name__ == "__main__":
