@@ -55,26 +55,40 @@ const CARD_EMOJIS = {
   MF:"🧙‍♀️", MD:"🩸", GW:"🛡️", RH:"🏹", MM:"🌿", FT:"🍺", LJ:"💪", WS:"🎯",
   ES:"💰", OT:"🥣",
   CN:"🪙",
+  // Mage class
+  NP:"🔥", EA:"📚", MK:"🪞", SK:"✨", SN:"🌋", AX:"📖", AM:"💨", MT:"☄️",
+  // Warrior class
+  BB:"🛡️", WG:"🏰", RR:"⚔️", BZ:"🪓", IA:"🔨", WD:"🥁", CV:"⚔️", FY:"🧱",
+  // Priest class
+  HA:"🙏", BI:"📿", RC:"💫", CP:"⛪", SS:"💧", SM:"⚡", HH:"🎵", GR:"💖",
+  // Rogue class
+  BA:"🥷", SC:"👤", VV:"🐍", TV:"🔪", AR:"🗡️", KT:"💉", SV:"🌪️", HL:"💰",
+  // Paladin class
+  SL:"✝️", DK:"🌅", CR:"🏇", TU:"🗡️", HW:"📜", KD:"👑", PS:"☀️", LH:"🤲",
+  // Shaman class
+  WL:"🐺", TN:"🗿", FK:"🔥", HM:"🔱", LL:"⚡", MV:"🌊", HX:"🧿", AN:"👻",
+  // Totems
+  ST:"🔥", HE:"💚", SF:"🪨", WA:"💨",
 };
 
 // Hero class accent colors
 const HERO_COLORS = {
-  Mage: "#2980b9", Warrior: "#c0392b", Priest: "#d4820a", Rogue: "#1abc9c", Paladin: "#c0a020",
+  Mage: "#2980b9", Warrior: "#c0392b", Priest: "#d4820a", Rogue: "#1abc9c", Paladin: "#c0a020", Shaman: "#0077b6",
 };
 
 // Hero class icons (used across multiple render functions)
 const HERO_ICONS = {
-  Mage: "🔮", Warrior: "⚔️", Priest: "✨", Rogue: "🗡️", Paladin: "🛡️",
+  Mage: "🔮", Warrior: "⚔️", Priest: "✨", Rogue: "🗡️", Paladin: "🛡️", Shaman: "⚡",
 };
 
 // Hero power labels (used in renderHeroPower)
 const HERO_POWER_LABELS = {
-  Mage: "Fireblast", Warrior: "Armor Up", Priest: "Heal", Rogue: "Dagger", Paladin: "Reinforce",
+  Mage: "Fireblast", Warrior: "Armor Up", Priest: "Heal", Rogue: "Dagger", Paladin: "Reinforce", Shaman: "Totemic Call",
 };
 
 // Hero power icons
 const HERO_POWER_ICONS = {
-  Mage: "🔥", Warrior: "🛡️", Priest: "💚", Rogue: "🗡️", Paladin: "⚔️",
+  Mage: "🔥", Warrior: "🛡️", Priest: "💚", Rogue: "🗡️", Paladin: "⚔️", Shaman: "🗿",
 };
 
 // ---------------------------------------------------------------------------
@@ -130,11 +144,25 @@ function setSort(sort) {
   renderCardPool();
 }
 
+function cardAllowedForClass(card, heroClass) {
+  if (card.uncollectible) return false;
+  if (!card.classes || card.classes.length === 0) return true;
+  return card.classes.includes(heroClass);
+}
+
+function poolCardNames() {
+  return Object.entries(CARD_DB)
+    .filter(([, card]) => cardAllowedForClass(card, selectedClass))
+    .map(([name]) => name);
+}
+
 function renderCardPool() {
   const pool = document.getElementById("card-pool");
   pool.innerHTML = "";
 
-  let entries = Object.entries(CARD_DB);
+  let entries = Object.entries(CARD_DB).filter(([, card]) =>
+    cardAllowedForClass(card, selectedClass)
+  );
 
   // Apply type filter
   if (filterType !== "all") {
@@ -154,7 +182,8 @@ function renderCardPool() {
     const count  = draftDeck.filter(c => c === name).length;
     const isFull = count >= maxCopies || draftDeck.length >= DECK_SIZE;
     const div    = document.createElement("div");
-    div.className = `pool-card pool-card--${card.type}${isFull ? " pool-card--full" : ""}${isLegendary ? " pool-card--legendary" : ""}`;
+    const isClass = card.classes?.length > 0;
+    div.className = `pool-card pool-card--${card.type}${isFull ? " pool-card--full" : ""}${isLegendary ? " pool-card--legendary" : ""}${isClass ? " pool-card--class" : ""}`;
     div.dataset.name = name;
 
     const icon = CARD_EMOJIS[card.icon] || card.icon;
@@ -182,6 +211,7 @@ function renderCardPool() {
       <div class="gem-cost">${card.cost}</div>
       ${count > 0 ? `<div class="gem-count">${count}</div>` : ""}
       ${isLegendary ? `<div class="legendary-crown" title="Legendary — only 1 copy per deck">♦</div>` : ""}
+      ${isClass ? `<div class="class-badge" title="${card.classes.join(", ")} only">${card.classes[0].slice(0,3)}</div>` : ""}
       <div class="pool-art">${icon}</div>
       <div class="pool-name">${name}</div>
       ${statsHtml}
@@ -197,6 +227,8 @@ function renderCardPool() {
 
 function addCardToDeck(name) {
   if (draftDeck.length >= DECK_SIZE) return;
+  const card = CARD_DB[name];
+  if (!card || !cardAllowedForClass(card, selectedClass)) return;
   const maxCopies = CARD_DB[name]?.legendary ? 1 : 2;
   if (draftDeck.filter(c => c === name).length >= maxCopies) return;
   draftDeck.push(name);
@@ -263,7 +295,7 @@ function renderManaCurve() {
 }
 
 function autoFillDeck() {
-  const pool = Object.keys(CARD_DB);
+  const pool = poolCardNames();
   let tries = 0;
   while (draftDeck.length < DECK_SIZE && tries < MAX_AUTOFILL_ATTEMPTS) {
     tries++;
@@ -310,7 +342,7 @@ function loadDeck(name) {
   const entry = saved[name];
   if (!entry) return;
   // Filter out any cards that no longer exist in CARD_DB (e.g. after a card set update)
-  draftDeck = entry.cards.filter(c => CARD_DB[c]);
+  draftDeck = entry.cards.filter(c => CARD_DB[c] && cardAllowedForClass(CARD_DB[c], selectedClass));
   if (draftDeck.length !== DECK_SIZE) {
     showStatusToast(`Saved deck has ${draftDeck.length} cards — rebuild to ${DECK_SIZE}.`);
   }
@@ -549,11 +581,14 @@ function buildTooltipHtml(name, card) {
 
   const legendaryBadge = isLegendary
     ? `<div class="tooltip-legendary">♦ LEGENDARY</div>` : "";
+  const classBadge = card.classes?.length
+    ? `<div class="tooltip-desc" style="color:var(--col-gold)">${card.classes.join(", ")} class</div>` : "";
 
   return `
     <div class="tooltip-name">${name}</div>
     <div class="tooltip-type">${card.type.toUpperCase()} · ${card.cost} Mana</div>
     ${legendaryBadge}
+    ${classBadge}
     ${stats}
     ${kws}
     ${abilities}
@@ -1646,7 +1681,7 @@ function handleHeroPowerClick(player, canUse) {
   if (selected?.type === "hero_power") { clearSelection(); return; }
   clearSelection();
 
-  if (["Warrior", "Rogue", "Paladin"].includes(player.hero_class)) {
+  if (["Warrior", "Rogue", "Paladin", "Shaman"].includes(player.hero_class)) {
     sendAction("hero_power", null, null); return;
   }
   selected = { type: "hero_power" };

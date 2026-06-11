@@ -19,6 +19,7 @@ from game_logic import (
     run_ai_turn, log_action, damage_hero, get_valid_targets,
     cleanup_dead, evaluate_ai_move, give_coin,
     ai_choose_mulligan, ai_do_mulligan,
+    card_allowed_for_class, cards_for_class,
 )
 
 
@@ -1166,7 +1167,52 @@ class TestCardDbIntegrity(unittest.TestCase):
                 self.assertLessEqual(count, 2, f"'{name}' appears {count} times")
 
     def test_hero_classes_valid(self):
-        self.assertEqual(HERO_CLASSES, ["Mage", "Warrior", "Priest", "Rogue", "Paladin"])
+        self.assertEqual(HERO_CLASSES, ["Mage", "Warrior", "Priest", "Rogue", "Paladin", "Shaman"])
+
+
+class TestClassCards(unittest.TestCase):
+    def test_mage_card_only_for_mage(self):
+        self.assertTrue(card_allowed_for_class("Scorching Sonnet", "Mage"))
+        self.assertFalse(card_allowed_for_class("Scorching Sonnet", "Warrior"))
+
+    def test_neutral_cards_all_classes(self):
+        self.assertTrue(card_allowed_for_class("Town Crier", "Mage"))
+        self.assertTrue(card_allowed_for_class("Town Crier", "Shaman"))
+
+    def test_cards_for_class_includes_neutrals_and_class_cards(self):
+        mage_pool = cards_for_class("Mage")
+        self.assertIn("Town Crier", mage_pool)
+        self.assertIn("Scorching Sonnet", mage_pool)
+        self.assertNotIn("Lightning Limerick", mage_pool)
+
+    def test_ai_deck_respects_class(self):
+        p = create_player("AI", "Shaman")
+        for name in p["deck"]:
+            self.assertTrue(card_allowed_for_class(name, "Shaman"), f"{name} in Shaman deck")
+
+
+class TestShamanHeroPower(unittest.TestCase):
+    def setUp(self):
+        GAME_LOG.clear()
+
+    def test_shaman_in_hero_classes(self):
+        self.assertIn("Shaman", HERO_CLASSES)
+
+    def test_totemic_call_summons_totem(self):
+        p1 = create_player("P1", "Shaman", custom_deck=_standard_test_deck(), shuffle=False)
+        p2 = create_player("P2", "Mage", custom_deck=_standard_test_deck(), shuffle=False)
+        p1["mana"] = 2
+        execute_move(p1, p2, ("hero_power", None, None))
+        self.assertEqual(len(p1["board"]), 1)
+        self.assertTrue(p1["hero_power_used"])
+
+    def test_totemic_call_not_available_when_board_full(self):
+        p1 = create_player("P1", "Shaman", custom_deck=_standard_test_deck(), shuffle=False)
+        p2 = create_player("P2", "Mage", custom_deck=_standard_test_deck(), shuffle=False)
+        p1["board"] = [_make_minion(f"M{i}", 1, 1) for i in range(7)]
+        p1["mana"] = 2
+        hp_moves = [m for m in get_legal_moves(p1, p2) if m[0] == "hero_power"]
+        self.assertEqual(hp_moves, [])
 
 
 class TestTheCoin(unittest.TestCase):

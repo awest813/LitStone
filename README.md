@@ -6,8 +6,8 @@ A lightweight, browser-based card game inspired by Hearthstone. Play against an 
 
 ## Features
 
-- **5 Hero Classes** — Mage, Warrior, Priest, Rogue, and Paladin, each with a unique hero power
-- **61-card library** — Literary-themed minions, spells, and a weapon with distinct mechanics, plus 37 Legendary storybook heroes and villains
+- **6 Hero Classes** — Mage, Warrior, Priest, Rogue, Paladin, and Shaman, each with a unique hero power
+- **109-card library** — Neutral literary cards plus 8 class-exclusive cards per hero (48 class cards), including 37 Legendary minions
 - **Rich card mechanics** — Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle
 - **Mulligan phase** — Select any opening-hand cards to redraw before each game starts
 - **Literary Legends** — Legendary minions inspired by Sherlock Holmes, Dr. John Watson, Professor Moriarty, Van Helsing, Victor Frankenstein, Frankenstein's Monster, Alice, The Mad Hatter, The White Rabbit, The Queen of Hearts, The Cheshire Cat, Snow White, Rapunzel, Sleeping Beauty, Little Red Riding Hood, Rumpelstiltskin, The Big Bad Wolf, Pied Piper, Baba Yaga, Bluebeard, King Arthur, Merlin, Lancelot, Guinevere, Morgan le Fay, Mordred, Gawain, Robin Hood, Maid Marian, Friar Tuck, Little John, Will Scarlet, Ebenezer Scrooge, Oliver Twist, Ivanhoe, Quasimodo, and Don Quixote (max 1 copy per deck)
@@ -71,6 +71,7 @@ python3 -m unittest test_game_logic -v
 | Priest  | Lesser Heal  | Restore 2 HP to a friendly character |
 | Rogue   | Dagger Mastery | Equip a 1/2 Wicked Dagger         |
 | Paladin | Reinforce      | Summon a 1/1 Silver Hand Recruit   |
+| Shaman  | Totemic Call   | Summon a random Totem              |
 
 ### Card Types
 

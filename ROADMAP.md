@@ -50,8 +50,8 @@ Goals: make the game feel complete and production-ready for single-player use.
 Goals: deepen the card pool and hero variety.
 
 - [x] **More cards** — 61-card library with broad literary themes
-- [x] **Additional hero classes** — Rogue and Paladin added; Shaman remains planned
-- [ ] **Class-specific cards** — some cards restricted to certain hero classes
+- [x] **Additional hero classes** — Rogue, Paladin, and Shaman (Totemic Call)
+- [x] **Class-specific cards** — 8 cards per class; neutrals usable by all heroes
 - [x] **Legendary minions** — 37 high-impact unique cards (one copy per deck)
 - [x] **30-card decks** — standard CCG deck size
 - [x] **The Coin** — second-player gains +1 mana crystal (once)

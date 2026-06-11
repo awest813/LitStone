@@ -14,7 +14,7 @@ from game_logic import (
     create_player, draw_card, start_turn, do_mulligan,
     get_legal_moves, execute_move, check_win,
     run_ai_turn, log_action, give_coin, ai_do_mulligan,
-    set_active_log,
+    set_active_log, card_allowed_for_class, cards_for_class,
 )
 
 app = Flask(__name__)
@@ -37,12 +37,15 @@ def _get_game(game_id: str | None) -> dict | None:
     return GAMES.get(game_id)
 
 
-def _validate_deck(deck: list) -> bool:
-    valid_cards = {k for k, c in CARD_DB.items() if not c.get("uncollectible")}
+def _validate_deck(deck: list, hero_class: str) -> bool:
+    if hero_class not in HERO_CLASSES:
+        return False
+    pool = set(cards_for_class(hero_class))
     return (
         isinstance(deck, list) and
         len(deck) == DECK_SIZE and
-        all(c in valid_cards for c in deck) and
+        all(c in pool for c in deck) and
+        all(card_allowed_for_class(c, hero_class) for c in deck) and
         all(deck.count(c) <= (1 if CARD_DB[c].get("legendary") else 2) for c in deck)
     )
 
@@ -164,7 +167,7 @@ def new_game():
     if player_cls not in HERO_CLASSES:
         player_cls = "Mage"
 
-    deck_valid = _validate_deck(deck)
+    deck_valid = _validate_deck(deck, player_cls)
 
     game_id = str(uuid.uuid4())
     GAME_LOG.clear()

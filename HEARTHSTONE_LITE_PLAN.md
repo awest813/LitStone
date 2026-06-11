@@ -245,7 +245,8 @@ Add new mechanics in Python with tests **before** wiring UI.
 4. ~~**The Coin + first player**~~ — ✅ random first player, coin to second.
 5. ~~**Animation spike**~~ — ✅ play arc, attack lunge, death burst, weapon swing, spell flash.
 6. ~~**Sound effects**~~ — ✅ Web Audio API with mute toggle (`localStorage`).
-7. **Class card schema:** add `"classes": ["Mage"]` field to `CARD_DB` entries.
+7. ~~**Class card schema**~~ — ✅ `"classes": ["Mage"]` on 48 class-exclusive cards; deck builder filters by hero.
+8. **Boss encounters** — 3 scripted AI bosses with unique decks (campaign stretch).
 
 ---
 

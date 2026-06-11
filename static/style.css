@@ -41,6 +41,7 @@
   --priest-col:       #d4820a;
   --rogue-col:        #1abc9c;
   --paladin-col:      #c0a020;
+  --shaman-col:       #0077b6;
 }
 
 body {
@@ -249,6 +250,7 @@ body::after {
 .priest-glow  { background: radial-gradient(circle, var(--priest-col), transparent); }
 .rogue-glow   { background: radial-gradient(circle, var(--rogue-col), transparent); }
 .paladin-glow { background: radial-gradient(circle, var(--paladin-col), transparent); }
+.shaman-glow  { background: radial-gradient(circle, var(--shaman-col), transparent); }
 
 .hero-emblem {
   font-size: 58px;
@@ -1472,6 +1474,27 @@ body::after {
 }
 .pool-card--legendary .pool-art {
   background: linear-gradient(160deg, #1a1000, #332000);
+}
+
+.pool-card--class {
+  border-color: rgba(0, 119, 182, .45);
+  box-shadow: inset 0 0 10px rgba(0, 119, 182, .08);
+}
+
+.class-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 8px;
+  font-weight: 700;
+  font-family: 'Cinzel', serif;
+  color: #7ec8e3;
+  background: rgba(0, 20, 40, .85);
+  border: 1px solid rgba(0, 119, 182, .5);
+  border-radius: 4px;
+  padding: 1px 4px;
+  pointer-events: none;
+  z-index: 6;
 }
 .pool-card--legendary:hover:not(.pool-card--full) {
   border-color: var(--col-gold-bright);
