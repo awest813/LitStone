@@ -28,6 +28,8 @@ const MAX_AUTOFILL_ATTEMPTS = 500; // safety cap for the random auto-fill loop
 let isActing          = false; // prevents double-submit during server round-trips
 let prevIsPlayerTurn  = null;  // tracks turn transitions for banner
 let turnNumber        = 0;     // client-side turn counter
+let sfxMuted          = localStorage.getItem("litstoneMuted") === "1";
+let audioCtx          = null;
 
 const KW_COLORS = {
   taunt: "#c0392b", divine_shield: "#d4a800", charge: "#00a878",
@@ -600,6 +602,7 @@ function showTurnBanner(isPlayerTurn) {
   // Force reflow so animation restarts cleanly
   void banner.offsetWidth;
   banner.classList.add("active");
+  playSfx("turn");
 }
 
 function setAiThinking(active) {
@@ -709,6 +712,406 @@ function applyHeroAnimations(prev) {
   if (p2ArmorGain > 0) {
     spawnFloat(`+${p2ArmorGain}🛡`, "var(--col-gold)", document.getElementById("hero-opp"), "normal");
   }
+  if (gameState.p1.hp < prev.p1.hp || gameState.p2.hp < prev.p2.hp) playSfx("damage");
+  if (gameState.p1.hp > prev.p1.hp) playSfx("heal");
+}
+
+// ---------------------------------------------------------------------------
+// SOUND FX (Web Audio — no asset files)
+// ---------------------------------------------------------------------------
+
+function motionEnabled() {
+  return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function getAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioCtx;
+}
+
+function tone(freq, duration, type = "sine", volume = 0.07) {
+  const ctx = getAudioCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(volume, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + duration);
+}
+
+function playSfx(kind) {
+  if (sfxMuted) return;
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === "suspended") ctx.resume();
+    switch (kind) {
+      case "play":
+        tone(392, 0.1);
+        setTimeout(() => tone(523, 0.12), 60);
+        break;
+      case "attack":
+        tone(160, 0.14, "square", 0.05);
+        break;
+      case "damage":
+        tone(110, 0.18, "sawtooth", 0.045);
+        break;
+      case "heal":
+        tone(440, 0.14);
+        setTimeout(() => tone(554, 0.16), 80);
+        break;
+      case "turn":
+        tone(330, 0.2);
+        setTimeout(() => tone(440, 0.15), 100);
+        break;
+      case "victory":
+        tone(523, 0.18);
+        setTimeout(() => tone(659, 0.18), 140);
+        setTimeout(() => tone(784, 0.22), 280);
+        break;
+      case "defeat":
+        tone(220, 0.25, "triangle", 0.06);
+        setTimeout(() => tone(165, 0.35, "triangle", 0.05), 200);
+        break;
+      default:
+        break;
+    }
+  } catch (_) {
+    /* Audio unavailable */
+  }
+}
+
+function toggleSfx() {
+  sfxMuted = !sfxMuted;
+  localStorage.setItem("litstoneMuted", sfxMuted ? "1" : "0");
+  const btn = document.getElementById("btn-sfx-toggle");
+  if (btn) {
+    btn.textContent = sfxMuted ? "🔇" : "🔊";
+    btn.title = sfxMuted ? "Unmute sound" : "Mute sound";
+    btn.setAttribute("aria-pressed", sfxMuted ? "true" : "false");
+  }
+  if (!sfxMuted) playSfx("turn");
+}
+
+function syncSfxButton() {
+  const btn = document.getElementById("btn-sfx-toggle");
+  if (!btn) return;
+  btn.textContent = sfxMuted ? "🔇" : "🔊";
+  btn.title = sfxMuted ? "Unmute sound" : "Mute sound";
+  btn.setAttribute("aria-pressed", sfxMuted ? "true" : "false");
+}
+
+// ---------------------------------------------------------------------------
+// ACTION ANIMATIONS (play arc, attack lunge, death burst)
+// ---------------------------------------------------------------------------
+
+function snapshotBoardRects() {
+  function grab(boardId) {
+    const board = document.getElementById(boardId);
+    if (!board) return [];
+    return Array.from(board.querySelectorAll(".minion-card")).map(el => ({
+      name: el.querySelector(".minion-name")?.textContent || "",
+      rect: el.getBoundingClientRect(),
+    }));
+  }
+  return { p1: grab("board-player"), p2: grab("board-opp") };
+}
+
+function snapshotHandRects() {
+  const hand = document.getElementById("hand-player");
+  if (!hand) return [];
+  return Array.from(hand.querySelectorAll(".hand-card")).map(el => ({
+    name: el.querySelector(".minion-name")?.textContent || "",
+    rect: el.getBoundingClientRect(),
+  }));
+}
+
+function countMinionsByName(board) {
+  const counts = {};
+  board.forEach(m => { counts[m.name] = (counts[m.name] || 0) + 1; });
+  return counts;
+}
+
+function minionsLost(prevBoard, currBoard) {
+  const prevC = countMinionsByName(prevBoard);
+  const currC = countMinionsByName(currBoard);
+  const lost = [];
+  Object.keys(prevC).forEach(name => {
+    const diff = prevC[name] - (currC[name] || 0);
+    for (let i = 0; i < diff; i++) lost.push(name);
+  });
+  return lost;
+}
+
+function consumeRectForName(rects, name) {
+  const idx = rects.findIndex(r => r.name === name);
+  if (idx === -1) return null;
+  return rects.splice(idx, 1)[0].rect;
+}
+
+function findMinionEl(boardId, name) {
+  const board = document.getElementById(boardId);
+  if (!board) return null;
+  for (const el of board.querySelectorAll(".minion-card")) {
+    if (el.querySelector(".minion-name")?.textContent === name) return el;
+  }
+  return null;
+}
+
+function findHeroElByName(name) {
+  if (name === "Player") return document.getElementById("hero-player");
+  if (name === "AI") return document.getElementById("hero-opp");
+  return null;
+}
+
+function animateFlyGhost(fromRect, toRect, emoji, cardType) {
+  if (!motionEnabled() || !fromRect || !toRect) return;
+  const layer = document.getElementById("fx-layer");
+  if (!layer) return;
+  const layerRect = layer.getBoundingClientRect();
+  const el = document.createElement("div");
+  el.className = `fx-fly-card fx-fly-card--${cardType || "minion"}`;
+  el.textContent = emoji || "🃏";
+
+  const sx = fromRect.left + fromRect.width / 2 - layerRect.left;
+  const sy = fromRect.top + fromRect.height / 2 - layerRect.top;
+  el.style.left = `${sx}px`;
+  el.style.top  = `${sy}px`;
+  layer.appendChild(el);
+
+  const dx = toRect.left + toRect.width / 2 - layerRect.left - sx;
+  const dy = toRect.top + toRect.height / 2 - layerRect.top - sy;
+
+  el.animate([
+    { transform: "translate(-50%, -50%) scale(1.15) rotate(-6deg)", opacity: 1 },
+    { transform: `translate(calc(-50% + ${dx * 0.45}px), calc(-50% + ${dy * 0.25}px)) scale(1) rotate(2deg)`, opacity: 1, offset: 0.55 },
+    { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.75) rotate(0deg)`, opacity: 0 },
+  ], { duration: 380, easing: "cubic-bezier(.25, .8, .25, 1)", fill: "forwards" })
+    .addEventListener("finish", () => el.remove());
+}
+
+function animateDeathBurst(rect) {
+  if (!motionEnabled() || !rect) return;
+  const layer = document.getElementById("fx-layer");
+  if (!layer) return;
+  const layerRect = layer.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2 - layerRect.left;
+  const cy = rect.top + rect.height / 2 - layerRect.top;
+
+  for (let i = 0; i < 6; i++) {
+    const shard = document.createElement("div");
+    shard.className = "fx-death-shard";
+    shard.style.left = `${cx}px`;
+    shard.style.top = `${cy}px`;
+    const angle = (i / 6) * Math.PI * 2;
+    const dist = 28 + Math.random() * 22;
+    layer.appendChild(shard);
+    shard.animate([
+      { transform: "translate(-50%, -50%) scale(1)", opacity: 1 },
+      { transform: `translate(calc(-50% + ${Math.cos(angle) * dist}px), calc(-50% + ${Math.sin(angle) * dist}px)) scale(0.2)`, opacity: 0 },
+    ], { duration: 420, easing: "ease-out", fill: "forwards" })
+      .addEventListener("finish", () => shard.remove());
+  }
+}
+
+function animateLunge(attackerEl, targetEl, fromPlayerBoard) {
+  if (!motionEnabled() || !attackerEl) return;
+  const cls = fromPlayerBoard ? "attack-lunge" : "attack-lunge-opp";
+  attackerEl.classList.remove(cls);
+  void attackerEl.offsetWidth;
+  attackerEl.classList.add(cls);
+  attackerEl.addEventListener("animationend", () => attackerEl.classList.remove(cls), { once: true });
+  if (targetEl) {
+    targetEl.classList.add("damage-flash");
+    targetEl.addEventListener("animationend", () => targetEl.classList.remove("damage-flash"), { once: true });
+  }
+}
+
+function animateHeroWeaponSwing(heroEl, targetEl, isPlayerHero) {
+  if (!motionEnabled() || !heroEl) return;
+  heroEl.classList.add(isPlayerHero ? "hero-weapon-swing" : "hero-weapon-swing-opp");
+  heroEl.addEventListener("animationend", () => {
+    heroEl.classList.remove("hero-weapon-swing", "hero-weapon-swing-opp");
+  }, { once: true });
+  if (targetEl) {
+    targetEl.classList.add("damage-flash");
+    targetEl.addEventListener("animationend", () => targetEl.classList.remove("damage-flash"), { once: true });
+  }
+}
+
+function flashSpellBoard(boardId) {
+  const board = document.getElementById(boardId);
+  if (!board || !motionEnabled()) return;
+  const flash = document.createElement("div");
+  flash.className = "board-spell-flash";
+  board.style.position = "relative";
+  board.appendChild(flash);
+  flash.addEventListener("animationend", () => flash.remove());
+}
+
+function parseLogAttacks(log, fromIndex) {
+  const attacks = [];
+  (log || []).slice(fromIndex).forEach(line => {
+    const m = line.match(/^>> (.+?) attacks (.+?)(?: for | with )/);
+    if (m) attacks.push({ attacker: m[1], target: m[2] });
+  });
+  return attacks;
+}
+
+function resolveAttackTarget(targetName) {
+  const hero = findHeroElByName(targetName);
+  if (hero) return { el: hero, isHero: true };
+  const onPlayer = findMinionEl("board-player", targetName);
+  if (onPlayer) return { el: onPlayer, isHero: false, onPlayerBoard: true };
+  const onOpp = findMinionEl("board-opp", targetName);
+  if (onOpp) return { el: onOpp, isHero: false, onPlayerBoard: false };
+  return null;
+}
+
+function resolveAttacker(attackerName) {
+  const onPlayer = findMinionEl("board-player", attackerName);
+  if (onPlayer) return { el: onPlayer, fromPlayerBoard: true, isHero: false };
+  const onOpp = findMinionEl("board-opp", attackerName);
+  if (onOpp) return { el: onOpp, fromPlayerBoard: false, isHero: false };
+  if (attackerName === "Player") return { el: document.getElementById("hero-player"), fromPlayerBoard: true, isHero: true };
+  if (attackerName === "AI") return { el: document.getElementById("hero-opp"), fromPlayerBoard: false, isHero: true };
+  return null;
+}
+
+function animateAttackPair(attackerName, targetName) {
+  const atk = resolveAttacker(attackerName);
+  const tgt = resolveAttackTarget(targetName);
+  if (!atk?.el || !tgt?.el) return;
+  playSfx("attack");
+  if (atk.isHero) {
+    animateHeroWeaponSwing(atk.el, tgt.el, atk.fromPlayerBoard);
+  } else {
+    animateLunge(atk.el, tgt.el, atk.fromPlayerBoard);
+  }
+}
+
+function applyHandDrawAnimation(prevHandLen) {
+  if (!gameState || gameState.p1.hand.length <= prevHandLen) return;
+  const hand = document.getElementById("hand-player");
+  if (!hand) return;
+  const cards = hand.querySelectorAll(".hand-card");
+  const newest = cards[cards.length - 1];
+  if (!newest) return;
+  newest.classList.add("card-draw-anim");
+  newest.addEventListener("animationend", () => newest.classList.remove("card-draw-anim"), { once: true });
+}
+
+/**
+ * Orchestrate play / attack / death animations after a state update.
+ * @param {object} ctx - snapshots captured before the server round-trip
+ */
+function applyActionAnimations(ctx) {
+  if (!ctx || !gameState) return;
+
+  const motion = motionEnabled();
+  const { prevSnap, prevRects, prevHandRects, action, idx, target, logFrom, prevHandLen, playedCardName } = ctx;
+  const p1Rects = [...(prevRects?.p1 || [])];
+  const p2Rects = [...(prevRects?.p2 || [])];
+
+  if (motion) {
+    minionsLost(prevSnap.p2, gameState.p2.board).forEach(name => {
+      animateDeathBurst(consumeRectForName(p2Rects, name));
+    });
+    minionsLost(prevSnap.p1, gameState.p1.board).forEach(name => {
+      animateDeathBurst(consumeRectForName(p1Rects, name));
+    });
+  }
+
+  if (action === "play" && playedCardName) {
+    const card = CARD_DB[playedCardName] || {};
+    const handRect = prevHandRects?.[idx]?.rect;
+    if (card.type === "minion") {
+      const played = findMinionEl("board-player", playedCardName);
+      if (motion && handRect && played) {
+        const icon = CARD_EMOJIS[card.icon] || card.icon || "🃏";
+        animateFlyGhost(handRect, played.getBoundingClientRect(), icon, "minion");
+      }
+      playSfx("play");
+    } else if (card.type === "spell") {
+      if (motion) {
+        flashSpellBoard(card.effect === "damage_all" || card.effect === "silence" ? "board-opp" : "board-player");
+      }
+      playSfx("play");
+    } else if (card.type === "weapon") {
+      playSfx("play");
+    }
+  }
+
+  if (action === "attack" && prevSnap?.p1?.[idx]) {
+    const atkName = prevSnap.p1[idx].name;
+    let tgtName = "AI";
+    if (target !== "hero" && typeof target === "number" && prevSnap.p2[target]) {
+      tgtName = prevSnap.p2[target].name;
+    }
+    if (motion) animateAttackPair(atkName, tgtName);
+    else playSfx("attack");
+  }
+
+  if (action === "hero_attack") {
+    let tgtName = "AI";
+    if (target !== "hero" && typeof target === "number" && prevSnap?.p2?.[target]) {
+      tgtName = prevSnap.p2[target].name;
+    }
+    playSfx("attack");
+    if (motion) {
+      animateHeroWeaponSwing(
+        document.getElementById("hero-player"),
+        resolveAttackTarget(tgtName)?.el,
+        true
+      );
+    }
+  }
+
+  if (action === "end_turn" || !action) {
+    parseLogAttacks(gameState.log, logFrom).forEach(({ attacker, target: tgt }, i) => {
+      setTimeout(() => {
+        if (motion) animateAttackPair(attacker, tgt);
+        else playSfx("attack");
+      }, i * 150);
+    });
+  }
+
+  if (motion) applyHandDrawAnimation(prevHandLen ?? 0);
+}
+
+function buildAnimContext(action, idx, target) {
+  return {
+    action,
+    idx,
+    target,
+    prevSnap: snapshotBoards(),
+    prevRects: snapshotBoardRects(),
+    prevHandRects: snapshotHandRects(),
+    prevHandLen: gameState?.p1?.hand?.length ?? 0,
+    logFrom: gameState?.log?.length ?? 0,
+    playedCardName: (action === "play" && idx != null) ? gameState?.p1?.hand?.[idx] : null,
+    prevHeroSnap: {
+      p1: { hp: gameState.p1.hp, armor: gameState.p1.armor || 0 },
+      p2: { hp: gameState.p2.hp, armor: gameState.p2.armor || 0 },
+    },
+  };
+}
+
+function onGameStateUpdated(data, animCtx) {
+  gameId    = data.game_id || gameId;
+  CARD_DB   = data.card_db || CARD_DB;
+  gameState = data;
+  renderGame();
+  if (animCtx) {
+    applyActionAnimations(animCtx);
+    applyPostRenderAnimations(animCtx.prevSnap);
+    applyHeroAnimations(animCtx.prevHeroSnap);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -755,11 +1158,16 @@ function renderGame() {
   const overlay = document.getElementById("winner-overlay");
   if (winner) {
     overlay.classList.remove("hidden");
+    const isWin = winner === "Player";
     document.getElementById("winner-text").textContent =
-      winner === "DRAW"   ? "It's a Draw!" :
-      winner === "Player" ? "Victory!"      : "Defeat!";
+      winner === "DRAW" ? "It's a Draw!" : isWin ? "Victory!" : "Defeat!";
+    if (!overlay.dataset.sfxPlayed) {
+      playSfx(winner === "DRAW" ? "turn" : isWin ? "victory" : "defeat");
+      overlay.dataset.sfxPlayed = "1";
+    }
   } else {
     overlay.classList.add("hidden");
+    delete overlay.dataset.sfxPlayed;
   }
 
   updateSelectionInfo();
@@ -1273,9 +1681,7 @@ async function sendAction(action, idx, target) {
   const etBtn = document.getElementById("btn-end-turn");
   etBtn.disabled = true;
 
-  const prevSnap     = snapshotBoards();
-  const prevHeroSnap = { p1: { hp: gameState.p1.hp, armor: gameState.p1.armor || 0 },
-                         p2: { hp: gameState.p2.hp, armor: gameState.p2.armor || 0 } };
+  const animCtx = buildAnimContext(action, idx, target);
 
   try {
     const res = await fetch("/api/action", {
@@ -1287,12 +1693,7 @@ async function sendAction(action, idx, target) {
     if (data.error) {
       spawnFloat(data.error, "var(--col-red)", null, "normal");
     } else {
-      gameId    = data.game_id || gameId;
-      CARD_DB   = data.card_db || CARD_DB;
-      gameState = data;
-      renderGame();
-      applyPostRenderAnimations(prevSnap);
-      applyHeroAnimations(prevHeroSnap);
+      onGameStateUpdated(data, animCtx);
     }
   } catch (err) {
     spawnFloat("Network error!", "var(--col-red)", null, "normal");
@@ -1311,9 +1712,7 @@ async function endTurn() {
   etBtn.disabled = true;
   setAiThinking(true);
 
-  const prevSnap     = snapshotBoards();
-  const prevHeroSnap = { p1: { hp: gameState.p1.hp, armor: gameState.p1.armor || 0 },
-                         p2: { hp: gameState.p2.hp, armor: gameState.p2.armor || 0 } };
+  const animCtx = buildAnimContext("end_turn", null, null);
 
   try {
     const res  = await fetch("/api/action", {
@@ -1333,16 +1732,10 @@ async function endTurn() {
     }
     // Guard: player may have resigned while the AI was thinking
     if (gameState === null) return;
-    gameId    = data.game_id || gameId;
-    CARD_DB   = data.card_db || CARD_DB;
-    gameState = data;
     setAiThinking(false);
-    // Sync turn counter from server; fall back to client increment for resilience.
-    if (!gameState.winner) turnNumber = gameState.turn_number || (turnNumber + 1);
-    renderGame();
+    if (!data.winner) turnNumber = data.turn_number || (turnNumber + 1);
+    onGameStateUpdated(data, animCtx);
     if (!gameState.winner) showTurnBanner(true);
-    applyPostRenderAnimations(prevSnap);
-    applyHeroAnimations(prevHeroSnap);
   } catch (err) {
     spawnFloat("Network error!", "var(--col-red)", null, "normal");
     setAiThinking(false);
@@ -1443,5 +1836,6 @@ function syncDeckSizeUi() {
     syncDeckSizeUi();
   } catch (_) {}
 
+  syncSfxButton();
   showScreen("screen-menu");
 })();

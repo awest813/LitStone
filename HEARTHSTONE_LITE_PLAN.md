@@ -106,15 +106,15 @@ flowchart TB
 
 **Goal:** Players *feel* impact when cards hit the board.
 
-| Task | Details |
-|------|---------|
-| Play animation | Card arcs from hand to board / target |
-| Attack animation | Minion lunges toward target, returns |
-| Death animation | Minion fades/shatters before DOM removal |
-| Hero weapon swing | Distinct from minion attack |
-| Sound design | Web Audio API: play, attack, damage, heal, turn start, victory (mute toggle) |
-| Board readability | Larger minion slots on desktop; pinch-zoom or stacked hand on mobile |
-| Loading states | Disable buttons during API calls (partially done) |
+| Task | Status |
+|------|--------|
+| Play animation — card arcs from hand to board | ✅ |
+| Attack animation — minion lunges toward target | ✅ |
+| Death animation — shard burst at last board position | ✅ |
+| Hero weapon swing | ✅ |
+| Sound design — Web Audio + mute toggle | ✅ |
+| Board readability — larger minion slots on mobile | ⬜ |
+| Loading states | ✅ (partial) |
 
 **Art direction (lite):** Commission or generate **consistent card frames + silhouettes** per literary character. Emoji is fine for dev; Lite needs illustrated or styled SVG portraits at minimum.
 
@@ -243,8 +243,9 @@ Add new mechanics in Python with tests **before** wiring UI.
 2. ~~**`game_id` sessions**~~ — ✅ UUID-keyed `GAMES` dict in `server.py`.
 3. ~~**AI mulligan**~~ — ✅ `ai_choose_mulligan` / `ai_do_mulligan`.
 4. ~~**The Coin + first player**~~ — ✅ random first player, coin to second.
-5. **Animation spike:** one play-from-hand arc in `game.js` as template for others.
-6. **Class card schema:** add `"classes": ["Mage"]` field to `CARD_DB` entries.
+5. ~~**Animation spike**~~ — ✅ play arc, attack lunge, death burst, weapon swing, spell flash.
+6. ~~**Sound effects**~~ — ✅ Web Audio API with mute toggle (`localStorage`).
+7. **Class card schema:** add `"classes": ["Mage"]` field to `CARD_DB` entries.
 
 ---
 

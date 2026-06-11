@@ -35,8 +35,8 @@ Goals: make the game feel complete and production-ready for single-player use.
 - [x] **AI mulligan** — heuristic opening-hand swaps for the AI opponent
 - [ ] **Improved AI** — smarter target selection, difficulty tiers, reduced random noise
 - [x] **Partial card animations** — summon flash, damage float, buff glow, turn banner, hero flash
-- [ ] **Full card animations** — play-from-hand arc, attack lunge, death removal
-- [ ] **Sound effects** — basic audio feedback for card play, attacks, and victory
+- [x] **Full card animations** — play-from-hand arc, attack lunge, death burst, weapon swing, spell flash
+- [x] **Sound effects** — Web Audio SFX for play, attack, damage, heal, turn, victory/defeat (mute toggle)
 - [x] **Partial responsive layout** — breakpoints at 900px / 1100px; mobile scroll fixes
 - [ ] **Full mobile polish** — playable board and hand on phone-sized viewports
 - [x] **Error handling** — status toasts, illegal-move feedback, network error messages
