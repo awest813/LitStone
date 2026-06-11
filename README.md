@@ -186,7 +186,7 @@ LitStone/
 ├── game_logic.py        # Pure Python game rules, AI, and card database
 ├── game_store.py        # SQLite persistence for active sessions
 ├── server.py            # Flask server and REST API
-├── test_game_logic.py   # Unit tests (146 tests)
+├── test_game_logic.py   # Unit tests (150 tests)
 ├── requirements.txt     # Python runtime dependencies
 ├── requirements-dev.txt # pytest, Ruff, and runtime deps
 ├── THIRD_PARTY_NOTICES.md  # MIT and other OSS attributions

@@ -26,7 +26,7 @@ The current state of the project establishes the core gameplay loop.
 - [x] Mulligan phase (player)
 - [x] Deck filter/sort, mana curve, save/load decks (localStorage)
 - [x] Legendary minions (37 literary legends)
-- [x] Unit tests — 146 tests covering game logic, AI, campaign API, and edge cases (`test_game_logic.py`)
+- [x] Unit tests — 150 tests covering game logic, AI, campaign API, and edge cases (`test_game_logic.py`)
 
 ---
 

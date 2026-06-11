@@ -168,7 +168,11 @@ def _finish_mulligan(gs: dict) -> None:
         gs["is_player_turn"] = True
         gs["turn_number"] = 1
         start_turn(gs["p1"], draw=False)
-        log_action("--- Your Turn (Turn 1) ---")
+        winner = check_win(gs["p1"], gs["p2"])
+        if winner:
+            log_action(f"=== {winner} wins! ===")
+        else:
+            log_action("--- Your Turn (Turn 1) ---")
         return
 
     gs["is_player_turn"] = False
@@ -182,7 +186,11 @@ def _finish_mulligan(gs: dict) -> None:
     gs["is_player_turn"] = True
     gs["turn_number"] = 2
     start_turn(gs["p1"])
-    log_action("--- Your Turn (Turn 2) ---")
+    winner = check_win(gs["p1"], gs["p2"])
+    if winner:
+        log_action(f"=== {winner} wins! ===")
+    else:
+        log_action("--- Your Turn (Turn 2) ---")
 
 
 # ---------------------------------------------------------------------------
@@ -420,14 +428,18 @@ def do_action():
             gs["is_player_turn"] = False
             log_action("--- AI's Turn ---")
             run_ai_turn(p2, p1, difficulty=gs.get("ai_difficulty", "normal"))
-            gs["turn_number"] += 1
             winner = check_win(p1, p2)
-            if not winner:
+            if winner:
+                log_action(f"=== {winner} wins! ===")
+            else:
+                gs["turn_number"] += 1
                 gs["is_player_turn"] = True
                 start_turn(p1)
-                log_action(f"--- Your Turn (Turn {gs['turn_number']}) ---")
-            else:
-                log_action(f"=== {winner} wins! ===")
+                winner = check_win(p1, p2)
+                if winner:
+                    log_action(f"=== {winner} wins! ===")
+                else:
+                    log_action(f"--- Your Turn (Turn {gs['turn_number']}) ---")
             _persist_game(gs)
             return jsonify(_state_response(gs))
 

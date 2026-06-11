@@ -454,7 +454,7 @@ def select_ai_move(
 
     best_score = scored[0][0]
     if best_score < 0:
-        return None
+        return scored[-1][1]
 
     if difficulty == "hard":
         contenders = [mv for score, mv in scored if score >= best_score - 1.5]
@@ -538,6 +538,12 @@ def effective_mana(player: dict) -> int:
     return 10 if player.get("infinite_mana") else player["mana"]
 
 
+def clamp_heal(player: dict, amount: int) -> int:
+    """Heal amount capped by hero max_hp."""
+    cap = player.get("max_hp", 30)
+    return max(0, min(amount, cap - player["hp"]))
+
+
 def create_player(name: str, hero_class: str = "Mage",
                   custom_deck: list | None = None, shuffle: bool = True) -> dict:
     if custom_deck is not None:
@@ -561,6 +567,7 @@ def create_player(name: str, hero_class: str = "Mage",
         "hero_power_used": False,
         "weapon":          None,
         "hero_can_attack": False,
+        "hero_attacked_this_turn": False,
     }
 
 
@@ -588,6 +595,7 @@ def start_turn(player: dict, on_event=None, *, draw: bool = True) -> None:
             player["max_mana"] += 1
         player["mana"] = player["max_mana"]
     player["hero_power_used"] = False
+    player["hero_attacked_this_turn"] = False
     player["hero_can_attack"] = bool(player["weapon"])
     for m in player["board"]:
         m["can_attack"] = True
@@ -715,7 +723,11 @@ def get_legal_moves(player: dict, opp: dict) -> list:
             for t in valid_targets:
                 moves.append(("attack", bi, t))
 
-    if player["weapon"] and player["hero_can_attack"]:
+    if (
+        player["weapon"]
+        and player["hero_can_attack"]
+        and not player.get("hero_attacked_this_turn")
+    ):
         for t in valid_targets:
             moves.append(("hero_attack", None, t))
 
@@ -766,7 +778,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             if "battlecry" in card:
                 bc = card["battlecry"]
                 if bc["effect"] == "heal_hero":
-                    amt = max(0, min(bc["val"], 30 - player["hp"]))
+                    amt = clamp_heal(player, bc["val"])
                     player["hp"] += amt
                     log_action(f"   [B.CRY] Battlecry: Heals hero for {amt}!")
                     notify("heal", player, "hero", amt)
@@ -778,7 +790,8 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
         elif card["type"] == "weapon":
             player["weapon"] = {"name": card_name, "atk": card["atk"],
                                  "durability": card["durability"]}
-            player["hero_can_attack"] = True
+            if not player.get("hero_attacked_this_turn"):
+                player["hero_can_attack"] = True
             log_action(f"   Equipped {card_name} ({card['atk']} Atk / {card['durability']} Durability).")
 
         elif card["type"] == "spell":
@@ -788,7 +801,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
                 notify("heal", player, "hero", 0)
 
             elif card["effect"] == "heal":
-                amt = max(0, min(card["val"], 30 - player["hp"]))
+                amt = clamp_heal(player, card["val"])
                 player["hp"] += amt
                 log_action(f"   {player['name']} heals for {amt} HP.")
                 notify("heal", player, "hero", amt)
@@ -848,7 +861,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
 
             elif card["effect"] == "heal_all":
                 log_action(f"   {player['name']} mends all friendly characters for {card['val']} HP!")
-                amt_hero = max(0, min(card["val"], 30 - player["hp"]))
+                amt_hero = clamp_heal(player, card["val"])
                 player["hp"] += amt_hero
                 if amt_hero:
                     notify("heal", player, "hero", amt_hero)
@@ -919,6 +932,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
 
     # ---- HERO ATTACK --------------------------------------------------------
     elif action == "hero_attack":
+        player["hero_attacked_this_turn"] = True
         player["hero_can_attack"] = False
         weapon = player["weapon"]
         w_atk  = weapon["atk"]
@@ -977,7 +991,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
 
         elif cls == "Priest":
             if target == "hero":
-                amt = max(0, min(2, 30 - player["hp"]))
+                amt = clamp_heal(player, 2)
                 player["hp"] += amt
                 log_action(f">> {player['name']} uses Lesser Heal! Restores {amt} HP to {player['name']}.")
                 notify("heal", player, "hero", amt)
@@ -992,7 +1006,8 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
         elif cls == "Rogue":
             # Dagger Mastery: equip (or refresh) a 1/2 Wicked Dagger
             player["weapon"] = {"name": "Wicked Dagger", "atk": 1, "durability": 2}
-            player["hero_can_attack"] = True
+            if not player.get("hero_attacked_this_turn"):
+                player["hero_can_attack"] = True
             log_action(f">> {player['name']} uses Dagger Mastery! Equipped a 1/2 Wicked Dagger.")
             notify("armor", player, "hero", 0)
 
@@ -1209,7 +1224,7 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
 def run_ai_turn(
     p2: dict,
     p1: dict,
-    max_moves: int = 10,
+    max_moves: int = 40,
     *,
     draw: bool = True,
     difficulty: str = "normal",
@@ -1217,11 +1232,15 @@ def run_ai_turn(
     """Execute AI turn synchronously. Returns the list of moves made."""
     difficulty = normalize_difficulty(difficulty)
     start_turn(p2, draw=draw)
+    if check_win(p1, p2):
+        return []
     moves_made = []
     for _ in range(max_moves):
         if check_win(p1, p2):
             break
         legal = get_legal_moves(p2, p1)
+        if not legal:
+            break
         best = select_ai_move(legal, p2, p1, difficulty)
         if best is None:
             break

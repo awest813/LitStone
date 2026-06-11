@@ -1091,6 +1091,18 @@ body::after {
   z-index: 5;
 }
 
+.fatigue-badge {
+  position: absolute; top: -5px; left: -5px;
+  background: linear-gradient(135deg, #4a1020, #801830);
+  color: #ffc0c8;
+  border-radius: 50%; width: 22px; height: 22px;
+  font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid #c04060;
+  box-shadow: 0 2px 8px rgba(0,0,0,.5);
+  z-index: 5;
+}
+
 .weapon-badge {
   position: absolute; bottom: -5px; left: -5px;
   background: linear-gradient(135deg, #c06000, #804000);

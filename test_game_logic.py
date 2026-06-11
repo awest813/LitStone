@@ -23,6 +23,7 @@ from game_logic import (
     ai_choose_mulligan, ai_do_mulligan,
     card_allowed_for_class, cards_for_class,
     clamp_practice_hp, apply_practice_options, effective_mana,
+    clamp_heal,
 )
 
 
@@ -1344,6 +1345,51 @@ class TestPracticeSandbox(unittest.TestCase):
         self.assertEqual(p1["mana"], 10)
 
 
+class TestGameplayPolish(unittest.TestCase):
+    def test_hero_one_attack_per_turn_after_weapon(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p1["weapon"] = {"name": "Heroic Blade", "atk": 3, "durability": 2}
+        p1["hero_can_attack"] = True
+        p1["mana"] = 10
+        execute_move(p1, p2, ("hero_attack", None, "hero"))
+        self.assertTrue(p1.get("hero_attacked_this_turn"))
+        p1["weapon"] = {"name": "Wicked Dagger", "atk": 1, "durability": 2}
+        moves = get_legal_moves(p1, p2)
+        self.assertNotIn(("hero_attack", None, "hero"), moves)
+
+    def test_heal_respects_max_hp(self):
+        p1 = create_player("P", "Priest", shuffle=False)
+        apply_practice_options(p1, hp=50, infinite_mana=False)
+        p1["hp"] = 40
+        amt = clamp_heal(p1, 20)
+        self.assertEqual(amt, 10)
+        p1["hp"] += amt
+        self.assertEqual(p1["hp"], 50)
+
+    def test_fatigue_lethal_on_draw(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p1["deck"] = []
+        p1["hp"] = 3
+        p1["fatigue"] = 2
+        draw_card(p1)
+        self.assertEqual(p1["hp"], 0)
+        self.assertEqual(check_win(p1, p2), "AI")
+
+    def test_ai_picks_move_when_all_scores_negative(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p1["hp"] = 1
+        p2["board"] = [_make_minion("B", 10, 10, taunt=True)]
+        p2["mana"] = 10
+        legal = get_legal_moves(p2, p1)
+        self.assertTrue(legal)
+        move = select_ai_move(legal, p2, p1, "normal")
+        self.assertIsNotNone(move)
+        self.assertIn(move, legal)
+
+
 class TestGameStore(unittest.TestCase):
     def test_save_load_delete(self):
         import os
@@ -1434,6 +1480,24 @@ class TestServerApi(unittest.TestCase):
         res = client.post("/api/action", json={"game_id": gid, "action": "end_turn"})
         self.assertEqual(res.status_code, 400)
         self.assertEqual(res.get_json().get("error"), "Game over")
+
+    def test_end_turn_fatigue_lethal_after_draw(self):
+        from server import app, GAMES
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        start = client.post("/api/new_game", json={"hero_class": "Mage", "deck": deck})
+        gid = start.get_json()["game_id"]
+        client.post("/api/mulligan", json={"game_id": gid, "indices": []})
+        GAMES[gid]["p1"]["deck"] = []
+        GAMES[gid]["p1"]["hp"] = 2
+        GAMES[gid]["p1"]["fatigue"] = 1
+        GAMES[gid]["is_player_turn"] = False
+        GAMES[gid]["p2"]["board"] = []
+        GAMES[gid]["p2"]["hand"] = []
+        res = client.post("/api/action", json={"game_id": gid, "action": "end_turn"})
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertEqual(data["winner"], "AI")
 
     def test_new_game_practice_mode(self):
         from server import app

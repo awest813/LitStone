@@ -314,6 +314,11 @@ function isNarrowViewport() {
   return window.matchMedia("(max-width: 900px)").matches;
 }
 
+function clientEffectiveMana(player) {
+  if (!player) return 0;
+  return player.infinite_mana ? 10 : player.mana;
+}
+
 function initGameScreenUi() {
   combatLogOpen = isNarrowViewport() ? false : settings.combatLog !== false;
   applyCombatLogState();
@@ -590,23 +595,36 @@ function onCampaignVictory() {
   }
 }
 
+function logShowsPlayerAttack(logLines) {
+  if (!logLines?.length || !gameState?.p1) return false;
+  const names = new Set(gameState.p1.board.map(m => m.name));
+  return logLines.some(line => {
+    if (line.startsWith(">> Player attacks")) return true;
+    for (const n of names) {
+      if (line.startsWith(`>> ${n} attacks`)) return true;
+    }
+    return false;
+  });
+}
+
 function advanceTutorialFromState() {
   if (!tutorialActive || !gameState) return;
   const p1 = gameState.p1;
   if (tutorialStep === 0 && p1.board.length > 0) {
     tutorialStep = 1;
   }
-  if (tutorialStep === 1 && gameState.log) {
-    const recent = gameState.log.slice(-8).join(" ").toLowerCase();
-    if (recent.includes("attacks") && recent.includes("player")) {
-      tutorialStep = 2;
-    }
+  if (tutorialStep === 1 && logShowsPlayerAttack(gameState.log?.slice(-12))) {
+    tutorialStep = 2;
   }
-  if (tutorialStep >= 2) {
-    localStorage.setItem(TUTORIAL_DONE_KEY, "1");
-    const btn = document.getElementById("btn-hub-tutorial");
-    if (btn) btn.textContent = "Tutorial ✓";
-  }
+}
+
+function completeTutorialIfReady() {
+  if (!tutorialActive || tutorialStep < 2) return;
+  if (gameState?.is_player_turn) return;
+  tutorialStep = 3;
+  localStorage.setItem(TUTORIAL_DONE_KEY, "1");
+  const title = document.querySelector("#btn-hub-tutorial .hub-mode-title");
+  if (title) title.textContent = "Tutorial ✓";
 }
 
 function tutorialHintText() {
@@ -1296,6 +1314,8 @@ function toggleMulliganCard(el, idx) {
 }
 
 async function confirmMulligan() {
+  if (isActing) return;
+  isActing = true;
   const indices = Array.from(mulliganSwapSet);
   const btn = document.getElementById("btn-mulligan-confirm");
   if (btn) btn.disabled = true;
@@ -1314,7 +1334,6 @@ async function confirmMulligan() {
     selected         = null;
     prevIsPlayerTurn = null;
     turnNumber       = data.turn_number || 1;
-    isActing         = false;
     initGameScreenUi();
     showScreen("screen-game");
     showTurnBanner(true);
@@ -1324,6 +1343,7 @@ async function confirmMulligan() {
     if (btn) btn.disabled = false;
   } finally {
     hideLoading();
+    isActing = false;
   }
 }
 
@@ -1798,8 +1818,11 @@ function findMinionEl(boardId, name) {
 }
 
 function findHeroElByName(name) {
-  if (name === "Player") return document.getElementById("hero-player");
-  if (name === "AI") return document.getElementById("hero-opp");
+  if (!gameState) return null;
+  const p1Name = gameState.p1?.name || "Player";
+  const p2Name = gameState.p2?.name || "AI";
+  if (name === p1Name || name === "Player") return document.getElementById("hero-player");
+  if (name === p2Name || name === "AI") return document.getElementById("hero-opp");
   return null;
 }
 
@@ -2053,6 +2076,8 @@ function onGameStateUpdated(data, animCtx) {
   CARD_DB   = data.card_db || CARD_DB;
   gameState = data;
   advanceTutorialFromState();
+  completeTutorialIfReady();
+  if (data.turn_number) turnNumber = data.turn_number;
   renderGame();
   if (animCtx) {
     applyActionAnimations(animCtx);
@@ -2102,7 +2127,8 @@ function renderGame() {
 
   // Turn counter badge
   const tcBadge = document.getElementById("turn-counter");
-  if (tcBadge) tcBadge.textContent = turnNumber > 0 ? `Turn ${turnNumber}` : "";
+  const displayTurn = gameState.turn_number || turnNumber;
+  if (tcBadge) tcBadge.textContent = displayTurn > 0 ? `Turn ${displayTurn}` : "";
 
   // Winner overlay
   const overlay = document.getElementById("winner-overlay");
@@ -2134,7 +2160,7 @@ function renderHero(elId, player, isOpp) {
 
   let cls = "hero-panel";
   if (!isOpp) {
-    const canAtk = player.weapon && player.hero_can_attack;
+    const canAtk = player.weapon && player.hero_can_attack && !player.hero_attacked_this_turn;
     if (canAtk && !selected) cls += " attackable";
     if (selected?.type === "hero_weapon") cls += " selected";
   }
@@ -2146,6 +2172,8 @@ function renderHero(elId, player, isOpp) {
     ? `<div class="armor-badge">${player.armor}</div>` : "";
   let weaponBadge = player.weapon
     ? `<div class="weapon-badge">${player.weapon.atk}⚔ ${player.weapon.durability}🛡</div>` : "";
+  const fatigueBadge = !isOpp && player.fatigue > 0
+    ? `<div class="fatigue-badge" title="Next fatigue hit">${player.fatigue}</div>` : "";
 
   el.className    = cls;
   el.dataset.class = player.hero_class;
@@ -2160,7 +2188,7 @@ function renderHero(elId, player, isOpp) {
   }
 
   el.innerHTML = `
-    ${armorBadge}${weaponBadge}
+    ${armorBadge}${weaponBadge}${fatigueBadge}
     <div class="hero-icon">${icon}</div>
     <div class="hero-class-name">${player.hero_class}</div>
     <div class="hero-hp-bar"><div class="hero-hp-fill" style="width:${hpPct}%"></div></div>
@@ -2251,7 +2279,7 @@ function renderHeroMana(trayId, player) {
 /* ---- Hero Power ---- */
 function renderHeroPower(elId, player, isOpp) {
   const el = document.getElementById(elId);
-  const canUse = !player.hero_power_used && player.mana >= 2;
+  const canUse = !player.hero_power_used && clientEffectiveMana(player) >= 2;
   const icon   = HERO_POWER_ICONS[player.hero_class] || "⚡";
 
   let cls = "hero-power-panel";
@@ -2352,7 +2380,7 @@ function renderHand(p1) {
 
   p1.hand.forEach((name, idx) => {
     const card       = CARD_DB[name] || {};
-    const affordable = p1.mana >= card.cost;
+    const affordable = clientEffectiveMana(p1) >= card.cost;
 
     let cls = `hand-card hand-card--${card.type} ${CardArt.frameClasses(card, name)}`;
     if (!affordable)                                       cls += " unaffordable";
@@ -2686,7 +2714,7 @@ window.addEventListener("resize", () => {
 // API CALLS
 // ---------------------------------------------------------------------------
 async function sendAction(action, idx, target) {
-  if (isPaused || isActing || !gameState?.is_player_turn) return;
+  if (isPaused || isActing || !gameState?.is_player_turn || gameState?.winner) return;
   isActing = true;
 
   const etBtn = document.getElementById("btn-end-turn");
@@ -2710,7 +2738,7 @@ async function sendAction(action, idx, target) {
 }
 
 async function endTurn() {
-  if (isPaused || isActing || !gameState?.is_player_turn) return;
+  if (isPaused || isActing || !gameState?.is_player_turn || gameState?.winner) return;
   isActing = true;
   clearSelection();
 
