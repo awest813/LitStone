@@ -6,7 +6,7 @@ This document defines what **Hearthstone Lite** means for LitStone and lays out 
 
 ## Audit Summary (June 2026 — updated)
 
-LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collectable cards, session-based multiplayer-ready API, animations, SFX, and **127 unit tests**.
+LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collectable cards, session-based multiplayer-ready API, animations, SFX, responsive UI polish, and **131 unit tests**.
 
 ### What already feels good
 
@@ -17,9 +17,10 @@ LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collec
 | Mulligan (player + AI), The Coin, first-player randomization | ✅ Complete |
 | 30-card decks, per-session `game_id` | ✅ Complete |
 | Class identity — 8 cards per hero + neutrals | ✅ Complete |
-| Deck builder (filter, sort, curve, save/load, class pool) | ✅ Complete |
+| Deck builder (filter, sort, search, curve, save/load, class pool) | ✅ Complete |
+| In-match UX (mana HUD, help bar, collapsible log, mobile hand/tray) | ✅ Partial |
 | Animations + Web Audio SFX (mute toggle) | ✅ Complete |
-| Rules tests | ✅ 127 tests in `test_game_logic.py` |
+| Rules tests | ✅ 131 tests in `test_game_logic.py` |
 
 ### Remaining gaps vs. Shippable Lite
 
@@ -29,7 +30,7 @@ LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collec
 | AI difficulty tiers; reduced random noise | Flat replay challenge |
 | No tutorial, practice, or campaign bosses | Steep for new players |
 | No discover / secrets / windfury / lifesteal | Missing HS texture |
-| Mobile board still cramped on small phones | Hard to tap targets |
+| Smallest phones (≤375px) still need tap-target tuning | Occasional mis-taps |
 | No persistence / Docker / CI | Not deploy-ready |
 
 ---

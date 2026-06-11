@@ -19,6 +19,8 @@ let selectedClass = null;
 // Deck-builder UI state
 let filterType = "all";  // "all" | "minion" | "spell" | "weapon"
 let sortBy     = "cost"; // "cost" | "name"
+let deckSearch = "";
+let combatLogOpen = true;
 
 // Deck-builder constants
 const MANA_CURVE_MAX_COST   = 7;   // buckets 1-7; costs ≥7 are grouped under "7+"
@@ -101,10 +103,69 @@ function showScreen(id) {
   });
   if (id === "screen-game") {
     document.getElementById("screen-game").style.display = "grid";
+    initGameScreenUi();
   }
   if (id === "screen-mulligan") {
     document.getElementById("screen-mulligan").style.display = "flex";
   }
+}
+
+function isNarrowViewport() {
+  return window.matchMedia("(max-width: 900px)").matches;
+}
+
+function initGameScreenUi() {
+  if (isNarrowViewport()) {
+    combatLogOpen = false;
+  }
+  applyCombatLogState();
+}
+
+function toggleCombatLog() {
+  combatLogOpen = !combatLogOpen;
+  applyCombatLogState();
+}
+
+function applyCombatLogState() {
+  const log = document.getElementById("combat-log");
+  const btn = document.getElementById("btn-log-toggle");
+  if (log) log.classList.toggle("collapsed", !combatLogOpen);
+  if (btn) {
+    btn.setAttribute("aria-expanded", combatLogOpen ? "true" : "false");
+    btn.textContent = combatLogOpen ? "📜 Hide Log" : "📜 Show Log";
+  }
+}
+
+function updateGameHelpBar() {
+  const bar = document.getElementById("game-help-bar");
+  if (!bar || !gameState) return;
+  if (gameState.winner) {
+    bar.textContent = "";
+    bar.classList.add("hidden");
+    return;
+  }
+  bar.classList.remove("hidden");
+  if (!gameState.is_player_turn) {
+    bar.textContent = "Opponent is thinking…";
+    return;
+  }
+  if (selected) return; // selection-info takes over
+  bar.textContent = "Play from hand · Attack glowing minions · Esc or right-click to cancel";
+}
+
+function renderManaHud(p1) {
+  const hud = document.getElementById("game-mana-hud");
+  if (!hud || !p1) return;
+  let gems = "";
+  for (let i = 0; i < 10; i++) {
+    const filled = i < p1.mana ? " filled" : (i < p1.max_mana ? "" : " empty");
+    gems += `<div class="mana-gem mana-gem--hud${filled}" aria-hidden="true"></div>`;
+  }
+  hud.innerHTML = `
+    <span class="mana-hud-label">Mana</span>
+    <span class="mana-hud-count">${p1.mana}/${p1.max_mana}</span>
+    <div class="mana-gems mana-gems--hud">${gems}</div>
+  `;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,6 +176,9 @@ function selectClass(cls) {
   draftDeck  = [];
   filterType = "all";
   sortBy     = "cost";
+  deckSearch = "";
+  const searchEl = document.getElementById("deck-search");
+  if (searchEl) searchEl.value = "";
   showScreen("screen-deck");
   document.getElementById("deck-title").textContent = `Build Your ${cls} Deck`;
   const sub = document.querySelector(".deck-subtitle");
@@ -148,6 +212,11 @@ function setSort(sort) {
   renderCardPool();
 }
 
+function setDeckSearch(query) {
+  deckSearch = (query || "").trim().toLowerCase();
+  renderCardPool();
+}
+
 function cardAllowedForClass(card, heroClass) {
   if (card.uncollectible) return false;
   if (!card.classes || card.classes.length === 0) return true;
@@ -171,6 +240,18 @@ function renderCardPool() {
   // Apply type filter
   if (filterType !== "all") {
     entries = entries.filter(([, card]) => card.type === filterType);
+  }
+
+  if (deckSearch) {
+    entries = entries.filter(([name, card]) => {
+      const hay = `${name} ${card.type} ${spellDesc(card, true)}`.toLowerCase();
+      return hay.includes(deckSearch);
+    });
+  }
+
+  if (entries.length === 0) {
+    pool.innerHTML = `<div class="pool-empty-msg">No cards match your filters.</div>`;
+    return;
   }
 
   // Apply sort
@@ -249,8 +330,10 @@ function removeFromDeck(name) {
 
 function updateDeckSidebar() {
   const count  = draftDeck.length;
+  const countBox = document.querySelector(".deck-count-box");
   document.getElementById("deck-count").textContent    = count;
   document.getElementById("deck-progress").style.width = `${(count / DECK_SIZE) * 100}%`;
+  if (countBox) countBox.classList.toggle("deck-count-box--ready", count === DECK_SIZE);
 
   const list   = document.getElementById("deck-list");
   list.innerHTML = "";
@@ -474,6 +557,7 @@ async function confirmMulligan() {
     prevIsPlayerTurn = null;
     turnNumber       = data.turn_number || 1;
     isActing         = false;
+    initGameScreenUi();
     showScreen("screen-game");
     showTurnBanner(true);
     renderGame();
@@ -486,7 +570,11 @@ async function confirmMulligan() {
 async function startGame() {
   if (draftDeck.length !== DECK_SIZE) return;
   const startBtn = document.getElementById("btn-start-ai");
-  if (startBtn) startBtn.disabled = true;
+  const startLabel = startBtn ? startBtn.textContent : "";
+  if (startBtn) {
+    startBtn.disabled = true;
+    startBtn.textContent = "Starting…";
+  }
   try {
     const res  = await fetch("/api/new_game", {
       method: "POST",
@@ -508,6 +596,7 @@ async function startGame() {
       selected         = null;
       prevIsPlayerTurn = null;
       turnNumber       = data.turn_number || 1;
+      initGameScreenUi();
       showScreen("screen-game");
       showTurnBanner(true);
       renderGame();
@@ -515,7 +604,10 @@ async function startGame() {
   } catch (err) {
     showStatusToast("Failed to start game. Check your connection and try again.");
   } finally {
-    if (startBtn) startBtn.disabled = draftDeck.length !== DECK_SIZE;
+    if (startBtn) {
+      startBtn.textContent = startLabel || "⚔️ Play vs AI";
+      startBtn.disabled = draftDeck.length !== DECK_SIZE;
+    }
   }
 }
 
@@ -1175,6 +1267,8 @@ function renderGame() {
   renderBoard("board-player", p1, false);
   renderHand(p1);
   renderLog(log);
+  renderManaHud(p1);
+  updateGameHelpBar();
 
   // Your-turn highlight
   document.getElementById("tray-player").classList.toggle("your-turn", !!is_player_turn && !winner);
@@ -1534,12 +1628,28 @@ function clearSelection() {
 
 function updateSelectionInfo() {
   const el = document.getElementById("selection-info");
-  if (!selected) { el.classList.add("hidden"); return; }
+  const help = document.getElementById("game-help-bar");
+  if (!selected) {
+    el.classList.add("hidden");
+    if (help) help.classList.remove("hidden");
+    return;
+  }
   el.classList.remove("hidden");
-  if (selected.type === "hand")        el.textContent = `Playing: ${gameState.p1.hand[selected.idx]} — click a target`;
-  if (selected.type === "board")       el.textContent = `Attacking with: ${gameState.p1.board[selected.idx].name} — click a target`;
-  if (selected.type === "hero_power")  el.textContent = "Hero Power — click a target";
-  if (selected.type === "hero_weapon") el.textContent = "Hero Attack — click a target";
+  if (help) help.classList.add("hidden");
+  let msg = "";
+  if (selected.type === "hand") {
+    const card = CARD_DB[gameState.p1.hand[selected.idx]] || {};
+    const needsTarget = ["damage", "buff", "add_shield", "silence"].includes(card.effect);
+    msg = needsTarget
+      ? `Target for ${gameState.p1.hand[selected.idx]} — click a highlighted target (Esc to cancel)`
+      : `Confirm ${gameState.p1.hand[selected.idx]} — click again to cancel`;
+  }
+  if (selected.type === "board") {
+    msg = `Attacking with ${gameState.p1.board[selected.idx].name} — click enemy or minion`;
+  }
+  if (selected.type === "hero_power")  msg = "Hero Power — click a valid target";
+  if (selected.type === "hero_weapon") msg = "Hero attack — click a valid target";
+  el.textContent = msg;
 }
 
 function getLegalMoves() {
@@ -1709,6 +1819,18 @@ document.querySelectorAll(".hero-card").forEach(card => {
     const cls = card.dataset.class;
     if (cls) selectClass(cls);
   });
+});
+
+let resizeUiTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeUiTimer);
+  resizeUiTimer = setTimeout(() => {
+    if (!document.getElementById("screen-game")?.classList.contains("active")) return;
+    if (isNarrowViewport() && combatLogOpen) {
+      combatLogOpen = false;
+      applyCombatLogState();
+    }
+  }, 150);
 });
 
 // ---------------------------------------------------------------------------

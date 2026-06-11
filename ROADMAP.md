@@ -38,7 +38,8 @@ Goals: make the game feel complete and production-ready for single-player use.
 - [x] **Full card animations** — play-from-hand arc, attack lunge, death burst, weapon swing, spell flash
 - [x] **Sound effects** — Web Audio SFX for play, attack, damage, heal, turn, victory/defeat (mute toggle)
 - [x] **Partial responsive layout** — breakpoints at 900px / 1100px; mobile scroll fixes
-- [ ] **Full mobile polish** — playable board and hand on phone-sized viewports
+- [x] **Partial mobile polish** — sticky hand/tray, collapsible log, touch targets, board scroll
+- [ ] **Full mobile polish** — further tap-target tuning on smallest phones
 - [x] **Error handling** — status toasts, illegal-move feedback, network error messages
 - [x] **Resign cleanup** — `POST /api/resign` clears server state when leaving a match
 - [x] **Unit tests** — comprehensive suite in `test_game_logic.py`
