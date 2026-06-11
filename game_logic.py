@@ -249,6 +249,222 @@ def cards_for_class(hero_class: str) -> list[str]:
     """Collectable card names legal in a deck for the given hero class."""
     return [n for n in CARD_DB if card_allowed_for_class(n, hero_class)]
 
+
+AI_DIFFICULTIES = ("easy", "normal", "hard")
+
+# Target copies per mana bucket for AI deck curves (sums to DECK_SIZE).
+CURVE_TARGETS = {1: 4, 2: 8, 3: 8, 4: 6, 5: 3, 6: 1}
+
+CAMPAIGN_NODES = [
+    {
+        "id": "n1",
+        "name": "Street Urchin",
+        "subtitle": "A quick-fingered Rogue tests your opener.",
+        "difficulty": "easy",
+        "ai_class": "Rogue",
+    },
+    {
+        "id": "n2",
+        "name": "Town Guard",
+        "subtitle": "Taunts and shields slow your assault.",
+        "difficulty": "normal",
+        "ai_class": "Warrior",
+    },
+    {
+        "id": "n3",
+        "name": "Guild Librarian",
+        "subtitle": "Arcane tricks and burn spells.",
+        "difficulty": "normal",
+        "ai_class": "Mage",
+    },
+    {
+        "id": "n4",
+        "name": "Van Helsing",
+        "subtitle": "Elite hunter — charges and armor.",
+        "difficulty": "hard",
+        "boss_id": "van_helsing",
+    },
+    {
+        "id": "n5",
+        "name": "Professor Moriarty",
+        "subtitle": "Final boss — poison, daggers, and schemes.",
+        "difficulty": "hard",
+        "boss_id": "moriarty",
+    },
+]
+
+BOSS_PRESETS = {
+    "van_helsing": {
+        "display_name": "Van Helsing",
+        "hero_class": "Warrior",
+        "hp": 35,
+        "core": [
+            "Van Helsing", "Gawain", "Gawain", "Lancelot", "Lancelot",
+            "Errant Knight", "Errant Knight", "Castle Guard", "Castle Guard",
+            "Templar Captain", "Bulwark Bearer", "Bulwark Bearer",
+            "Shieldwall Sergeant", "Shieldwall Sergeant", "Rampart Raider", "Rampart Raider",
+            "Cleave Chronicle", "Cleave Chronicle", "Fortify", "Fortify",
+            "War Drums", "Ironclad Anvil", "Bulwark Bearer", "Rampart Raider",
+            "Castle Guard", "Errant Knight", "Gawain", "Lancelot", "Fortify", "Cleave Chronicle",
+        ],
+    },
+    "moriarty": {
+        "display_name": "Professor Moriarty",
+        "hero_class": "Rogue",
+        "hp": 32,
+        "core": [
+            "Professor Moriarty", "Back Alley Burglar", "Back Alley Burglar",
+            "Shadowstep Scout", "Shadowstep Scout", "Venomous Valet", "Venomous Valet",
+            "Sherlock Holmes", "Cheap Shot", "Cheap Shot", "Shiv Storm", "Shiv Storm",
+            "Thief's Shiv", "Thief's Shiv", "Assassin's Rapier", "Heist Ledger", "Heist Ledger",
+            "Cave Spider", "Cave Spider", "Rebel's Ambush", "Quill Bolt", "Quill Bolt",
+            "Back Alley Burglar", "Shadowstep Scout", "Cheap Shot", "Shiv Storm",
+            "Venomous Valet", "Heist Ledger", "Thief's Shiv", "Rebel's Ambush",
+        ],
+    },
+}
+
+
+def get_campaign_node(node_id: str) -> dict | None:
+    for node in CAMPAIGN_NODES:
+        if node["id"] == node_id:
+            return node
+    return None
+
+
+def complete_deck_from_core(hero_class: str, core: list[str]) -> list[str]:
+    """Build a legal DECK_SIZE deck starting from themed core cards."""
+    deck: list[str] = []
+    for name in core:
+        if len(deck) >= DECK_SIZE:
+            break
+        if name not in CARD_DB or not card_allowed_for_class(name, hero_class):
+            continue
+        max_copies = 1 if CARD_DB[name].get("legendary") else 2
+        if deck.count(name) < max_copies:
+            deck.append(name)
+    for name in build_curved_ai_deck(hero_class):
+        if len(deck) >= DECK_SIZE:
+            break
+        max_copies = 1 if CARD_DB[name].get("legendary") else 2
+        if deck.count(name) < max_copies:
+            deck.append(name)
+    return deck[:DECK_SIZE]
+
+
+def build_curved_ai_deck(hero_class: str) -> list[str]:
+    """Build a 30-card deck with a playable mana curve for the AI."""
+    pool = [n for n in cards_for_class(hero_class) if not CARD_DB[n].get("legendary")]
+    by_cost: dict[int, list[str]] = {}
+    for name in pool:
+        cost = max(1, min(CARD_DB[name]["cost"], 6))
+        by_cost.setdefault(cost, []).append(name)
+
+    deck: list[str] = []
+
+    def try_add(name: str) -> bool:
+        if len(deck) >= DECK_SIZE:
+            return False
+        max_copies = 1 if CARD_DB[name].get("legendary") else 2
+        if deck.count(name) >= max_copies:
+            return False
+        deck.append(name)
+        return True
+
+    for cost, need in CURVE_TARGETS.items():
+        added = 0
+        candidates = list(by_cost.get(cost, []))
+        random.shuffle(candidates)
+        for name in candidates:
+            while try_add(name) and added < need:
+                added += 1
+            if added >= need:
+                break
+        if added < need:
+            for alt in (cost - 1, cost + 1, cost - 2, cost + 2):
+                if alt < 1 or alt > 6:
+                    continue
+                for name in by_cost.get(alt, []):
+                    while try_add(name) and added < need:
+                        added += 1
+                    if added >= need:
+                        break
+                if added >= need:
+                    break
+
+    guard = 0
+    shuffled = list(pool)
+    random.shuffle(shuffled)
+    while len(deck) < DECK_SIZE and guard < DECK_SIZE * 4:
+        guard += 1
+        try_add(shuffled[guard % len(shuffled)])
+    return deck[:DECK_SIZE]
+
+
+def create_ai_opponent(
+    *,
+    hero_class: str | None = None,
+    boss_id: str | None = None,
+    campaign_node: str | None = None,
+) -> dict:
+    """Create an AI player with a curved or scripted deck."""
+    if boss_id and boss_id in BOSS_PRESETS:
+        preset = BOSS_PRESETS[boss_id]
+        hero_class = preset["hero_class"]
+        deck = complete_deck_from_core(hero_class, preset["core"])
+        player = create_player(preset["display_name"], hero_class, deck)
+        boss_hp = preset.get("hp", 30)
+        player["hp"] = boss_hp
+        player["max_hp"] = boss_hp
+        return player
+
+    ai_class = hero_class or "Mage"
+    if campaign_node:
+        node = get_campaign_node(campaign_node)
+        if node and not boss_id:
+            ai_class = node.get("ai_class", ai_class)
+
+    deck = build_curved_ai_deck(ai_class)
+    return create_player("AI", ai_class, deck)
+
+
+def normalize_difficulty(difficulty: str | None) -> str:
+    d = (difficulty or "normal").lower()
+    return d if d in AI_DIFFICULTIES else "normal"
+
+
+def select_ai_move(
+    legal: list,
+    p2: dict,
+    p1: dict,
+    difficulty: str = "normal",
+) -> tuple | None:
+    """Pick a move for the AI based on difficulty tier."""
+    if not legal:
+        return None
+
+    scored = [(evaluate_ai_move(p2, p1, mv), mv) for mv in legal]
+    scored.sort(key=lambda pair: -pair[0])
+
+    if difficulty == "easy":
+        if random.random() < 0.4:
+            return random.choice(legal)
+        pool = scored[: max(1, (len(scored) + 1) // 2)]
+        return random.choice(pool)[1]
+
+    best_score = scored[0][0]
+    if best_score < 0:
+        return scored[-1][1]
+
+    if difficulty == "hard":
+        contenders = [mv for score, mv in scored if score >= best_score - 1.5]
+        return max(contenders, key=lambda mv: evaluate_ai_move(p2, p1, mv))
+
+    # normal — slight variety among near-best lines
+    contenders = [mv for score, mv in scored if score >= best_score - 0.75]
+    return random.choice(contenders)
+
+
 KW_COLORS = {
     "taunt": "#E74C3C", "divine_shield": "#F1C40F", "charge": "#2ECC71",
     "poisonous": "#9B59B6", "battlecry": "#3498DB", "deathrattle": "#566573",
@@ -293,24 +509,54 @@ def log_action(msg: str) -> None:
 # 2. STATE INITIALISATION
 # ---------------------------------------------------------------------------
 
+def clamp_practice_hp(value, default: int = 30) -> int:
+    """Clamp custom hero HP for practice sandbox (1–60)."""
+    try:
+        hp = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(1, min(60, hp))
+
+
+def apply_practice_options(player: dict, *, hp: int, infinite_mana: bool = False) -> None:
+    """Apply practice-mode sandbox flags to a player."""
+    player["hp"] = clamp_practice_hp(hp)
+    player["max_hp"] = player["hp"]
+    if infinite_mana:
+        player["infinite_mana"] = True
+        player["max_mana"] = 10
+        player["mana"] = 10
+
+
+def refresh_infinite_mana(player: dict) -> None:
+    if player.get("infinite_mana"):
+        player["max_mana"] = 10
+        player["mana"] = 10
+
+
+def effective_mana(player: dict) -> int:
+    return 10 if player.get("infinite_mana") else player["mana"]
+
+
+def clamp_heal(player: dict, amount: int) -> int:
+    """Heal amount capped by hero max_hp."""
+    cap = player.get("max_hp", 30)
+    return max(0, min(amount, cap - player["hp"]))
+
+
 def create_player(name: str, hero_class: str = "Mage",
                   custom_deck: list | None = None, shuffle: bool = True) -> dict:
     if custom_deck is not None:
         deck = custom_deck.copy()
     else:
-        deck = []
-        build_pool = cards_for_class(hero_class)
-        while len(deck) < DECK_SIZE:
-            c = random.choice(build_pool)
-            max_copies = 1 if CARD_DB[c].get("legendary") else 2
-            if deck.count(c) < max_copies:
-                deck.append(c)
+        deck = build_curved_ai_deck(hero_class)
     if shuffle:
         random.shuffle(deck)
     return {
         "name":            name,
         "hero_class":      hero_class,
         "hp":              30,
+        "max_hp":          30,
         "armor":           0,
         "mana":            0,
         "max_mana":        0,
@@ -321,6 +567,7 @@ def create_player(name: str, hero_class: str = "Mage",
         "hero_power_used": False,
         "weapon":          None,
         "hero_can_attack": False,
+        "hero_attacked_this_turn": False,
     }
 
 
@@ -340,10 +587,15 @@ def draw_card(player: dict, on_event=None) -> None:
 
 
 def start_turn(player: dict, on_event=None, *, draw: bool = True) -> None:
-    if player["max_mana"] < 10:
-        player["max_mana"] += 1
-    player["mana"] = player["max_mana"]
+    if player.get("infinite_mana"):
+        player["max_mana"] = 10
+        player["mana"] = 10
+    else:
+        if player["max_mana"] < 10:
+            player["max_mana"] += 1
+        player["mana"] = player["max_mana"]
     player["hero_power_used"] = False
+    player["hero_attacked_this_turn"] = False
     player["hero_can_attack"] = bool(player["weapon"])
     for m in player["board"]:
         m["can_attack"] = True
@@ -438,11 +690,14 @@ def get_valid_targets(opp: dict, is_attack: bool = True) -> list:
 
 
 def get_legal_moves(player: dict, opp: dict) -> list:
+    if player["hp"] <= 0 or opp["hp"] <= 0:
+        return []
+
     moves = []
 
     for hand_idx, card_name in enumerate(player["hand"]):
         card = CARD_DB[card_name]
-        if player["mana"] < card["cost"]:
+        if effective_mana(player) < card["cost"]:
             continue
         if card["type"] == "minion":
             if len(player["board"]) < 7:
@@ -468,11 +723,15 @@ def get_legal_moves(player: dict, opp: dict) -> list:
             for t in valid_targets:
                 moves.append(("attack", bi, t))
 
-    if player["weapon"] and player["hero_can_attack"]:
+    if (
+        player["weapon"]
+        and player["hero_can_attack"]
+        and not player.get("hero_attacked_this_turn")
+    ):
         for t in valid_targets:
             moves.append(("hero_attack", None, t))
 
-    if player["mana"] >= 2 and not player["hero_power_used"]:
+    if effective_mana(player) >= 2 and not player["hero_power_used"]:
         cls = player["hero_class"]
         if cls == "Warrior":
             moves.append(("hero_power", None, None))
@@ -505,7 +764,8 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
     if action == "play":
         card_name = player["hand"].pop(idx)
         card = CARD_DB[card_name]
-        player["mana"] -= card["cost"]
+        if not player.get("infinite_mana"):
+            player["mana"] -= card["cost"]
         log_action(f">> {player['name']} plays {card_name}!")
         notify("play", player, None, card_name)
 
@@ -518,7 +778,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             if "battlecry" in card:
                 bc = card["battlecry"]
                 if bc["effect"] == "heal_hero":
-                    amt = max(0, min(bc["val"], 30 - player["hp"]))
+                    amt = clamp_heal(player, bc["val"])
                     player["hp"] += amt
                     log_action(f"   [B.CRY] Battlecry: Heals hero for {amt}!")
                     notify("heal", player, "hero", amt)
@@ -530,7 +790,8 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
         elif card["type"] == "weapon":
             player["weapon"] = {"name": card_name, "atk": card["atk"],
                                  "durability": card["durability"]}
-            player["hero_can_attack"] = True
+            if not player.get("hero_attacked_this_turn"):
+                player["hero_can_attack"] = True
             log_action(f"   Equipped {card_name} ({card['atk']} Atk / {card['durability']} Durability).")
 
         elif card["type"] == "spell":
@@ -540,7 +801,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
                 notify("heal", player, "hero", 0)
 
             elif card["effect"] == "heal":
-                amt = max(0, min(card["val"], 30 - player["hp"]))
+                amt = clamp_heal(player, card["val"])
                 player["hp"] += amt
                 log_action(f"   {player['name']} heals for {amt} HP.")
                 notify("heal", player, "hero", amt)
@@ -600,7 +861,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
 
             elif card["effect"] == "heal_all":
                 log_action(f"   {player['name']} mends all friendly characters for {card['val']} HP!")
-                amt_hero = max(0, min(card["val"], 30 - player["hp"]))
+                amt_hero = clamp_heal(player, card["val"])
                 player["hp"] += amt_hero
                 if amt_hero:
                     notify("heal", player, "hero", amt_hero)
@@ -671,6 +932,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
 
     # ---- HERO ATTACK --------------------------------------------------------
     elif action == "hero_attack":
+        player["hero_attacked_this_turn"] = True
         player["hero_can_attack"] = False
         weapon = player["weapon"]
         w_atk  = weapon["atk"]
@@ -701,7 +963,8 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
 
     # ---- HERO POWER ---------------------------------------------------------
     elif action == "hero_power":
-        player["mana"] -= 2
+        if not player.get("infinite_mana"):
+            player["mana"] -= 2
         player["hero_power_used"] = True
         cls = player["hero_class"]
 
@@ -728,7 +991,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
 
         elif cls == "Priest":
             if target == "hero":
-                amt = max(0, min(2, 30 - player["hp"]))
+                amt = clamp_heal(player, 2)
                 player["hp"] += amt
                 log_action(f">> {player['name']} uses Lesser Heal! Restores {amt} HP to {player['name']}.")
                 notify("heal", player, "hero", amt)
@@ -743,7 +1006,8 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
         elif cls == "Rogue":
             # Dagger Mastery: equip (or refresh) a 1/2 Wicked Dagger
             player["weapon"] = {"name": "Wicked Dagger", "atk": 1, "durability": 2}
-            player["hero_can_attack"] = True
+            if not player.get("hero_attacked_this_turn"):
+                player["hero_can_attack"] = True
             log_action(f">> {player['name']} uses Dagger Mastery! Equipped a 1/2 Wicked Dagger.")
             notify("armor", player, "hero", 0)
 
@@ -766,6 +1030,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             log_action(f">> {player['name']} uses Totemic Call! Summons {totem['name']}.")
             notify("armor", player, "hero", 0)
 
+    refresh_infinite_mana(player)
     cleanup_dead(player, opp, on_event)
 
 
@@ -956,9 +1221,19 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
     return score
 
 
-def run_ai_turn(p2: dict, p1: dict, max_moves: int = 10, *, draw: bool = True) -> list[tuple]:
+def run_ai_turn(
+    p2: dict,
+    p1: dict,
+    max_moves: int = 40,
+    *,
+    draw: bool = True,
+    difficulty: str = "normal",
+) -> list[tuple]:
     """Execute AI turn synchronously. Returns the list of moves made."""
+    difficulty = normalize_difficulty(difficulty)
     start_turn(p2, draw=draw)
+    if check_win(p1, p2):
+        return []
     moves_made = []
     for _ in range(max_moves):
         if check_win(p1, p2):
@@ -966,14 +1241,8 @@ def run_ai_turn(p2: dict, p1: dict, max_moves: int = 10, *, draw: bool = True) -
         legal = get_legal_moves(p2, p1)
         if not legal:
             break
-        best, best_score = None, -9999.0
-        for mv in legal:
-            s = evaluate_ai_move(p2, p1, mv)
-            if s > best_score:
-                best_score, best = s, mv
-            elif s == best_score and random.random() < 0.5:
-                best = mv
-        if best_score < 0:
+        best = select_ai_move(legal, p2, p1, difficulty)
+        if best is None:
             break
         execute_move(p2, p1, best)
         moves_made.append(best)

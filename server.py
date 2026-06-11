@@ -6,23 +6,60 @@ Serves the browser-based UI and exposes a JSON REST API for all game actions.
 import os
 import random
 import uuid
-from flask import Flask, jsonify, request, render_template
+
+from flask import Flask, jsonify, render_template, request
+from whitenoise import WhiteNoise
 
 from game_logic import (
-    CARD_DB, HERO_CLASSES, GAME_LOG, DECK_SIZE,
-    OPENING_HAND_FIRST, OPENING_HAND_SECOND, COIN_CARD,
-    create_player, draw_card, start_turn, do_mulligan,
-    get_legal_moves, execute_move, check_win,
-    run_ai_turn, log_action, give_coin, ai_do_mulligan,
-    set_active_log, card_allowed_for_class, cards_for_class,
+    CAMPAIGN_NODES,
+    CARD_DB,
+    DECK_SIZE,
+    GAME_LOG,
+    HERO_CLASSES,
+    OPENING_HAND_FIRST,
+    OPENING_HAND_SECOND,
+    ai_do_mulligan,
+    apply_practice_options,
+    card_allowed_for_class,
+    cards_for_class,
+    check_win,
+    clamp_practice_hp,
+    create_ai_opponent,
+    create_player,
+    do_mulligan,
+    draw_card,
+    execute_move,
+    get_campaign_node,
+    get_legal_moves,
+    give_coin,
+    log_action,
+    normalize_difficulty,
+    run_ai_turn,
+    set_active_log,
+    start_turn,
 )
+from game_store import GameStore
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "litstone-dev-secret")
+
+_static_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+app.wsgi_app = WhiteNoise(app.wsgi_app, root=_static_root, prefix="static/")
 
 # ---------------------------------------------------------------------------
 # Per-session game state (keyed by game_id UUID)
 # ---------------------------------------------------------------------------
-GAMES: dict[str, dict] = {}
+STORE = GameStore(os.environ.get("LITSTONE_DB_PATH", "litstone.db"))
+GAMES: dict[str, dict] = STORE.load_all()
+
+
+def _persist_game(gs: dict) -> None:
+    STORE.save(gs["game_id"], gs)
+
+
+def _remove_game(game_id: str) -> None:
+    GAMES.pop(game_id, None)
+    STORE.delete(game_id)
 
 
 def _resolve_game_id() -> str | None:
@@ -83,6 +120,14 @@ def _state_response(gs: dict, *, include_card_db: bool = False) -> dict:
     }
     if include_card_db:
         resp["card_db"] = CARD_DB
+    resp["ai_difficulty"] = gs.get("ai_difficulty", "normal")
+    resp["opponent_name"] = gs["p2"].get("name", "AI")
+    resp["campaign_node"] = gs.get("campaign_node")
+    resp["boss_id"] = gs.get("boss_id")
+    resp["tutorial"] = gs.get("tutorial", False)
+    resp["mode"] = gs.get("mode", "standard")
+    if gs.get("practice"):
+        resp["practice"] = gs["practice"]
     return resp
 
 
@@ -123,13 +168,17 @@ def _finish_mulligan(gs: dict) -> None:
         gs["is_player_turn"] = True
         gs["turn_number"] = 1
         start_turn(gs["p1"], draw=False)
-        log_action("--- Your Turn (Turn 1) ---")
+        winner = check_win(gs["p1"], gs["p2"])
+        if winner:
+            log_action(f"=== {winner} wins! ===")
+        else:
+            log_action("--- Your Turn (Turn 1) ---")
         return
 
     gs["is_player_turn"] = False
     gs["turn_number"] = 1
     log_action("--- AI goes first ---")
-    run_ai_turn(gs["p2"], gs["p1"], draw=False)
+    run_ai_turn(gs["p2"], gs["p1"], draw=False, difficulty=gs.get("ai_difficulty", "normal"))
     winner = check_win(gs["p1"], gs["p2"])
     if winner:
         log_action(f"=== {winner} wins! ===")
@@ -137,7 +186,11 @@ def _finish_mulligan(gs: dict) -> None:
     gs["is_player_turn"] = True
     gs["turn_number"] = 2
     start_turn(gs["p1"])
-    log_action("--- Your Turn (Turn 2) ---")
+    winner = check_win(gs["p1"], gs["p2"])
+    if winner:
+        log_action(f"=== {winner} wins! ===")
+    else:
+        log_action("--- Your Turn (Turn 2) ---")
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +204,14 @@ def index():
 
 @app.route("/api/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "heroes": len(HERO_CLASSES), "deck_size": DECK_SIZE})
+    return jsonify({
+        "status": "ok",
+        "heroes": len(HERO_CLASSES),
+        "deck_size": DECK_SIZE,
+        "active_games": len(GAMES),
+        "persisted_games": STORE.count(),
+        "persistence": "sqlite",
+    })
 
 
 @app.route("/api/cards", methods=["GET"])
@@ -163,6 +223,70 @@ def cards():
         "hero_classes": HERO_CLASSES,
         "deck_size": DECK_SIZE,
     })
+
+
+def _parse_practice_options(data: dict) -> dict | None:
+    if not data.get("practice"):
+        return None
+    return {
+        "p1_hp": clamp_practice_hp(data.get("p1_hp")),
+        "p2_hp": clamp_practice_hp(data.get("p2_hp")),
+        "infinite_mana": bool(data.get("infinite_mana")),
+    }
+
+
+def _resolve_match_setup(data: dict) -> dict:
+    """Derive AI opponent, difficulty, and mode flags from a new-game request."""
+    practice = _parse_practice_options(data)
+    tutorial = bool(data.get("tutorial"))
+    campaign_node = data.get("campaign_node")
+    boss_id = data.get("boss_id")
+    node = get_campaign_node(campaign_node) if campaign_node else None
+
+    if node and node.get("boss_id"):
+        boss_id = node["boss_id"]
+
+    difficulty = normalize_difficulty(data.get("difficulty"))
+    if practice:
+        difficulty = "easy"
+    elif tutorial:
+        difficulty = "easy"
+    elif node:
+        difficulty = normalize_difficulty(node.get("difficulty", difficulty))
+
+    ai_class = data.get("ai_class")
+    if node and not boss_id:
+        ai_class = node.get("ai_class", ai_class)
+
+    p2 = create_ai_opponent(
+        hero_class=ai_class,
+        boss_id=boss_id,
+        campaign_node=campaign_node if node and not boss_id else None,
+    )
+
+    if practice:
+        mode = "practice"
+    elif tutorial:
+        mode = "tutorial"
+    elif campaign_node:
+        mode = "campaign"
+    else:
+        mode = "standard"
+
+    return {
+        "p2": p2,
+        "difficulty": difficulty,
+        "campaign_node": campaign_node,
+        "boss_id": boss_id,
+        "tutorial": tutorial,
+        "practice": practice,
+        "mode": mode,
+    }
+
+
+@app.route("/api/campaign", methods=["GET"])
+def campaign_info():
+    return jsonify({"nodes": CAMPAIGN_NODES, "deck_size": DECK_SIZE})
 
 
 @app.route("/api/new_game", methods=["POST"])
@@ -179,24 +303,55 @@ def new_game():
             "error": f"Invalid deck — need {DECK_SIZE} legal cards for {player_cls} (neutrals + class cards only).",
         }), 400
 
+    campaign_node = data.get("campaign_node")
+    if campaign_node and not data.get("practice") and not data.get("tutorial"):
+        if get_campaign_node(campaign_node) is None:
+            return jsonify({"error": f"Unknown campaign node: {campaign_node}"}), 400
+
     game_id = str(uuid.uuid4())
     GAME_LOG.clear()
 
+    match = _resolve_match_setup(data)
     player_goes_first = random.choice([True, False])
     gs = {
         "game_id":           game_id,
         "p1":                create_player("Player", player_cls, deck),
-        "p2":                create_player("AI", random.choice(HERO_CLASSES)),
+        "p2":                match["p2"],
         "turn_number":       1,
         "is_player_turn":    True,
         "mulligan_phase":    True,
         "player_goes_first": player_goes_first,
+        "ai_difficulty":     match["difficulty"],
+        "campaign_node":     match["campaign_node"],
+        "boss_id":           match["boss_id"],
+        "tutorial":          match["tutorial"],
+        "mode":              match["mode"],
         "log":               [],
     }
+    if match["practice"]:
+        opts = match["practice"]
+        gs["practice"] = opts
+        apply_practice_options(gs["p1"], hp=opts["p1_hp"], infinite_mana=opts["infinite_mana"])
+        apply_practice_options(gs["p2"], hp=opts["p2_hp"], infinite_mana=opts["infinite_mana"])
+
     GAMES[game_id] = gs
+    _persist_game(gs)
 
     with _with_game_log(gs):
         log_action("--- NEW GAME STARTED ---")
+        if gs["mode"] == "campaign" and match["campaign_node"]:
+            node = get_campaign_node(match["campaign_node"])
+            if node:
+                log_action(f"--- Campaign: {node['name']} ---")
+        if gs["tutorial"]:
+            log_action("--- Tutorial Match — follow the hints ---")
+        if gs.get("practice"):
+            opts = gs["practice"]
+            mana_note = " · infinite mana" if opts["infinite_mana"] else ""
+            log_action(
+                f"--- Practice Sandbox — You {opts['p1_hp']} HP · AI {opts['p2_hp']} HP{mana_note} ---"
+            )
+        log_action(f"Opponent: {gs['p2']['name']} ({gs['p2']['hero_class']}) · {gs['ai_difficulty'].title()} AI")
         order = "You go first." if player_goes_first else "AI goes first — you'll receive The Coin."
         log_action(order)
         _deal_opening_hands(gs)
@@ -223,6 +378,7 @@ def do_mulligan_route():
     with _with_game_log(gs):
         do_mulligan(gs["p1"], indices)
         _finish_mulligan(gs)
+        _persist_game(gs)
 
     return jsonify(_state_response(gs, include_card_db=True))
 
@@ -249,6 +405,9 @@ def do_action():
     if gs.get("mulligan_phase"):
         return jsonify({"error": "Mulligan phase in progress"}), 400
 
+    if check_win(p1, p2):
+        return jsonify({"error": "Game over"}), 400
+
     if not gs.get("is_player_turn"):
         return jsonify({"error": "Not your turn"}), 400
 
@@ -268,15 +427,20 @@ def do_action():
         if action == "end_turn":
             gs["is_player_turn"] = False
             log_action("--- AI's Turn ---")
-            run_ai_turn(p2, p1)
-            gs["turn_number"] += 1
+            run_ai_turn(p2, p1, difficulty=gs.get("ai_difficulty", "normal"))
             winner = check_win(p1, p2)
-            if not winner:
+            if winner:
+                log_action(f"=== {winner} wins! ===")
+            else:
+                gs["turn_number"] += 1
                 gs["is_player_turn"] = True
                 start_turn(p1)
-                log_action(f"--- Your Turn (Turn {gs['turn_number']}) ---")
-            else:
-                log_action(f"=== {winner} wins! ===")
+                winner = check_win(p1, p2)
+                if winner:
+                    log_action(f"=== {winner} wins! ===")
+                else:
+                    log_action(f"--- Your Turn (Turn {gs['turn_number']}) ---")
+            _persist_game(gs)
             return jsonify(_state_response(gs))
 
         move  = (action, idx, target)
@@ -289,6 +453,7 @@ def do_action():
         winner = check_win(p1, p2)
         if winner:
             log_action(f"=== {winner} wins! ===")
+        _persist_game(gs)
 
     return jsonify(_state_response(gs))
 
@@ -307,8 +472,8 @@ def legal_moves():
 def resign():
     """Remove a game session so a new match can start cleanly."""
     game_id = _resolve_game_id()
-    if game_id and game_id in GAMES:
-        del GAMES[game_id]
+    if game_id:
+        _remove_game(game_id)
     if not GAMES:
         GAME_LOG.clear()
     return jsonify({"ok": True})
@@ -319,5 +484,8 @@ def resign():
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     debug = os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true", "yes")
-    print("LitStone server starting — open http://localhost:5000 in your browser.")
-    app.run(debug=debug, port=5000)
+    port = int(os.environ.get("PORT", "5000"))
+    print(f"LitStone server starting — open http://localhost:{port} in your browser.")
+    if GAMES:
+        print(f"Restored {len(GAMES)} persisted game(s) from {STORE.db_path}.")
+    app.run(debug=debug, port=port)

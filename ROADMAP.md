@@ -26,7 +26,7 @@ The current state of the project establishes the core gameplay loop.
 - [x] Mulligan phase (player)
 - [x] Deck filter/sort, mana curve, save/load decks (localStorage)
 - [x] Legendary minions (37 literary legends)
-- [x] Unit tests — 127+ tests covering game logic, AI, class cards, and edge cases (`test_game_logic.py`)
+- [x] Unit tests — 150 tests covering game logic, AI, campaign API, and edge cases (`test_game_logic.py`)
 
 ---
 
@@ -34,16 +34,16 @@ The current state of the project establishes the core gameplay loop.
 
 Goals: make the game feel complete and production-ready for single-player use.
 
-- [ ] **Persistent game state** — survive server restarts using a lightweight store (e.g. SQLite or JSON file)
+- [x] **Persistent game state** — SQLite-backed game sessions survive server restarts
 - [x] **Per-session game IDs** — UUID-keyed game sessions (`GAMES` dict)
 - [x] **AI mulligan** — heuristic opening-hand swaps for the AI opponent
-- [ ] **Improved AI** — smarter target selection, difficulty tiers, reduced random noise
+- [x] **Improved AI** — difficulty tiers (Easy/Normal/Hard), curved AI decks, boss opponents
 - [x] **Partial card animations** — summon flash, damage float, buff glow, turn banner, hero flash
 - [x] **Full card animations** — play-from-hand arc, attack lunge, death burst, weapon swing, spell flash
 - [x] **Sound effects** — Web Audio SFX for play, attack, damage, heal, turn, victory/defeat (mute toggle)
 - [x] **Partial responsive layout** — breakpoints at 900px / 1100px; mobile scroll fixes
 - [x] **Partial mobile polish** — sticky hand/tray, collapsible log, touch targets, board scroll
-- [ ] **Full mobile polish** — further tap-target tuning on smallest phones
+- [x] **Partial mobile polish (≤375px)** — deck-builder and in-game controls meet 44px tap targets
 - [x] **Error handling** — status toasts, illegal-move feedback, network error messages
 - [x] **Resign cleanup** — `POST /api/resign` clears server state when leaving a match
 - [x] **Unit tests** — comprehensive suite in `test_game_logic.py`
@@ -61,7 +61,7 @@ Goals: deepen the card pool and hero variety.
 - [x] **30-card decks** — standard CCG deck size
 - [x] **The Coin** — second-player gains +1 mana crystal (once)
 - [x] **First-player randomization** — coin flip for who goes first
-- [ ] **Adventure / campaign mode** — scripted encounters against bosses with predefined decks
+- [x] **Adventure / campaign mode** — 5-node campaign with 2 boss encounters and progress tracking
 
 ---
 
@@ -92,7 +92,9 @@ Goals: give players a reason to keep coming back.
 
 Ideas that may be incorporated into any version:
 
-- AI difficulty settings (Easy / Normal / Hard)
+- [x] AI difficulty settings (Easy / Normal / Hard)
+- [x] Tutorial match with in-game step hints
+- [x] Practice sandbox mode (custom HP / infinite mana)
 - Replay system — save and replay past games
 - Draft / Arena mode — pick cards one at a time from random sets
 - New keywords: Windfury, Lifesteal, Discover, Secrets

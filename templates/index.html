@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="/static/style.css" />
   <link rel="stylesheet" href="/static/card-frames.css" />
   <link rel="stylesheet" href="/static/screens.css" />
+  <link rel="stylesheet" href="/static/vendor/nprogress.css" />
 </head>
 <body>
 
@@ -19,34 +20,115 @@
 <div id="screen-hub" class="screen active">
   <div class="menu-bg-overlay"></div>
   <div class="hub-inner">
-    <div class="hub-emblem" aria-hidden="true">📜</div>
-    <h1 class="game-title">LitStone</h1>
-    <p class="hub-tagline">Literary legends · Arcane duels</p>
-    <div class="hub-actions">
-      <button type="button" class="btn btn-primary btn-hub-play" id="btn-hub-play" onclick="goToClassSelect()">
-        Play
+    <header class="hub-brand">
+      <div class="hub-emblem" aria-hidden="true">📜</div>
+      <h1 class="game-title">LitStone</h1>
+      <p class="hub-tagline">Literary legends · Arcane duels</p>
+    </header>
+
+    <div class="hub-modes" role="group" aria-label="Game modes">
+      <button type="button" class="hub-mode hub-mode--play" id="btn-hub-play" onclick="startStandardPlay()">
+        <span class="hub-mode-icon" aria-hidden="true">⚔️</span>
+        <span class="hub-mode-text">
+          <span class="hub-mode-title">Play</span>
+          <span class="hub-mode-desc">Quick match vs AI</span>
+        </span>
       </button>
+      <button type="button" class="hub-mode hub-mode--career" onclick="goToCareer()">
+        <span class="hub-mode-icon" aria-hidden="true">📖</span>
+        <span class="hub-mode-text">
+          <span class="hub-mode-title">Career</span>
+          <span class="hub-mode-desc" id="hub-career-progress">5 chapter duels</span>
+        </span>
+      </button>
+      <button type="button" class="hub-mode hub-mode--practice" onclick="goToPractice()">
+        <span class="hub-mode-icon" aria-hidden="true">🧪</span>
+        <span class="hub-mode-text">
+          <span class="hub-mode-title">Practice</span>
+          <span class="hub-mode-desc">Sandbox · custom HP &amp; mana</span>
+        </span>
+      </button>
+      <button type="button" class="hub-mode hub-mode--tutorial" id="btn-hub-tutorial" onclick="startTutorial()">
+        <span class="hub-mode-icon" aria-hidden="true">🎓</span>
+        <span class="hub-mode-text">
+          <span class="hub-mode-title">Tutorial</span>
+          <span class="hub-mode-desc">Learn the basics</span>
+        </span>
+      </button>
+    </div>
+
+    <div class="hub-footer">
       <button type="button" class="btn hub-continue hidden" id="btn-hub-continue" onclick="continueLastDeck()">
         Continue Last Deck
       </button>
-      <button type="button" class="btn btn-hub-secondary" onclick="openSettings()">Settings</button>
+      <button type="button" class="btn btn-hub-ghost" onclick="openSettings()" aria-label="Settings">⚙️ Settings</button>
+      <p class="hub-meta" id="hub-meta">6 classes · 109 cards · single-player vs AI</p>
     </div>
-    <p class="hub-meta" id="hub-meta">6 classes · 109 cards · single-player vs AI</p>
   </div>
+</div>
+
+<!-- =====================  SCREEN: PRACTICE SETUP  ======================= -->
+<div id="screen-practice" class="screen">
+  <div class="menu-bg-overlay"></div>
+  <header class="menu-header">
+    <button type="button" class="btn btn-back btn-icon" onclick="goToHub()" title="Back" aria-label="Back to title">←</button>
+    <span class="menu-header-spacer"></span>
+  </header>
+  <h2 class="practice-title">Practice Sandbox</h2>
+  <p class="practice-subtitle">Tune hero health and mana, then build a deck and spar with Easy AI.</p>
+  <div class="practice-panel">
+    <label class="practice-field">
+      <span>Your hero HP</span>
+      <input type="number" id="practice-p1-hp" min="1" max="60" value="30" />
+    </label>
+    <label class="practice-field">
+      <span>AI hero HP</span>
+      <input type="number" id="practice-p2-hp" min="1" max="60" value="30" />
+    </label>
+    <label class="practice-toggle">
+      <input type="checkbox" id="practice-infinite-mana" />
+      <span>Infinite mana (both players)</span>
+    </label>
+    <button type="button" class="btn btn-primary" onclick="startPracticeFromSetup()">Choose Class &amp; Deck</button>
+  </div>
+</div>
+
+<!-- =====================  SCREEN: CAREER  ================================= -->
+<div id="screen-campaign" class="screen">
+  <div class="menu-bg-overlay"></div>
+  <header class="menu-header">
+    <button type="button" class="btn btn-back btn-icon" onclick="goToHub()" title="Back" aria-label="Back to title">←</button>
+    <nav class="flow-breadcrumb flow-breadcrumb--header" id="career-flow-breadcrumb" aria-label="Navigation trail"></nav>
+    <span class="menu-header-spacer"></span>
+  </header>
+  <div class="career-hero">
+    <h2 class="campaign-title">Literary Career</h2>
+    <p class="campaign-subtitle">Conquer five chapters of the anthology — each duel unlocks the next.</p>
+    <div class="career-progress-wrap" aria-label="Career progress">
+      <div class="career-progress-track">
+        <div class="career-progress-fill" id="career-progress-fill"></div>
+      </div>
+      <span class="career-progress-label" id="career-progress-label">0 / 5 chapters</span>
+    </div>
+  </div>
+  <div class="campaign-map" id="campaign-map"></div>
 </div>
 
 <!-- =====================  SCREEN: HERO SELECT  ========================== -->
 <div id="screen-menu" class="screen">
   <div class="menu-bg-overlay"></div>
   <header class="menu-header">
-    <button type="button" class="btn btn-back btn-icon" onclick="goToHub()" title="Back" aria-label="Back to title">←</button>
-    <span class="menu-header-spacer"></span>
+    <button type="button" class="btn btn-back btn-icon" onclick="goBackFromClassSelect()" title="Back" aria-label="Back">←</button>
+    <nav class="flow-breadcrumb flow-breadcrumb--header" id="class-flow-breadcrumb" aria-label="Navigation trail"></nav>
     <div class="menu-header-actions">
       <button type="button" class="btn btn-icon" onclick="openSettings()" title="Settings" aria-label="Settings">⚙️</button>
     </div>
   </header>
-  <h1 class="game-title">LitStone</h1>
-  <p class="menu-subtitle">Choose Your Class</p>
+  <div class="class-select-intro">
+    <span class="mode-chip" id="class-mode-chip">Quick Play</span>
+    <h1 class="game-title class-select-title">Choose Your Class</h1>
+    <p class="menu-subtitle" id="menu-mode-subtitle">Pick a hero, then build your 30-card deck.</p>
+  </div>
   <div class="hero-grid">
 
     <div class="hero-card" data-class="Mage" role="button" tabindex="0" aria-label="Choose Mage class" onclick="selectClass('Mage')">
@@ -135,9 +217,11 @@
 <!-- =====================  SCREEN: DECK BUILDER  ========================= -->
 <div id="screen-deck" class="screen">
   <header class="deck-header">
-    <button type="button" class="btn btn-back deck-header-back" onclick="goBack()">← Classes</button>
+    <button type="button" class="btn btn-back deck-header-back" id="deck-header-back" onclick="goBack()" aria-label="Back">← Classes</button>
     <div class="deck-class-emblem" id="deck-class-emblem" aria-hidden="true">🔮</div>
     <div class="deck-header-main">
+      <nav class="flow-breadcrumb" id="deck-flow-breadcrumb" aria-label="Navigation trail"></nav>
+      <span class="mode-chip mode-chip--deck" id="deck-mode-chip">Quick Play</span>
       <h2 class="deck-title" id="deck-title">Build Your Deck</h2>
       <p class="deck-subtitle" id="deck-subtitle">Click cards to add · Maximum 2 copies · 30 cards total</p>
       <p class="deck-validation" id="deck-validation" aria-live="polite"></p>
@@ -145,30 +229,34 @@
     <button type="button" class="btn btn-icon" onclick="openSettings()" title="Settings" aria-label="Settings">⚙️</button>
   </header>
 
+  <button type="button" class="deck-sidebar-toggle" id="deck-sidebar-toggle" onclick="toggleDeckSidebar()" aria-expanded="true" aria-controls="deck-sidebar">
+    <span id="deck-sidebar-toggle-label">Hide deck panel</span>
+  </button>
+
   <!-- Filter & sort controls -->
   <div class="deck-controls">
     <input type="search" id="deck-search" class="deck-search" placeholder="Search cards…"
            aria-label="Search cards" oninput="setDeckSearch(this.value)" autocomplete="off" />
     <div class="filter-group" role="group" aria-label="Filter by card type">
-      <button class="filter-btn active" data-filter="all"    onclick="setFilter('all')">All</button>
-      <button class="filter-btn"        data-filter="minion" onclick="setFilter('minion')">Minions</button>
-      <button class="filter-btn"        data-filter="spell"  onclick="setFilter('spell')">Spells</button>
-      <button class="filter-btn"        data-filter="weapon" onclick="setFilter('weapon')">Weapons</button>
+      <button class="filter-btn active" data-filter="all"    aria-pressed="true"  onclick="setFilter('all')">All</button>
+      <button class="filter-btn"        data-filter="minion" aria-pressed="false" onclick="setFilter('minion')">Minions</button>
+      <button class="filter-btn"        data-filter="spell"  aria-pressed="false" onclick="setFilter('spell')">Spells</button>
+      <button class="filter-btn"        data-filter="weapon" aria-pressed="false" onclick="setFilter('weapon')">Weapons</button>
     </div>
     <div class="sort-group" role="group" aria-label="Sort card pool">
       <span class="sort-label">Sort:</span>
-      <button class="sort-btn active" data-sort="cost" onclick="setSort('cost')">Cost</button>
-      <button class="sort-btn"        data-sort="name" onclick="setSort('name')">Name</button>
+      <button class="sort-btn active" data-sort="cost" aria-pressed="true"  onclick="setSort('cost')">Cost</button>
+      <button class="sort-btn"        data-sort="name" aria-pressed="false" onclick="setSort('name')">Name</button>
     </div>
     <div class="deck-cost-filters" role="group" aria-label="Filter by mana cost">
       <span class="sort-label">Cost:</span>
-      <button type="button" class="cost-filter-btn active" data-cost="all" onclick="setCostFilter('all')">All</button>
-      <button type="button" class="cost-filter-btn" data-cost="1" onclick="setCostFilter('1')">1</button>
-      <button type="button" class="cost-filter-btn" data-cost="2" onclick="setCostFilter('2')">2</button>
-      <button type="button" class="cost-filter-btn" data-cost="3" onclick="setCostFilter('3')">3</button>
-      <button type="button" class="cost-filter-btn" data-cost="4" onclick="setCostFilter('4')">4</button>
-      <button type="button" class="cost-filter-btn" data-cost="5" onclick="setCostFilter('5')">5</button>
-      <button type="button" class="cost-filter-btn" data-cost="6plus" onclick="setCostFilter('6plus')">6+</button>
+      <button type="button" class="cost-filter-btn active" data-cost="all" aria-pressed="true"  onclick="setCostFilter('all')">All</button>
+      <button type="button" class="cost-filter-btn" data-cost="1" aria-pressed="false" onclick="setCostFilter('1')">1</button>
+      <button type="button" class="cost-filter-btn" data-cost="2" aria-pressed="false" onclick="setCostFilter('2')">2</button>
+      <button type="button" class="cost-filter-btn" data-cost="3" aria-pressed="false" onclick="setCostFilter('3')">3</button>
+      <button type="button" class="cost-filter-btn" data-cost="4" aria-pressed="false" onclick="setCostFilter('4')">4</button>
+      <button type="button" class="cost-filter-btn" data-cost="5" aria-pressed="false" onclick="setCostFilter('5')">5</button>
+      <button type="button" class="cost-filter-btn" data-cost="6plus" aria-pressed="false" onclick="setCostFilter('6plus')">6+</button>
     </div>
   </div>
 
@@ -177,7 +265,7 @@
     <div class="card-pool" id="card-pool"></div>
 
     <!-- Sidebar -->
-    <div class="deck-sidebar">
+    <div class="deck-sidebar" id="deck-sidebar">
       <div class="deck-count-box">
         <span id="deck-count">0</span><span class="deck-count-sep">/</span><span id="deck-size-max">30</span>
         <div class="deck-progress-bar"><div id="deck-progress" class="deck-progress-fill"></div></div>
@@ -193,9 +281,9 @@
 
       <!-- Quick actions -->
       <div class="deck-quick-actions">
-        <button type="button" class="btn btn-starter-deck" onclick="loadStarterDeck()" title="Load a balanced starter list">📋 Starter</button>
-        <button type="button" class="btn btn-autofill" onclick="autoFillDeck()" title="Randomly fill remaining slots">⚡ Fill</button>
-        <button type="button" class="btn btn-clear-deck" onclick="clearDeck()" title="Remove all cards from deck">🗑</button>
+        <button type="button" class="btn btn-starter-deck" onclick="loadStarterDeck()" title="Load a balanced starter list" aria-label="Load starter deck">📋 Starter</button>
+        <button type="button" class="btn btn-autofill" onclick="autoFillDeck()" title="Randomly fill remaining slots" aria-label="Auto-fill deck">⚡ Fill</button>
+        <button type="button" class="btn btn-clear-deck" onclick="clearDeck()" title="Remove all cards from deck" aria-label="Clear deck">🗑</button>
       </div>
 
       <!-- Save / load decks (localStorage) -->
@@ -208,9 +296,19 @@
         <div class="saved-decks-list" id="saved-decks-list"></div>
       </div>
 
-      <button type="button" class="btn btn-primary" id="btn-start-ai" disabled onclick="startGame()">
-        ⚔️ Play vs AI
-      </button>
+      <div class="match-options">
+        <label class="match-option-label" for="match-difficulty">AI difficulty</label>
+        <select id="match-difficulty" class="setting-select match-difficulty-select" aria-label="AI difficulty">
+          <option value="easy">Easy</option>
+          <option value="normal" selected>Normal</option>
+          <option value="hard">Hard</option>
+        </select>
+      </div>
+      <div class="deck-start-wrap">
+        <button type="button" class="btn btn-primary btn-start-match" id="btn-start-ai" disabled onclick="startGame()">
+          ⚔️ Start Match
+        </button>
+      </div>
     </div>
   </div>
 
@@ -384,11 +482,13 @@
 </div>
 
 <!-- Loading overlay -->
-<div id="loading-overlay" class="loading-overlay hidden" aria-live="polite" aria-busy="true">
+<div id="loading-overlay" class="loading-overlay hidden" role="status" aria-live="polite" aria-busy="true" aria-labelledby="loading-text">
   <div class="loading-spinner" aria-hidden="true"></div>
   <p class="loading-text" id="loading-text">Loading…</p>
 </div>
 
+<script src="/static/vendor/fuzzysort.min.js"></script>
+<script src="/static/vendor/nprogress.js"></script>
 <script src="/static/card-art.js"></script>
 <script src="/static/game.js"></script>
 </body>

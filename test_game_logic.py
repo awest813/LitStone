@@ -17,9 +17,13 @@ from game_logic import (
     create_player, draw_card, start_turn, do_mulligan,
     get_legal_moves, execute_move, check_win,
     run_ai_turn, log_action, damage_hero, get_valid_targets,
+    build_curved_ai_deck, select_ai_move, complete_deck_from_core,
+    create_ai_opponent, normalize_difficulty, BOSS_PRESETS,
     cleanup_dead, evaluate_ai_move, give_coin,
     ai_choose_mulligan, ai_do_mulligan,
     card_allowed_for_class, cards_for_class,
+    clamp_practice_hp, apply_practice_options, effective_mana,
+    clamp_heal,
 )
 
 
@@ -1283,6 +1287,127 @@ class TestStartTurnOptions(unittest.TestCase):
         self.assertEqual(len(p["hand"]), 0)
 
 
+class TestAiDeckAndDifficulty(unittest.TestCase):
+    def test_build_curved_ai_deck_size(self):
+        for cls in ["Mage", "Warrior", "Rogue", "Priest", "Paladin", "Shaman"]:
+            deck = build_curved_ai_deck(cls)
+            self.assertEqual(len(deck), DECK_SIZE)
+            for name in deck:
+                self.assertTrue(card_allowed_for_class(name, cls))
+
+    def test_boss_decks_are_valid(self):
+        for boss_id, preset in BOSS_PRESETS.items():
+            deck = complete_deck_from_core(preset["hero_class"], preset["core"])
+            self.assertEqual(len(deck), DECK_SIZE)
+            opp = create_ai_opponent(boss_id=boss_id)
+            self.assertEqual(opp["name"], preset["display_name"])
+            self.assertEqual(opp["hp"], preset["hp"])
+
+    def test_select_ai_move_easy_can_differ(self):
+        p1 = create_player("P1", "Mage")
+        p2 = create_player("AI", "Warrior")
+        p2["hand"] = ["Town Crier"]
+        p2["mana"] = 10
+        p2["max_mana"] = 10
+        legal = get_legal_moves(p2, p1)
+        self.assertTrue(legal)
+        mv = select_ai_move(legal, p2, p1, "easy")
+        self.assertIn(mv, legal)
+
+    def test_normalize_difficulty(self):
+        self.assertEqual(normalize_difficulty("hard"), "hard")
+        self.assertEqual(normalize_difficulty("bogus"), "normal")
+
+
+class TestPracticeSandbox(unittest.TestCase):
+    def test_clamp_practice_hp(self):
+        self.assertEqual(clamp_practice_hp(5), 5)
+        self.assertEqual(clamp_practice_hp(99), 60)
+        self.assertEqual(clamp_practice_hp("bad"), 30)
+
+    def test_infinite_mana_allows_plays_at_zero_mana(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        apply_practice_options(p1, hp=40, infinite_mana=True)
+        p1["hand"] = ["Town Crier"]
+        p1["mana"] = 0
+        self.assertGreaterEqual(effective_mana(p1), 10)
+        moves = get_legal_moves(p1, p2)
+        self.assertIn(("play", 0, None), moves)
+
+    def test_infinite_mana_restored_after_play(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        apply_practice_options(p1, hp=30, infinite_mana=True)
+        p1["hand"] = ["Town Crier"]
+        p1["board"] = []
+        execute_move(p1, p2, ("play", 0, None))
+        self.assertEqual(p1["mana"], 10)
+
+
+class TestGameplayPolish(unittest.TestCase):
+    def test_hero_one_attack_per_turn_after_weapon(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p1["weapon"] = {"name": "Heroic Blade", "atk": 3, "durability": 2}
+        p1["hero_can_attack"] = True
+        p1["mana"] = 10
+        execute_move(p1, p2, ("hero_attack", None, "hero"))
+        self.assertTrue(p1.get("hero_attacked_this_turn"))
+        p1["weapon"] = {"name": "Wicked Dagger", "atk": 1, "durability": 2}
+        moves = get_legal_moves(p1, p2)
+        self.assertNotIn(("hero_attack", None, "hero"), moves)
+
+    def test_heal_respects_max_hp(self):
+        p1 = create_player("P", "Priest", shuffle=False)
+        apply_practice_options(p1, hp=50, infinite_mana=False)
+        p1["hp"] = 40
+        amt = clamp_heal(p1, 20)
+        self.assertEqual(amt, 10)
+        p1["hp"] += amt
+        self.assertEqual(p1["hp"], 50)
+
+    def test_fatigue_lethal_on_draw(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p1["deck"] = []
+        p1["hp"] = 3
+        p1["fatigue"] = 2
+        draw_card(p1)
+        self.assertEqual(p1["hp"], 0)
+        self.assertEqual(check_win(p1, p2), "AI")
+
+    def test_ai_picks_move_when_all_scores_negative(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p1["hp"] = 1
+        p2["board"] = [_make_minion("B", 10, 10, taunt=True)]
+        p2["mana"] = 10
+        legal = get_legal_moves(p2, p1)
+        self.assertTrue(legal)
+        move = select_ai_move(legal, p2, p1, "normal")
+        self.assertIsNotNone(move)
+        self.assertIn(move, legal)
+
+
+class TestGameStore(unittest.TestCase):
+    def test_save_load_delete(self):
+        import os
+        import tempfile
+        from game_store import GameStore
+
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "test.db")
+            store = GameStore(path)
+            state = {"game_id": "g1", "turn_number": 1, "p1": {"hp": 30}}
+            store.save("g1", state)
+            self.assertEqual(store.count(), 1)
+            loaded = store.load_all()
+            self.assertEqual(loaded["g1"]["turn_number"], 1)
+            store.delete("g1")
+            self.assertEqual(store.load_all(), {})
+
+
 class TestServerApi(unittest.TestCase):
     def test_health_endpoint(self):
         from server import app
@@ -1292,6 +1417,7 @@ class TestServerApi(unittest.TestCase):
         data = res.get_json()
         self.assertEqual(data["status"], "ok")
         self.assertEqual(data["deck_size"], DECK_SIZE)
+        self.assertEqual(data["persistence"], "sqlite")
 
     def test_invalid_deck_rejected(self):
         from server import app
@@ -1301,6 +1427,96 @@ class TestServerApi(unittest.TestCase):
         res = client.post("/api/new_game", json={"hero_class": "Mage", "deck": bad})
         self.assertEqual(res.status_code, 400)
         self.assertIn("error", res.get_json())
+
+    def test_campaign_endpoint(self):
+        from server import app
+        client = app.test_client()
+        res = client.get("/api/campaign")
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertEqual(len(data["nodes"]), 5)
+
+    def test_new_game_campaign_boss(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        res = client.post("/api/new_game", json={
+            "hero_class": "Mage",
+            "deck": deck,
+            "campaign_node": "n5",
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertEqual(data["boss_id"], "moriarty")
+        self.assertEqual(data["opponent_name"], "Professor Moriarty")
+        self.assertEqual(data["ai_difficulty"], "hard")
+
+    def test_legal_moves_empty_when_hero_dead(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p2["hp"] = 0
+        self.assertEqual(get_legal_moves(p1, p2), [])
+
+    def test_invalid_campaign_node_rejected(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        res = client.post("/api/new_game", json={
+            "hero_class": "Mage",
+            "deck": deck,
+            "campaign_node": "nonexistent",
+        })
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("error", res.get_json())
+
+    def test_action_rejected_after_game_over(self):
+        from server import app, GAMES
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        start = client.post("/api/new_game", json={"hero_class": "Mage", "deck": deck})
+        gid = start.get_json()["game_id"]
+        client.post("/api/mulligan", json={"game_id": gid, "indices": []})
+        GAMES[gid]["p2"]["hp"] = 0
+        res = client.post("/api/action", json={"game_id": gid, "action": "end_turn"})
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.get_json().get("error"), "Game over")
+
+    def test_end_turn_fatigue_lethal_after_draw(self):
+        from server import app, GAMES
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        start = client.post("/api/new_game", json={"hero_class": "Mage", "deck": deck})
+        gid = start.get_json()["game_id"]
+        client.post("/api/mulligan", json={"game_id": gid, "indices": []})
+        GAMES[gid]["p1"]["deck"] = []
+        GAMES[gid]["p1"]["hp"] = 2
+        GAMES[gid]["p1"]["fatigue"] = 1
+        GAMES[gid]["is_player_turn"] = True
+        GAMES[gid]["p2"]["board"] = []
+        GAMES[gid]["p2"]["hand"] = []
+        res = client.post("/api/action", json={"game_id": gid, "action": "end_turn"})
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertEqual(data["winner"], "AI")
+
+    def test_new_game_practice_mode(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        res = client.post("/api/new_game", json={
+            "hero_class": "Mage",
+            "deck": deck,
+            "practice": True,
+            "p1_hp": 50,
+            "p2_hp": 15,
+            "infinite_mana": True,
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertEqual(data["mode"], "practice")
+        self.assertEqual(data["practice"]["p1_hp"], 50)
+        self.assertEqual(data["p1"]["hp"], 50)
+        self.assertTrue(data["p1"].get("infinite_mana") or data.get("practice", {}).get("infinite_mana"))
 
     def test_action_response_omits_card_db(self):
         from server import app

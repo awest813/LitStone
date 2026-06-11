@@ -12,7 +12,9 @@ A lightweight, browser-based card game inspired by Hearthstone. Play against an 
 - **Mulligan phase** — Select any opening-hand cards to redraw before each game starts
 - **Literary Legends** — Legendary minions inspired by Sherlock Holmes, Dr. John Watson, Professor Moriarty, Van Helsing, Victor Frankenstein, Frankenstein's Monster, Alice, The Mad Hatter, The White Rabbit, The Queen of Hearts, The Cheshire Cat, Snow White, Rapunzel, Sleeping Beauty, Little Red Riding Hood, Rumpelstiltskin, The Big Bad Wolf, Pied Piper, Baba Yaga, Bluebeard, King Arthur, Merlin, Lancelot, Guinevere, Morgan le Fay, Mordred, Gawain, Robin Hood, Maid Marian, Friar Tuck, Little John, Will Scarlet, Ebenezer Scrooge, Oliver Twist, Ivanhoe, Quasimodo, and Don Quixote (max 1 copy per deck)
 - **Deck Builder** — Build a custom 30-card deck (max 2 copies per card; max 1 copy of Legendary cards) before each game
-- **AI opponent** — Heuristic-driven AI that evaluates board state and plays competitively
+- **AI opponent** — Heuristic-driven AI with Easy / Normal / Hard difficulty and curved decks
+- **Campaign & tutorial** — 5-node literary campaign, guided tutorial, and practice sandbox
+- **Session persistence** — active games saved to SQLite and restored after server restart
 - **Combat log** — Real-time log of every action taken during the game
 - **Fatigue system** — Players take increasing damage when their deck runs out
 
@@ -21,8 +23,11 @@ A lightweight, browser-based card game inspired by Hearthstone. Play against an 
 | Layer    | Technology |
 |----------|------------|
 | Backend  | Python 3.12 + Flask |
+| Production | Gunicorn + WhiteNoise |
 | Frontend | Vanilla JavaScript, HTML5, CSS3 |
+| Frontend libs | [fuzzysort](https://github.com/farzher/fuzzysort) (MIT), [NProgress](https://github.com/rstacruz/nprogress) (MIT) |
 | Fonts    | Google Fonts (Cinzel, Crimson Text) |
+| CI       | GitHub Actions (pytest + Ruff) |
 
 ## Getting Started
 
@@ -36,31 +41,51 @@ A lightweight, browser-based card game inspired by Hearthstone. Play against an 
 ```bash
 git clone https://github.com/awest813/LitStone.git
 cd LitStone
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 ### Running the server
+
+Development:
 
 ```bash
 python3 server.py
 ```
 
-Open [http://localhost:5000](http://localhost:5000) in your browser.
-
-Run tests:
+Production (Gunicorn):
 
 ```bash
-python3 -m unittest test_game_logic -v
+gunicorn -c gunicorn.conf.py wsgi:app
 ```
+
+Docker:
+
+```bash
+docker build -t litstone .
+docker run -p 5000:5000 litstone
+```
+
+Open [http://localhost:5000](http://localhost:5000) in your browser.
+
+Run tests and lint:
+
+```bash
+pytest test_game_logic.py -v
+ruff check .
+```
+
+Third-party licenses: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 ## How to Play
 
-1. **Choose a Hero Class** on the main menu.
-2. **Build your deck** — select 30 cards from the card pool (up to 2 copies each).
-3. Click **Play vs AI** to start the game.
-4. On your turn, play cards from your hand, attack with minions or your hero, and use your hero power.
+1. From the **title hub**, pick **Play**, **Campaign**, **Practice**, or **Tutorial**.
+2. **Choose a hero class**, then **build a 30-card deck** (up to 2 copies each; legendaries max 1).
+3. **Mulligan** any opening-hand cards you want to replace, then confirm.
+4. On your turn, play cards, attack with minions or your hero, and use your hero power.
 5. Click **End Turn** to let the AI take its turn.
 6. Reduce the opponent's hero HP to 0 to win.
+
+**Practice sandbox:** set custom hero HP and optional infinite mana before building your deck.
 
 ### Hero Powers (cost 2 mana, once per turn)
 
@@ -159,16 +184,25 @@ These legendary minions are based on classic literature and folklore and have a 
 ```
 LitStone/
 ├── game_logic.py        # Pure Python game rules, AI, and card database
+├── game_store.py        # SQLite persistence for active sessions
 ├── server.py            # Flask server and REST API
-├── test_game_logic.py   # Unit tests (113 tests)
-├── requirements.txt     # Python dependencies
+├── test_game_logic.py   # Unit tests (150 tests)
+├── requirements.txt     # Python runtime dependencies
+├── requirements-dev.txt # pytest, Ruff, and runtime deps
+├── THIRD_PARTY_NOTICES.md  # MIT and other OSS attributions
+├── Dockerfile           # Production container (gunicorn)
+├── wsgi.py              # WSGI entry for gunicorn
 ├── ROADMAP.md           # Version roadmap
 ├── HEARTHSTONE_LITE_PLAN.md  # Strategic plan for HS-lite quality
 ├── templates/
 │   └── index.html       # Single-page HTML shell
 └── static/
     ├── game.js          # All frontend game logic and rendering
-    └── style.css        # Styling and animations
+    ├── card-art.js      # Procedural card art rendering
+    ├── style.css        # Core styling and animations
+    ├── screens.css      # Hub, modals, campaign, practice screens
+    ├── card-frames.css  # Card frame styles
+    └── vendor/          # Vendored MIT JS (fuzzysort, NProgress)
 ```
 
 ## API Endpoints
@@ -177,6 +211,7 @@ LitStone/
 |--------|--------------------|----------------------------------|
 | GET    | `/`                | Serves the game UI               |
 | GET    | `/api/health`      | Server health check              |
+| GET    | `/api/campaign`    | Campaign node list for single-player |
 | GET    | `/api/cards`       | Returns the full card database   |
 | POST   | `/api/new_game`    | Starts a new game session        |
 | POST   | `/api/mulligan`    | Submit mulligan card swaps       |

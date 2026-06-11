@@ -6,7 +6,7 @@ This document defines what **Hearthstone Lite** means for LitStone and lays out 
 
 ## Audit Summary (June 2026 — updated)
 
-LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collectable cards, session-based multiplayer-ready API, animations, SFX, responsive UI polish, and **131 unit tests**.
+LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collectable cards, campaign/tutorial/practice modes, SQLite session persistence, animations, SFX, responsive UI polish, and **146 unit tests**.
 
 ### What already feels good
 
@@ -21,7 +21,7 @@ LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collec
 | In-match UX (mana HUD, help bar, collapsible log, mobile hand/tray) | ✅ Partial |
 | Animations + Web Audio SFX (mute toggle) | ✅ Complete |
 | Procedural card art — class-themed frames, motifs, tooltip previews | ✅ Complete |
-| Rules tests | ✅ 131 tests in `test_game_logic.py` |
+| Rules tests | ✅ 146 tests in `test_game_logic.py` |
 
 ### Remaining gaps vs. Shippable Lite
 
@@ -29,10 +29,10 @@ LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collec
 |-----|--------|
 | Procedural card frames (no bespoke illustrated art per card) | Good readability; less immersion than full art |
 | AI difficulty tiers; reduced random noise | Flat replay challenge |
-| No tutorial, practice, or campaign bosses | Steep for new players |
+| Practice sandbox polish (deck presets, no-AI solo) | Nice-to-have |
 | No discover / secrets / windfury / lifesteal | Missing HS texture |
-| Smallest phones (≤375px) still need tap-target tuning | Occasional mis-taps |
-| No persistence / Docker / CI | Not deploy-ready |
+| Pool card tooltips are hover-only (no tap path) | Harder card preview on touch |
+| Illustrated card art (beyond procedural frames) | Less immersion |
 
 ---
 
@@ -142,14 +142,15 @@ flowchart TB
 
 **Goal:** Worth replaying without another human.
 
-| Task | Details |
-|------|---------|
-| AI mulligan | Keep 2–3 cost cards; toss expensive dead draws |
-| Difficulty tiers | Easy (noise ↑), Normal (current), Hard (lookahead 1–2 moves, noise ↓) |
-| AI deck building | Class-appropriate curves instead of pure random |
-| Practice mode | Sandbox: both heroes at custom HP, infinite mana toggle |
-| Tutorial | 3-step guided match: play minion → attack → hero power |
-| Campaign | Map of 5 nodes: 3 normal AI → 1 elite → 1 boss; unlock cosmetic or card |
+| Task | Status |
+|------|--------|
+| AI mulligan | ✅ |
+| Difficulty tiers (Easy / Normal / Hard) | ✅ |
+| AI deck building (mana curve) | ✅ |
+| Boss decks (Van Helsing, Professor Moriarty) | ✅ |
+| Campaign (5 nodes) | ✅ |
+| Tutorial (3-step guided match) | ✅ |
+| Practice mode (sandbox) | ✅ |
 
 ---
 
@@ -159,12 +160,12 @@ flowchart TB
 
 | Task | Details |
 |------|---------|
-| SQLite game store | Persist active games; survive server restart |
-| Deck storage (server) | Optional account-less deck list via browser token |
-| Environment config | `FLASK_DEBUG`, `PORT`, `SECRET_KEY` via env |
-| Docker image | `python:3.12-slim` + gunicorn |
-| CI pipeline | `unittest` + optional `ruff` on push |
-| Health endpoint | `GET /api/health` for uptime checks |
+| SQLite game store | Persist active games; survive server restart | ✅ |
+| Deck storage (server) | Optional account-less deck list via browser token | ⬜ |
+| Environment config | `FLASK_DEBUG`, `PORT`, `SECRET_KEY` via env | ✅ |
+| Docker image | `python:3.12-slim` + gunicorn | ✅ |
+| CI pipeline | `unittest` + optional `ruff` on push | ✅ |
+| Health endpoint | `GET /api/health` for uptime checks | ✅ |
 
 ---
 
