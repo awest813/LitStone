@@ -433,6 +433,8 @@ async function confirmMulligan() {
 
 async function startGame() {
   if (draftDeck.length !== 15) return;
+  const startBtn = document.getElementById("btn-start-ai");
+  if (startBtn) startBtn.disabled = true;
   try {
     const res  = await fetch("/api/new_game", {
       method: "POST",
@@ -440,6 +442,10 @@ async function startGame() {
       body: JSON.stringify({ hero_class: selectedClass, deck: draftDeck }),
     });
     const data = await res.json();
+    if (data.error) {
+      showStatusToast(data.error);
+      return;
+    }
     CARD_DB   = data.card_db;
     gameState = data;
     isActing  = false;
@@ -455,6 +461,8 @@ async function startGame() {
     }
   } catch (err) {
     showStatusToast("Failed to start game. Check your connection and try again.");
+  } finally {
+    if (startBtn) startBtn.disabled = draftDeck.length !== 15;
   }
 }
 
@@ -1327,15 +1335,23 @@ async function endTurn() {
   }
 }
 
-function resign() {
-  if (!confirm("Resign and return to menu?")) return;
+async function abandonGame() {
+  try {
+    await fetch("/api/resign", { method: "POST" });
+  } catch (_) {
+    // Best-effort — local UI should still reset even if the server is unreachable.
+  }
   resetGameState();
   showScreen("screen-menu");
 }
 
+function resign() {
+  if (!confirm("Resign and return to menu?")) return;
+  abandonGame();
+}
+
 function returnToMenu() {
-  resetGameState();
-  showScreen("screen-menu");
+  abandonGame();
 }
 
 function resetGameState() {

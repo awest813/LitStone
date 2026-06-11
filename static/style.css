@@ -1554,8 +1554,20 @@ body::after {
 
 /* ---- Responsiveness guard ---- */
 @media (max-width: 900px) {
+  body { overflow-y: auto; overflow-x: hidden; }
+
   .hero-grid { gap: 16px; }
   .hero-card { width: 180px; }
+
+  #screen-deck.active {
+    overflow-y: auto;
+    max-height: 100vh;
+    padding-bottom: 24px;
+  }
+
+  .deck-layout { flex-direction: column; }
+  .deck-sidebar { width: 100%; max-width: 100%; }
+  .card-pool { max-height: none; }
 }
 
 /* ============================================================

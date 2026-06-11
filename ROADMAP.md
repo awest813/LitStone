@@ -2,21 +2,27 @@
 
 This document tracks planned improvements and future directions for LitStone.
 
+For the strategic plan to reach **Hearthstone Lite** quality, see [HEARTHSTONE_LITE_PLAN.md](HEARTHSTONE_LITE_PLAN.md).
+
 ---
 
 ## Version 0.x — Current (Foundation)
 
 The current state of the project establishes the core gameplay loop.
 
-- [x] Literary-themed card library (50+ minions, spells, a weapon, and support spells)
+- [x] Literary-themed card library (61 cards: minions, spells, weapon, support spells)
 - [x] 5 hero classes with unique hero powers (Mage, Warrior, Priest, Rogue, Paladin)
-- [x] Full keyword system: Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle
-- [x] Deck builder (15 cards, max 2 copies)
+- [x] Full keyword system: Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle, Silence
+- [x] Deck builder (15 cards, max 2 copies; legendaries max 1)
 - [x] Heuristic AI opponent
 - [x] Flask REST API backend
 - [x] Browser-based UI with combat log
 - [x] Fatigue damage system
 - [x] Weapon system
+- [x] Mulligan phase (player)
+- [x] Deck filter/sort, mana curve, save/load decks (localStorage)
+- [x] Legendary minions (37 literary legends)
+- [x] Unit tests — 113 tests covering game logic, AI, and edge cases (`test_game_logic.py`)
 
 ---
 
@@ -25,12 +31,16 @@ The current state of the project establishes the core gameplay loop.
 Goals: make the game feel complete and production-ready for single-player use.
 
 - [ ] **Persistent game state** — survive server restarts using a lightweight store (e.g. SQLite or JSON file)
-- [ ] **Improved AI** — smarter target selection, better end-game recognition, and reduced random noise
-- [ ] **Card animations** — play/attack/death animations in the frontend
+- [ ] **Per-session game IDs** — support multiple concurrent games (replace global `GAME_STATE`)
+- [ ] **Improved AI** — smarter target selection, mulligan, difficulty tiers, reduced random noise
+- [x] **Partial card animations** — summon flash, damage float, buff glow, turn banner, hero flash
+- [ ] **Full card animations** — play-from-hand arc, attack lunge, death removal
 - [ ] **Sound effects** — basic audio feedback for card play, attacks, and victory
-- [ ] **Responsive layout** — mobile-friendly board and hand scaling
-- [ ] **Error handling** — graceful UI feedback on illegal moves or server errors
-- [ ] **Unit tests** — pytest suite covering game logic, AI moves, and edge cases
+- [x] **Partial responsive layout** — breakpoints at 900px / 1100px; mobile scroll fixes
+- [ ] **Full mobile polish** — playable board and hand on phone-sized viewports
+- [x] **Error handling** — status toasts, illegal-move feedback, network error messages
+- [x] **Resign cleanup** — `POST /api/resign` clears server state when leaving a match
+- [x] **Unit tests** — comprehensive suite in `test_game_logic.py`
 
 ---
 
@@ -38,10 +48,12 @@ Goals: make the game feel complete and production-ready for single-player use.
 
 Goals: deepen the card pool and hero variety.
 
-- [x] **More cards** — expanded the library to 50+ cards with broader literary themes
-- [x] **Additional hero classes** — Rogue (Dagger Mastery: equip a 1/2 Wicked Dagger) and Paladin (Reinforce: summon a 1/1 Silver Hand Recruit); Shaman remains planned
+- [x] **More cards** — 61-card library with broad literary themes
+- [x] **Additional hero classes** — Rogue and Paladin added; Shaman remains planned
 - [ ] **Class-specific cards** — some cards restricted to certain hero classes
-- [x] **Legendary minions** — high-cost, high-impact unique cards (one copy per deck); expanded roster to 37 literary legends plus support spells
+- [x] **Legendary minions** — 37 high-impact unique cards (one copy per deck)
+- [ ] **30-card decks** — standard CCG deck size (see Hearthstone Lite plan)
+- [ ] **The Coin** — second-player compensation
 - [ ] **Adventure / campaign mode** — scripted encounters against bosses with predefined decks
 
 ---
@@ -76,8 +88,6 @@ Ideas that may be incorporated into any version:
 - AI difficulty settings (Easy / Normal / Hard)
 - Replay system — save and replay past games
 - Draft / Arena mode — pick cards one at a time from random sets
-- [x] Deck builder filter & sort — filter card pool by type (Minion / Spell / Weapon); sort by cost or name
-- [x] Mana curve — live bar chart showing the distribution of cards by mana cost in the deck builder
-- [x] Save / load decks — name, save, and reload decks using browser localStorage
+- New keywords: Windfury, Lifesteal, Discover, Secrets
 - Accessibility improvements (screen reader support, high-contrast theme)
 - Localization (i18n framework for non-English languages)

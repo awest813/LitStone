@@ -2,6 +2,8 @@
 
 A lightweight, browser-based card game inspired by Hearthstone. Play against an AI opponent in a turn-based battle using minions, spells, and weapons.
 
+**Roadmap:** [ROADMAP.md](ROADMAP.md) · **Hearthstone Lite plan:** [HEARTHSTONE_LITE_PLAN.md](HEARTHSTONE_LITE_PLAN.md)
+
 ## Features
 
 - **5 Hero Classes** — Mage, Warrior, Priest, Rogue, and Paladin, each with a unique hero power
@@ -40,10 +42,16 @@ pip install -r requirements.txt
 ### Running the server
 
 ```bash
-python server.py
+python3 server.py
 ```
 
 Open [http://localhost:5000](http://localhost:5000) in your browser.
+
+Run tests:
+
+```bash
+python3 -m unittest test_game_logic -v
+```
 
 ## How to Play
 
@@ -151,7 +159,10 @@ These legendary minions are based on classic literature and folklore and have a 
 LitStone/
 ├── game_logic.py        # Pure Python game rules, AI, and card database
 ├── server.py            # Flask server and REST API
+├── test_game_logic.py   # Unit tests (113 tests)
 ├── requirements.txt     # Python dependencies
+├── ROADMAP.md           # Version roadmap
+├── HEARTHSTONE_LITE_PLAN.md  # Strategic plan for HS-lite quality
 ├── templates/
 │   └── index.html       # Single-page HTML shell
 └── static/
@@ -169,6 +180,7 @@ LitStone/
 | POST   | `/api/mulligan`    | Submit mulligan card swaps       |
 | GET    | `/api/state`       | Returns the current game state   |
 | POST   | `/api/action`      | Executes a player action         |
+| POST   | `/api/resign`      | Abandon the current game         |
 | GET    | `/api/legal_moves` | Returns all legal moves for P1   |
 
 ## License

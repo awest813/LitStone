@@ -3,6 +3,7 @@ server.py — Flask web server for LitStone.
 Serves the browser-based UI and exposes a JSON REST API for all game actions.
 """
 
+import os
 import random
 from flask import Flask, jsonify, request, render_template
 
@@ -207,9 +208,18 @@ def legal_moves():
     return jsonify({"moves": moves})
 
 
+@app.route("/api/resign", methods=["POST"])
+def resign():
+    """Clear the in-memory game so a new match can start cleanly."""
+    GAME_STATE.clear()
+    GAME_LOG.clear()
+    return jsonify({"ok": True})
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
+    debug = os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true", "yes")
     print("LitStone server starting — open http://localhost:5000 in your browser.")
-    app.run(debug=True, port=5000)
+    app.run(debug=debug, port=5000)

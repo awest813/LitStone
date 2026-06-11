@@ -1,0 +1,263 @@
+# LitStone → Hearthstone Lite Plan
+
+This document defines what **Hearthstone Lite** means for LitStone and lays out a phased plan to get there. It complements [ROADMAP.md](ROADMAP.md) with concrete scope, priorities, and acceptance criteria.
+
+---
+
+## Audit Summary (June 2026)
+
+LitStone is a **solid prototype** with a working single-player loop, a rich literary card pool, and strong rules-engine test coverage (113 unit tests). The foundation is real — not vaporware.
+
+### What already feels good
+
+| Area | Status |
+|------|--------|
+| Core turn loop (mana, play, attack, hero power, end turn) | ✅ Complete |
+| Keywords (Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle, Silence) | ✅ Complete |
+| Mulligan phase | ✅ Player only |
+| Deck builder (filter, sort, curve, save/load) | ✅ Complete |
+| AI opponent | ✅ Heuristic, playable |
+| UI juice (turn banner, float text, summon/damage flashes, legendary frames) | ✅ Partial |
+| Rules tests | ✅ 113 tests in `test_game_logic.py` |
+
+### Gaps vs. a credible Hearthstone Lite
+
+| Gap | Impact |
+|-----|--------|
+| 15-card decks (HS uses 30) | Games feel swingy and short |
+| No class-specific cards | Heroes feel interchangeable |
+| Emoji art, no audio | Low immersion |
+| AI doesn't mulligan; random scoring noise | Inconsistent challenge |
+| Single global game session | Can't share/deploy easily |
+| No tutorial, practice, or campaign | Steep for new players |
+| No discover / secrets / overload / windfury | Missing HS texture |
+| Mobile layout is partial | Unplayable on phones |
+
+---
+
+## Defining "Hearthstone Lite"
+
+**Hearthstone Lite** is not a clone of every expansion mechanic. It is a product that delivers the *feel* of Hearthstone in a browser:
+
+1. **Pick a hero** with a distinct identity and power
+2. **Build a 30-card deck** with curve and synergy
+3. **Mulligan** into a playable opening hand
+4. **Play a full match** with readable board state, satisfying feedback, and fair rules
+5. **Beat AI** at multiple difficulty levels or scripted bosses
+6. **Come back** via saved decks, optional progression, or new content
+
+Out of scope for Lite (defer to v2+): ranked ladder, real-money economy, full collection grind, cross-platform accounts, esports.
+
+---
+
+## Target Experience Pillars
+
+```mermaid
+flowchart TB
+  subgraph pillars [Hearthstone Lite Pillars]
+    R[Rules Fidelity]
+    F[Feel and Juice]
+    C[Content Depth]
+    P[Progression Loop]
+    Q[Quality Bar]
+  end
+  R --> M[Playable Match]
+  F --> M
+  C --> M
+  P --> M
+  Q --> M
+```
+
+| Pillar | Lite target |
+|--------|-------------|
+| **Rules fidelity** | 30-card decks, 7-minion board, 10-card hand, fatigue, weapons, hero attacks |
+| **Feel & juice** | Play/attack/death arcs, SFX, screen shake, readable combat log |
+| **Content depth** | ~80–120 cards, class cards per hero, 3–5 boss encounters |
+| **Progression loop** | All cards free *or* light unlock-by-wins; deck codes; AI difficulty |
+| **Quality bar** | Mobile playable, no stale server state, CI on every push |
+
+---
+
+## Phased Plan
+
+### Phase 1 — Match Fidelity (rules + session)
+
+**Goal:** A single match should *feel* like Hearthstone structurally.
+
+| Task | Details | Done when |
+|------|---------|-----------|
+| 30-card decks | Bump deck size; rebalance AI default decks and builder UI | Builder enforces 30; games last 8–15 turns on average |
+| Standard mulligan | Player + AI: draw 3/4, replace any number once | Both sides mulligan before turn 1 |
+| Coin / first player | Random who goes first; second player gets "The Coin" (temp +1 mana once) | Coin spell in hand, consumed on use |
+| Session IDs | Replace global `GAME_STATE` with per-tab `game_id` (in-memory dict or SQLite) | Two browser tabs = two games |
+| Resign / cleanup | ✅ `POST /api/resign` clears server state | Resign → new game works without refresh |
+| Card text from server | Expose `get_spell_desc()` via API; drop duplicated `spellDesc()` in JS | One source of truth for card text |
+
+**Engine keywords to add (priority order):**
+
+1. **Windfury** — attack twice per turn
+2. **Lifesteal** — damage heals hero
+3. **Discover** — pick 1 of 3 random cards (lite: from subset of pool)
+4. **Secrets** — 1 hidden reactive spell slot (start with 2–3 secrets total)
+
+---
+
+### Phase 2 — Feel & Presentation (the "Hearthstone" in the name)
+
+**Goal:** Players *feel* impact when cards hit the board.
+
+| Task | Details |
+|------|---------|
+| Play animation | Card arcs from hand to board / target |
+| Attack animation | Minion lunges toward target, returns |
+| Death animation | Minion fades/shatters before DOM removal |
+| Hero weapon swing | Distinct from minion attack |
+| Sound design | Web Audio API: play, attack, damage, heal, turn start, victory (mute toggle) |
+| Board readability | Larger minion slots on desktop; pinch-zoom or stacked hand on mobile |
+| Loading states | Disable buttons during API calls (partially done) |
+
+**Art direction (lite):** Commission or generate **consistent card frames + silhouettes** per literary character. Emoji is fine for dev; Lite needs illustrated or styled SVG portraits at minimum.
+
+---
+
+### Phase 3 — Hero Identity & Content
+
+**Goal:** Choosing Mage vs Warrior changes how you build and play.
+
+| Task | Details |
+|------|---------|
+| Class-specific cards | 8–12 cards per class (only in that class's pool) |
+| Neutral core set | ~40 neutrals usable by all |
+| Rarity tiers | Common / Rare / Epic / Legendary (cosmetic frame + drop weight if collecting) |
+| Shaman hero | Hero power: Totemic Call (summon random 0-cost totem) |
+| Balance pass | Curve benchmarks per class; remove auto-win AI lines |
+| Boss decks | 3 scripted AI bosses with unique hero powers and fixed decks |
+
+**Content target for Lite launch:** **~100 cards** (40 neutral + 12×5 class cards).
+
+---
+
+### Phase 4 — AI & Single-Player Modes
+
+**Goal:** Worth replaying without another human.
+
+| Task | Details |
+|------|---------|
+| AI mulligan | Keep 2–3 cost cards; toss expensive dead draws |
+| Difficulty tiers | Easy (noise ↑), Normal (current), Hard (lookahead 1–2 moves, noise ↓) |
+| AI deck building | Class-appropriate curves instead of pure random |
+| Practice mode | Sandbox: both heroes at custom HP, infinite mana toggle |
+| Tutorial | 3-step guided match: play minion → attack → hero power |
+| Campaign | Map of 5 nodes: 3 normal AI → 1 elite → 1 boss; unlock cosmetic or card |
+
+---
+
+### Phase 5 — Persistence & Deploy
+
+**Goal:** Shareable, stable, good enough to host.
+
+| Task | Details |
+|------|---------|
+| SQLite game store | Persist active games; survive server restart |
+| Deck storage (server) | Optional account-less deck list via browser token |
+| Environment config | `FLASK_DEBUG`, `PORT`, `SECRET_KEY` via env |
+| Docker image | `python:3.12-slim` + gunicorn |
+| CI pipeline | `unittest` + optional `ruff` on push |
+| Health endpoint | `GET /api/health` for uptime checks |
+
+---
+
+### Phase 6 — Multiplayer Lite (optional stretch)
+
+Only after Phases 1–4 feel great solo.
+
+| Task | Details |
+|------|---------|
+| Room codes | Create/join 4-letter room |
+| WebSockets | Flask-SocketIO or similar for real-time sync |
+| Reconnect | Resume by room + player token |
+| Spectate | Read-only state stream |
+
+---
+
+## Priority Matrix
+
+| Priority | Work | Why |
+|----------|------|-----|
+| **P0** | 30-card decks, session IDs, AI mulligan | Structural HS fidelity |
+| **P0** | Play/attack/death animations + basic SFX | Emotional payoff |
+| **P1** | Class cards + Shaman | Hero identity |
+| **P1** | AI difficulty + boss encounters | Replay value |
+| **P1** | Mobile layout pass | Reach |
+| **P2** | Discover, Secrets, Windfury | Depth without bloat |
+| **P2** | SQLite persistence + Docker | Deployability |
+| **P3** | Multiplayer | Network complexity |
+| **P3** | Collection / quests / ranked | Retention systems |
+
+---
+
+## Suggested Milestones
+
+| Milestone | Name | Exit criteria |
+|-----------|------|---------------|
+| **M1** | *Faithful Match* | 30 cards, mulligan both sides, coin, session IDs, 150+ tests |
+| **M2** | *Juicy* | Animations + SFX + mobile deck builder usable on phone |
+| **M3** | *Identity* | 100 cards, class restrictions, 3 bosses, AI difficulty |
+| **M4** | *Shippable Lite* | Docker, CI, tutorial, campaign, hosted demo URL |
+| **M5** | *Social* | Room-code multiplayer |
+
+---
+
+## Technical Notes
+
+### Keep the architecture
+
+The current split is correct:
+
+- `game_logic.py` — pure rules (expand here first)
+- `server.py` — thin HTTP layer
+- `static/game.js` — presentation + input
+
+Add new mechanics in Python with tests **before** wiring UI.
+
+### Avoid early pitfalls
+
+1. **Don't add React** until the vanilla UI blocks you — the CSS/JS base is already large and styled.
+2. **Don't expose opponent hand** in API responses (already masked — keep it).
+3. **Don't balance by gut** — log win rates per class vs AI at each difficulty.
+4. **Don't ship 200 cards** before class identity exists — content without identity feels random.
+
+### Test strategy expansion
+
+| Layer | Tool | Focus |
+|-------|------|-------|
+| Rules | `unittest` / `pytest` | Every keyword, every spell effect |
+| API | `pytest` + Flask test client | Illegal moves, session isolation |
+| Frontend | Playwright (later) | Mulligan flow, targeting, mobile tap |
+
+---
+
+## Immediate Next Steps (this week)
+
+1. **Phase 1 kickoff:** Design doc for 30-card migration (constants, UI labels, AI decks).
+2. **Implement `game_id` sessions** in `server.py` (smallest change: UUID keyed dict).
+3. **AI mulligan** in `game_logic.py` — heuristic keep curve.
+4. **Animation spike:** one play-from-hand arc in `game.js` as template for others.
+5. **Class card schema:** add `"classes": ["Mage"]` field to `CARD_DB` entries.
+
+---
+
+## Success Metrics
+
+| Metric | Lite target |
+|--------|-------------|
+| Average game length | 8–15 turns |
+| New player completes tutorial | > 80% |
+| Mobile deck build (375px width) | No horizontal scroll |
+| Unit test count | 200+ |
+| AI win rate vs default deck (Normal) | 45–55% |
+| Lighthouse performance (desktop) | > 80 |
+
+---
+
+*This plan is a living document. Update it as milestones ship.*
