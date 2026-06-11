@@ -17,10 +17,13 @@ let draftDeck = [];
 let selectedClass = null;
 
 // Deck-builder UI state
-let filterType = "all";  // "all" | "minion" | "spell" | "weapon"
-let sortBy     = "cost"; // "cost" | "name"
-let deckSearch = "";
+let filterType  = "all";  // "all" | "minion" | "spell" | "weapon"
+let filterCost  = "all";  // "all" | "1".."5" | "6plus"
+let sortBy      = "cost"; // "cost" | "name"
+let deckSearch  = "";
 let combatLogOpen = true;
+let isPaused    = false;
+let lastMatchDeck = null; // { heroClass, cards } for Play Again
 
 // Deck-builder constants
 const MANA_CURVE_MAX_COST   = 7;   // buckets 1-7; costs ≥7 are grouped under "7+"
@@ -30,8 +33,35 @@ const MAX_AUTOFILL_ATTEMPTS = 500; // safety cap for the random auto-fill loop
 let isActing          = false; // prevents double-submit during server round-trips
 let prevIsPlayerTurn  = null;  // tracks turn transitions for banner
 let turnNumber        = 0;     // client-side turn counter
-let sfxMuted          = localStorage.getItem("litstoneMuted") === "1";
 let audioCtx          = null;
+
+const SETTINGS_KEY    = "litstoneSettings";
+const LAST_DECK_KEY   = "litstoneLastDeck";
+
+function defaultSettings() {
+  return { sfx: true, animations: true, combatLog: true, confirmResign: true };
+}
+
+function loadSettings() {
+  const legacyMuted = localStorage.getItem("litstoneMuted") === "1";
+  try {
+    const stored = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+    const s = { ...defaultSettings(), ...stored };
+    if (legacyMuted && stored.sfx === undefined) s.sfx = false;
+    return s;
+  } catch (_) {
+    return { ...defaultSettings(), sfx: !legacyMuted };
+  }
+}
+
+function saveSettings() {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  localStorage.setItem("litstoneMuted", settings.sfx ? "0" : "1");
+}
+
+let settings = loadSettings();
+let sfxMuted = !settings.sfx;
+let animationsEnabled = settings.animations !== false;
 
 const KW_COLORS = {
   taunt: "#c0392b", divine_shield: "#d4a800", charge: "#00a878",
@@ -65,17 +95,20 @@ const HERO_POWER_ICONS = {
 // Screen helpers
 // ---------------------------------------------------------------------------
 function showScreen(id) {
+  if (id !== "screen-game") closePause(false);
   document.querySelectorAll(".screen").forEach(s => {
-    s.classList.toggle("active", s.id === id);
-    s.style.display = s.id === id ? "" : "none";
+    const on = s.id === id;
+    s.classList.toggle("active", on);
+    if (!on) {
+      s.style.display = "none";
+      return;
+    }
+    if (id === "screen-game") s.style.display = "grid";
+    else if (id === "screen-mulligan") s.style.display = "flex";
+    else s.style.display = "";
   });
-  if (id === "screen-game") {
-    document.getElementById("screen-game").style.display = "grid";
-    initGameScreenUi();
-  }
-  if (id === "screen-mulligan") {
-    document.getElementById("screen-mulligan").style.display = "flex";
-  }
+  if (id === "screen-game") initGameScreenUi();
+  if (id === "screen-hub") updateHubContinue();
 }
 
 function isNarrowViewport() {
@@ -83,10 +116,9 @@ function isNarrowViewport() {
 }
 
 function initGameScreenUi() {
-  if (isNarrowViewport()) {
-    combatLogOpen = false;
-  }
+  combatLogOpen = isNarrowViewport() ? false : settings.combatLog !== false;
   applyCombatLogState();
+  syncSfxButton();
 }
 
 function toggleCombatLog() {
@@ -137,28 +169,179 @@ function renderManaHud(p1) {
 }
 
 // ---------------------------------------------------------------------------
-// MENU
+// NAVIGATION — hub, class select, settings, pause
 // ---------------------------------------------------------------------------
-function selectClass(cls) {
+function goToHub() {
+  showScreen("screen-hub");
+}
+
+function goToClassSelect() {
+  showScreen("screen-menu");
+}
+
+function openSettings() {
+  syncSettingsUi();
+  const modal = document.getElementById("settings-modal");
+  if (modal) modal.classList.remove("hidden");
+}
+
+function closeSettings() {
+  document.getElementById("settings-modal")?.classList.add("hidden");
+}
+
+function openSettingsFromPause() {
+  openSettings();
+}
+
+function syncSettingsUi() {
+  const sfx = document.getElementById("setting-sfx");
+  const anim = document.getElementById("setting-animations");
+  const log = document.getElementById("setting-combat-log");
+  const resign = document.getElementById("setting-confirm-resign");
+  if (sfx) sfx.checked = settings.sfx;
+  if (anim) anim.checked = settings.animations;
+  if (log) log.checked = settings.combatLog;
+  if (resign) resign.checked = settings.confirmResign;
+}
+
+function applySettingSfx(on) {
+  settings.sfx = on;
+  sfxMuted = !on;
+  saveSettings();
+  syncSfxButton();
+  if (on) playSfx("turn");
+}
+
+function applySettingAnimations(on) {
+  settings.animations = on;
+  animationsEnabled = on;
+  saveSettings();
+}
+
+function applySettingCombatLog(on) {
+  settings.combatLog = on;
+  saveSettings();
+  if (document.getElementById("screen-game")?.classList.contains("active") && !isNarrowViewport()) {
+    combatLogOpen = on;
+    applyCombatLogState();
+  }
+}
+
+function applySettingConfirmResign(on) {
+  settings.confirmResign = on;
+  saveSettings();
+}
+
+function togglePause() {
+  if (isPaused) closePause();
+  else openPause();
+}
+
+function openPause() {
+  if (!gameState || gameState.winner) return;
+  if (document.getElementById("screen-game")?.classList.contains("active") === false) return;
+  isPaused = true;
+  clearSelection();
+  document.getElementById("screen-game")?.classList.add("is-paused");
+  document.getElementById("pause-overlay")?.classList.remove("hidden");
+}
+
+function closePause(focusGame = true) {
+  isPaused = false;
+  document.getElementById("screen-game")?.classList.remove("is-paused");
+  document.getElementById("pause-overlay")?.classList.add("hidden");
+  if (focusGame) document.getElementById("btn-pause")?.focus();
+}
+
+function resignFromPause() {
+  closePause(false);
+  resign();
+}
+
+function quitToHubFromPause() {
+  closePause(false);
+  if (settings.confirmResign && !confirm("Leave match and return to menu?")) return;
+  abandonGame().then(() => goToHub());
+}
+
+function showLoading(text) {
+  const el = document.getElementById("loading-overlay");
+  const msg = document.getElementById("loading-text");
+  if (msg) msg.textContent = text || "Loading…";
+  el?.classList.remove("hidden");
+}
+
+function hideLoading() {
+  document.getElementById("loading-overlay")?.classList.add("hidden");
+}
+
+function saveLastDeck() {
+  if (!selectedClass || draftDeck.length !== DECK_SIZE) return;
+  localStorage.setItem(LAST_DECK_KEY, JSON.stringify({
+    heroClass: selectedClass,
+    cards: [...draftDeck],
+    savedAt: Date.now(),
+  }));
+}
+
+function getLastDeck() {
+  try {
+    return JSON.parse(localStorage.getItem(LAST_DECK_KEY) || "null");
+  } catch (_) {
+    return null;
+  }
+}
+
+function updateHubContinue() {
+  const btn = document.getElementById("btn-hub-continue");
+  const last = getLastDeck();
+  if (!btn) return;
+  if (last?.heroClass && last.cards?.length === DECK_SIZE) {
+    btn.textContent = `Continue — ${last.heroClass} Deck`;
+    btn.classList.remove("hidden");
+  } else {
+    btn.classList.add("hidden");
+  }
+}
+
+function continueLastDeck() {
+  const last = getLastDeck();
+  if (!last?.heroClass || !last.cards) return;
+  enterDeckBuilder(last.heroClass, last.cards);
+}
+
+function enterDeckBuilder(cls, initialDeck) {
   selectedClass = cls;
-  draftDeck  = [];
+  draftDeck = initialDeck ? [...initialDeck] : [];
   filterType = "all";
-  sortBy     = "cost";
+  filterCost = "all";
+  sortBy = "cost";
   deckSearch = "";
   const searchEl = document.getElementById("deck-search");
   if (searchEl) searchEl.value = "";
-  showScreen("screen-deck");
   document.getElementById("deck-title").textContent = `Build Your ${cls} Deck`;
-  const sub = document.querySelector(".deck-subtitle");
+  const sub = document.getElementById("deck-subtitle");
   if (sub) {
     sub.textContent = `${cls} + neutral cards · Max 2 copies · ${DECK_SIZE} cards total`;
   }
-  // Reset filter/sort button states
+  const emblem = document.getElementById("deck-class-emblem");
+  if (emblem) {
+    emblem.textContent = HERO_ICONS[cls] || "?";
+    emblem.style.borderColor = HERO_COLORS[cls] || "var(--col-border-bright)";
+    emblem.style.boxShadow = `0 0 14px ${HERO_COLORS[cls] || "#333"}55`;
+  }
   document.querySelectorAll(".filter-btn").forEach(b => b.classList.toggle("active", b.dataset.filter === "all"));
   document.querySelectorAll(".sort-btn").forEach(b => b.classList.toggle("active", b.dataset.sort === "cost"));
+  document.querySelectorAll(".cost-filter-btn").forEach(b => b.classList.toggle("active", b.dataset.cost === "all"));
+  showScreen("screen-deck");
   renderCardPool();
   updateDeckSidebar();
   renderSavedDecks();
+  updateDeckValidation();
+}
+
+function selectClass(cls) {
+  enterDeckBuilder(cls, []);
 }
 
 // ---------------------------------------------------------------------------
@@ -185,6 +368,69 @@ function setDeckSearch(query) {
   renderCardPool();
 }
 
+function setCostFilter(cost) {
+  filterCost = cost;
+  document.querySelectorAll(".cost-filter-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.cost === cost)
+  );
+  renderCardPool();
+}
+
+function cardMatchesCostFilter(card) {
+  if (filterCost === "all") return true;
+  const c = card.cost ?? 0;
+  if (filterCost === "6plus") return c >= 6;
+  return String(c) === filterCost;
+}
+
+function loadStarterDeck() {
+  if (!selectedClass) return;
+  const classCards = Object.entries(CARD_DB)
+    .filter(([, c]) => c.classes?.includes(selectedClass) && !c.legendary && !c.uncollectible)
+    .sort((a, b) => a[1].cost - b[1].cost || a[0].localeCompare(b[0]));
+  const neutrals = Object.entries(CARD_DB)
+    .filter(([, c]) => (!c.classes || c.classes.length === 0) && !c.legendary && !c.uncollectible)
+    .sort((a, b) => a[1].cost - b[1].cost || a[0].localeCompare(b[0]));
+
+  draftDeck = [];
+  classCards.slice(0, 6).forEach(([name]) => {
+    for (let i = 0; i < 2 && draftDeck.length < DECK_SIZE; i++) draftDeck.push(name);
+  });
+  let guard = 0;
+  let ni = 0;
+  while (draftDeck.length < DECK_SIZE && neutrals.length > 0 && guard < 600) {
+    guard++;
+    const [name] = neutrals[ni % neutrals.length];
+    const max = CARD_DB[name]?.legendary ? 1 : 2;
+    if (draftDeck.filter(c => c === name).length < max) draftDeck.push(name);
+    ni++;
+  }
+  if (draftDeck.length < DECK_SIZE) autoFillDeck();
+  else {
+    renderCardPool();
+    updateDeckSidebar();
+  }
+  showStatusToast("Starter deck loaded — tweak it or play!");
+}
+
+function updateDeckValidation() {
+  const el = document.getElementById("deck-validation");
+  if (!el) return;
+  const n = draftDeck.length;
+  const need = DECK_SIZE - n;
+  el.className = "deck-validation";
+  if (n === DECK_SIZE) {
+    el.textContent = "✓ Deck ready — good luck!";
+    el.classList.add("deck-validation--ok");
+  } else if (n === 0) {
+    el.textContent = `Add ${DECK_SIZE} cards or tap Starter / Fill`;
+    el.classList.add("deck-validation--warn");
+  } else {
+    el.textContent = `Need ${need} more card${need === 1 ? "" : "s"}`;
+    el.classList.add("deck-validation--warn");
+  }
+}
+
 function cardAllowedForClass(card, heroClass) {
   if (card.uncollectible) return false;
   if (!card.classes || card.classes.length === 0) return true;
@@ -208,6 +454,10 @@ function renderCardPool() {
   // Apply type filter
   if (filterType !== "all") {
     entries = entries.filter(([, card]) => card.type === filterType);
+  }
+
+  if (filterCost !== "all") {
+    entries = entries.filter(([, card]) => cardMatchesCostFilter(card));
   }
 
   if (deckSearch) {
@@ -318,7 +568,12 @@ function updateDeckSidebar() {
   });
 
   document.getElementById("btn-start-ai").disabled = count !== DECK_SIZE;
+  const startBtn = document.getElementById("btn-start-ai");
+  if (startBtn) {
+    startBtn.textContent = count === DECK_SIZE ? "⚔️ Play vs AI" : `Need ${DECK_SIZE - count} cards`;
+  }
   renderManaCurve();
+  updateDeckValidation();
 }
 
 function renderManaCurve() {
@@ -394,10 +649,15 @@ function loadDeck(name) {
   const saved = getSavedDecks();
   const entry = saved[name];
   if (!entry) return;
-  // Filter out any cards that no longer exist in CARD_DB (e.g. after a card set update)
+  if (entry.heroClass && entry.heroClass !== selectedClass) {
+    showStatusToast(`That deck is for ${entry.heroClass} — pick that class first.`);
+    return;
+  }
   draftDeck = entry.cards.filter(c => CARD_DB[c] && cardAllowedForClass(CARD_DB[c], selectedClass));
   if (draftDeck.length !== DECK_SIZE) {
-    showStatusToast(`Saved deck has ${draftDeck.length} cards — rebuild to ${DECK_SIZE}.`);
+    showStatusToast(`Loaded ${draftDeck.length}/${DECK_SIZE} cards — fill the rest.`);
+  } else {
+    showStatusToast(`Loaded "${name}"`);
   }
   renderCardPool();
   updateDeckSidebar();
@@ -419,20 +679,25 @@ function renderSavedDecks() {
     return;
   }
   el.innerHTML = "";
-  entries.forEach(([name, data]) => {
-    const div = document.createElement("div");
-    div.className = "saved-deck-entry";
-    const cls = data.heroClass || "";
-    div.innerHTML = `
-      <span class="saved-deck-name" title="${name}">${name}</span>
-      <span class="saved-deck-class">${cls}</span>
-      <button class="btn-load-deck">Load</button>
-      <button class="btn-delete-deck">✕</button>
-    `;
-    div.querySelector(".btn-load-deck").addEventListener("click", () => loadDeck(name));
-    div.querySelector(".btn-delete-deck").addEventListener("click", () => deleteSavedDeck(name));
-    el.appendChild(div);
-  });
+  entries
+    .filter(([, data]) => !data.heroClass || data.heroClass === selectedClass)
+    .forEach(([name, data]) => {
+      const div = document.createElement("div");
+      div.className = "saved-deck-entry";
+      const count = data.cards?.length ?? 0;
+      div.innerHTML = `
+        <span class="saved-deck-name" title="${name}">${name}</span>
+        <span class="saved-deck-class">${count}/${DECK_SIZE}</span>
+        <button type="button" class="btn-load-deck">Load</button>
+        <button type="button" class="btn-delete-deck" aria-label="Delete">✕</button>
+      `;
+      div.querySelector(".btn-load-deck").addEventListener("click", () => loadDeck(name));
+      div.querySelector(".btn-delete-deck").addEventListener("click", () => deleteSavedDeck(name));
+      el.appendChild(div);
+    });
+  if (el.children.length === 0) {
+    el.innerHTML = `<div class="saved-decks-empty">No saved ${selectedClass} decks</div>`;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -503,6 +768,7 @@ async function confirmMulligan() {
   const indices = Array.from(mulliganSwapSet);
   const btn = document.getElementById("btn-mulligan-confirm");
   if (btn) btn.disabled = true;
+  showLoading("Entering match…");
   try {
     const res  = await fetch("/api/mulligan", {
       method: "POST",
@@ -515,6 +781,7 @@ async function confirmMulligan() {
       if (btn) btn.disabled = false;
       return;
     }
+    lastMatchDeck = { heroClass: selectedClass, cards: [...draftDeck] };
     gameId           = data.game_id || gameId;
     CARD_DB          = data.card_db || CARD_DB;
     gameState        = data;
@@ -529,17 +796,18 @@ async function confirmMulligan() {
   } catch (err) {
     showStatusToast("Network error during mulligan.");
     if (btn) btn.disabled = false;
+  } finally {
+    hideLoading();
   }
 }
 
 async function startGame() {
   if (draftDeck.length !== DECK_SIZE) return;
+  saveLastDeck();
+  lastMatchDeck = { heroClass: selectedClass, cards: [...draftDeck] };
   const startBtn = document.getElementById("btn-start-ai");
-  const startLabel = startBtn ? startBtn.textContent : "";
-  if (startBtn) {
-    startBtn.disabled = true;
-    startBtn.textContent = "Starting…";
-  }
+  if (startBtn) startBtn.disabled = true;
+  showLoading("Finding opponent…");
   try {
     const res  = await fetch("/api/new_game", {
       method: "POST",
@@ -569,15 +837,21 @@ async function startGame() {
   } catch (err) {
     showStatusToast("Failed to start game. Check your connection and try again.");
   } finally {
-    if (startBtn) {
-      startBtn.textContent = startLabel || "⚔️ Play vs AI";
-      startBtn.disabled = draftDeck.length !== DECK_SIZE;
-    }
+    hideLoading();
+    updateDeckSidebar();
   }
 }
 
 function goBack() {
   showScreen("screen-menu");
+}
+
+async function playAgain() {
+  if (!lastMatchDeck?.cards?.length) return;
+  document.getElementById("winner-overlay")?.classList.add("hidden");
+  await abandonGame();
+  enterDeckBuilder(lastMatchDeck.heroClass, lastMatchDeck.cards);
+  await startGame();
 }
 
 function showStatusToast(message, ms = 2400) {
@@ -819,6 +1093,7 @@ function applyHeroAnimations(prev) {
 // ---------------------------------------------------------------------------
 
 function motionEnabled() {
+  if (!animationsEnabled) return false;
   return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
@@ -886,7 +1161,8 @@ function playSfx(kind) {
 
 function toggleSfx() {
   sfxMuted = !sfxMuted;
-  localStorage.setItem("litstoneMuted", sfxMuted ? "1" : "0");
+  settings.sfx = !sfxMuted;
+  saveSettings();
   const btn = document.getElementById("btn-sfx-toggle");
   if (btn) {
     btn.textContent = sfxMuted ? "🔇" : "🔊";
@@ -1624,7 +1900,7 @@ function getLegalMoves() {
 // CLICK HANDLERS
 // ---------------------------------------------------------------------------
 function handleHandClick(idx, p1, name, card, affordable) {
-  if (!gameState.is_player_turn || gameState.winner) return;
+  if (isPaused || !gameState.is_player_turn || gameState.winner) return;
   if (!affordable) {
     const handEl = document.getElementById("hand-player");
     const cards  = handEl ? handEl.querySelectorAll(".hand-card") : [];
@@ -1688,7 +1964,7 @@ function shakeElement(el) {
 }
 
 function handleMinionClick(idx, isOpp, player, minion) {
-  if (!gameState.is_player_turn || gameState.winner) return;
+  if (isPaused || !gameState.is_player_turn || gameState.winner) return;
 
   if (selected) {
     const targetValid = isValidMinionTarget(idx, isOpp);
@@ -1724,7 +2000,7 @@ function handleMinionClick(idx, isOpp, player, minion) {
 }
 
 function handleHeroClick(isOpp, player) {
-  if (!gameState.is_player_turn || gameState.winner) return;
+  if (isPaused || !gameState.is_player_turn || gameState.winner) return;
 
   if (selected) {
     if (!isValidHeroTarget(isOpp)) {
@@ -1750,7 +2026,7 @@ function handleHeroClick(isOpp, player) {
 }
 
 function handleHeroPowerClick(player, canUse) {
-  if (!gameState.is_player_turn || gameState.winner) return;
+  if (isPaused || !gameState.is_player_turn || gameState.winner) return;
   if (!canUse) {
     const msg = player.hero_power_used ? "Already used!" : "Not enough mana!";
     spawnFloat(msg, "var(--col-purple-bright)", null, "small");
@@ -1767,8 +2043,28 @@ function handleHeroPowerClick(player, canUse) {
   renderGame();
 }
 
-// Right-click / Escape to cancel
-document.addEventListener("keydown", e => { if (e.key === "Escape") clearSelection(); });
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  const settingsOpen = !document.getElementById("settings-modal")?.classList.contains("hidden");
+  const pauseOpen = !document.getElementById("pause-overlay")?.classList.contains("hidden");
+  if (settingsOpen) {
+    closeSettings();
+    return;
+  }
+  if (pauseOpen) {
+    closePause();
+    return;
+  }
+  if (document.getElementById("screen-game")?.classList.contains("active") && gameState && !gameState.winner) {
+    if (selected) {
+      clearSelection();
+      return;
+    }
+    openPause();
+    return;
+  }
+  if (selected) clearSelection();
+});
 document.addEventListener("contextmenu", e => {
   if (document.getElementById("screen-game")?.classList.contains("active")) {
     e.preventDefault();
@@ -1801,7 +2097,7 @@ window.addEventListener("resize", () => {
 // API CALLS
 // ---------------------------------------------------------------------------
 async function sendAction(action, idx, target) {
-  if (isActing || !gameState?.is_player_turn) return;
+  if (isPaused || isActing || !gameState?.is_player_turn) return;
   isActing = true;
 
   const etBtn = document.getElementById("btn-end-turn");
@@ -1830,7 +2126,7 @@ async function sendAction(action, idx, target) {
 }
 
 async function endTurn() {
-  if (isActing || !gameState?.is_player_turn) return;
+  if (isPaused || isActing || !gameState?.is_player_turn) return;
   isActing = true;
   clearSelection();
 
@@ -1873,26 +2169,28 @@ async function endTurn() {
 }
 
 async function abandonGame() {
+  closePause(false);
   try {
-    await fetch("/api/resign", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ game_id: gameId }),
-    });
+    if (gameId) {
+      await fetch("/api/resign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ game_id: gameId }),
+      });
+    }
   } catch (_) {
     // Best-effort — local UI should still reset even if the server is unreachable.
   }
   resetGameState();
-  showScreen("screen-menu");
 }
 
 function resign() {
-  if (!confirm("Resign and return to menu?")) return;
-  abandonGame();
+  if (settings.confirmResign && !confirm("Resign and return to menu?")) return;
+  abandonGame().then(() => goToHub());
 }
 
 function returnToMenu() {
-  abandonGame();
+  abandonGame().then(() => goToHub());
 }
 
 function resetGameState() {
@@ -1954,14 +2252,24 @@ function syncDeckSizeUi() {
 }
 
 (async function init() {
+  let cardCount = 109;
   try {
     const res  = await fetch("/api/cards");
     const data = await res.json();
     if (data.card_db) CARD_DB = data.card_db;
     if (data.deck_size) DECK_SIZE = data.deck_size;
+    cardCount = Object.keys(data.card_db || {}).filter(k => !data.card_db[k].uncollectible).length;
     syncDeckSizeUi();
   } catch (_) {}
 
   syncSfxButton();
-  showScreen("screen-menu");
+  syncSettingsUi();
+  updateHubContinue();
+  const meta = document.getElementById("hub-meta");
+  if (meta) meta.textContent = `6 classes · ${cardCount} cards · single-player vs AI`;
+  showScreen("screen-hub");
 })();
+
+document.getElementById("settings-modal")?.addEventListener("click", e => {
+  if (e.target.id === "settings-modal") closeSettings();
+});

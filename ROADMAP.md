@@ -18,6 +18,8 @@ The current state of the project establishes the core gameplay loop.
 - [x] Flask REST API backend
 - [x] Browser-based UI with combat log
 - [x] Procedural card art — layered frames, class palettes, tooltip art previews
+- [x] Title hub, settings modal, in-game pause, and match loading overlay
+- [x] Deck builder — starter deck, mana cost filter, validation hints, continue last deck
 - [x] Fatigue damage system
 - [x] Weapon system
 - [x] Mulligan phase (player)
