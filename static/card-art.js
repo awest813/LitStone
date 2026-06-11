@@ -10,7 +10,7 @@ const CLASS_ART = {
   Warrior: { accent: "#e05040", bg1: "#280808", bg2: "#501818", motif: "iron" },
   Priest:  { accent: "#f0b040", bg1: "#302008", bg2: "#504018", motif: "holy" },
   Rogue:   { accent: "#2ec4a8", bg1: "#082820", bg2: "#104038", motif: "shadow" },
-  Paladin: { accent: "#e8c040", bg1: "#302808", bg2: "#504820", motif: "holy" },
+  Paladin: { accent: "#e8c040", bg1: "#302808", bg2: "#504820", motif: "crusade" },
   Shaman:  { accent: "#40c8f0", bg1: "#082830", bg2: "#104858", motif: "storm" },
 };
 
@@ -19,6 +19,8 @@ const TYPE_ART = {
   spell:  { accent: "#c090f0", bg1: "#180828", bg2: "#301050", motif: "arcane" },
   weapon: { accent: "#e0a050", bg1: "#281408", bg2: "#403018", motif: "steel" },
 };
+
+const TYPE_ICONS = { minion: "⚔", spell: "✦", weapon: "🗡" };
 
 const NEUTRAL_VARIANTS = [
   { hue: 205, accent: "#4a9edd" },
@@ -64,6 +66,10 @@ function hashStr(s) {
 
 function emoji(icon) {
   return CARD_EMOJIS[icon] || icon || "?";
+}
+
+function typeIcon(type) {
+  return TYPE_ICONS[type] || "•";
 }
 
 function isCoin(card, name) {
@@ -138,26 +144,32 @@ function renderArt(card, name, size) {
   const legCls = card?.legendary ? " card-art--legendary" : "";
   const coinCls = isCoin(card, name) ? " card-art--coin" : "";
   const classAttr = card?.classes?.[0] ? ` data-card-class="${card.classes[0]}"` : "";
+  const label = name ? `${name} card art` : "Card art";
   return `<div class="card-art${sizeCls}${legCls}${coinCls}" data-motif="${t.motif}" data-variant="${t.variant ?? 0}"${classAttr} style="${styleAttr(card)}">
     <div class="card-art__rim" aria-hidden="true"></div>
     <div class="card-art__bg" aria-hidden="true"></div>
     <div class="card-art__motif" aria-hidden="true"></div>
     <div class="card-art__vignette" aria-hidden="true"></div>
     <div class="card-art__shine" aria-hidden="true"></div>
-    <span class="card-art__glyph" role="img" aria-label="">${glyph}</span>
+    <span class="card-art__glyph" role="img" aria-label="${label}">${glyph}</span>
   </div>`;
 }
 
 function renderFlyCard(card, name) {
   const fc = frameClasses(card, name, "fx-fly-card");
+  const cost = card?.cost ?? 0;
   return `<div class="fx-fly-card ${fc}" style="${styleAttr(card)}">
+    <div class="fx-fly-cost">${cost}</div>
     ${renderArt(card, name, "fly")}
+    <div class="fx-fly-name">${name || ""}</div>
   </div>`;
 }
 
 const CardArt = {
   EMOJIS: CARD_EMOJIS,
+  TYPE_ICONS,
   emoji,
+  typeIcon,
   resolveTheme,
   frameClasses,
   artStyle,

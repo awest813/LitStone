@@ -106,10 +106,29 @@
   opacity: .45;
 }
 
-.card-art[data-motif="iron"] .card-art__motif,
+.card-art[data-motif="iron"] .card-art__motif {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cpath fill='%23e08070' fill-opacity='.35' d='M24 4L28 16h12l-10 8 4 12-14-10L6 16h12z'/%3E%3C/svg%3E");
+  background-size: 36px 36px;
+  background-repeat: repeat;
+  opacity: .38;
+}
+
 .card-art[data-motif="shadow"] .card-art__motif {
-  background-image: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, .12) 0%, transparent 55%);
-  opacity: .4;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(46, 196, 168, .14) 0px,
+    rgba(46, 196, 168, .14) 1px,
+    transparent 1px,
+    transparent 8px
+  );
+  opacity: .5;
+}
+
+.card-art[data-motif="crusade"] .card-art__motif {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Cpath fill='%23ffe080' fill-opacity='.35' d='M28 6v44M6 28h44'/%3E%3Crect x='22' y='14' width='12' height='28' rx='2' fill='%23ffe080' fill-opacity='.22'/%3E%3C/svg%3E");
+  background-size: 48px 48px;
+  background-position: center;
+  opacity: .42;
 }
 
 .card-art[data-motif="holy"] .card-art__motif {
@@ -143,9 +162,26 @@
   box-shadow: inset 0 0 8px rgba(255, 208, 96, .2), 0 0 10px rgba(232, 160, 32, .25);
 }
 
+.card-art--legendary .card-art__shine {
+  animation: cardArtLegendaryShine 3.2s ease-in-out infinite;
+}
+
+@keyframes cardArtLegendaryShine {
+  0%, 100% { opacity: .85; }
+  50% { opacity: 1; filter: brightness(1.15); }
+}
+
+/* Per-class art saturation tweaks */
+.card-art[data-card-class="Mage"] .card-art__bg { filter: saturate(1.12) brightness(1.02); }
+.card-art[data-card-class="Warrior"] .card-art__bg { filter: saturate(1.08) contrast(1.05); }
+.card-art[data-card-class="Priest"] .card-art__bg { filter: saturate(1.05) brightness(1.04); }
+.card-art[data-card-class="Rogue"] .card-art__bg { filter: saturate(1.1) hue-rotate(-4deg); }
+.card-art[data-card-class="Paladin"] .card-art__bg { filter: saturate(1.08) brightness(1.03); }
+.card-art[data-card-class="Shaman"] .card-art__bg { filter: saturate(1.15) hue-rotate(4deg); }
+
 /* Size presets */
-.card-art--pool   { width: 100%; height: 52px; margin-bottom: 4px; }
-.card-art--pool .card-art__glyph { font-size: 26px; }
+.card-art--pool   { width: 100%; height: 56px; margin-bottom: 4px; }
+.card-art--pool .card-art__glyph { font-size: 28px; }
 
 .card-art--hand   { width: 100%; height: 40px; margin-bottom: 3px; }
 .card-art--hand .card-art__glyph { font-size: 22px; }
@@ -181,17 +217,25 @@
 .card-frame--class-shaman  { --frame-accent: var(--shaman-col); }
 
 [class*="card-frame--class-"] {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--frame-accent, transparent) 35%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--frame-accent, transparent) 40%, transparent),
+    inset 0 -18px 24px -20px color-mix(in srgb, var(--frame-accent, transparent) 18%, transparent);
 }
 
 /* Pool cards — illustrated frame */
 .pool-card {
-  background: linear-gradient(175deg, var(--frame-face, var(--col-surface)), color-mix(in srgb, var(--frame-face, #d8c8b0) 70%, #000));
+  background:
+    linear-gradient(175deg, var(--frame-face, var(--col-surface)), color-mix(in srgb, var(--frame-face, #d8c8b0) 70%, #000));
   border-color: var(--frame-edge, var(--col-border));
+  transition: transform .15s, border-color .18s, box-shadow .18s, background .2s;
+}
+
+.pool-card[class*="card-frame--class-"] {
+  border-color: color-mix(in srgb, var(--frame-accent) 50%, var(--frame-edge, var(--col-border)));
 }
 
 .pool-card::after {
-  background: var(--frame-stripe, var(--col-border));
+  background: linear-gradient(90deg, transparent, var(--frame-stripe, var(--col-border)), transparent);
   height: 3px;
 }
 
@@ -203,6 +247,37 @@
   border: 1px solid rgba(255, 255, 255, .08);
   pointer-events: none;
   z-index: 1;
+  opacity: 1;
+  background: transparent;
+  transition: background .2s, opacity .2s;
+}
+
+.pool-card:hover:not(.pool-card--full)::before {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(255, 255, 255, .09) 50%,
+    rgba(255, 255, 255, 0) 70%
+  );
+}
+
+.pool-type-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  line-height: 1;
+  background: rgba(0, 0, 0, .55);
+  border: 1px solid rgba(255, 255, 255, .12);
+  color: var(--frame-stripe, var(--col-text-dim));
+  z-index: 6;
+  pointer-events: none;
 }
 
 .pool-card--legendary {
@@ -217,6 +292,11 @@
 /* Board minions */
 .minion-card {
   background: linear-gradient(175deg, var(--frame-face, #e8dcc8), color-mix(in srgb, var(--frame-face, #d8c8b0) 75%, #a89070));
+  border-color: var(--frame-edge, #a09070);
+}
+
+.hand-card:not(.hand-card--spell):not(.hand-card--weapon):not(.hand-card--coin) {
+  background: linear-gradient(175deg, var(--frame-face, #e8dcc8), color-mix(in srgb, var(--frame-face, #d8c8b0) 78%, #a89070));
   border-color: var(--frame-edge, #a09070);
 }
 
@@ -238,10 +318,18 @@
 
 /* Name plate banner */
 .minion-name,
-.pool-name {
+.pool-name,
+.mulligan-card-name {
   background: linear-gradient(180deg, rgba(0, 0, 0, .06), rgba(0, 0, 0, .12));
   border-radius: 3px;
   padding: 1px 2px;
+  border-left: 2px solid color-mix(in srgb, var(--frame-stripe, var(--col-border)) 70%, transparent);
+}
+
+[class*="card-frame--class-"] .pool-name,
+[class*="card-frame--class-"] .minion-name,
+[class*="card-frame--class-"] .mulligan-card-name {
+  border-left-color: color-mix(in srgb, var(--frame-accent, var(--col-gold)) 75%, transparent);
 }
 
 /* Mulligan — full illustrated cards */
@@ -281,13 +369,26 @@
   border: 1.5px solid rgba(255, 255, 255, .25);
 }
 
+.mulligan-card.card-frame--legendary {
+  border-color: var(--col-gold);
+  box-shadow: 0 0 16px rgba(232, 160, 32, .35), inset 0 0 14px rgba(232, 160, 32, .1);
+}
+
+.mulligan-card.card-frame--spell { border-color: var(--frame-edge, #9060b8); }
+.mulligan-card.card-frame--weapon { border-color: var(--frame-edge, #c07020); }
+
+.mulligan-card-type {
+  text-transform: uppercase;
+  opacity: .85;
+}
+
 /* Tooltip art preview */
 .tooltip-art-wrap {
   margin: -2px -2px 10px;
   border-radius: 10px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, .08);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, .5);
+  border: 1px solid color-mix(in srgb, var(--art-accent, rgba(255, 255, 255, .12)) 45%, rgba(255, 255, 255, .08));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .5), 0 0 12px color-mix(in srgb, var(--art-accent, transparent) 25%, transparent);
 }
 
 .card-tooltip {
@@ -298,8 +399,8 @@
 /* Flying card ghost */
 .fx-fly-card {
   position: absolute;
-  width: 54px;
-  height: 72px;
+  width: 58px;
+  height: 80px;
   border-radius: 8px;
   border: 2px solid;
   padding: 0;
@@ -313,7 +414,45 @@
 
 .fx-fly-card .card-art--fly {
   width: 100%;
-  height: 100%;
+  height: calc(100% - 14px);
+  margin-top: 12px;
+}
+
+.fx-fly-cost {
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: radial-gradient(circle at 35% 35%, var(--col-mana-bright), var(--col-mana));
+  border: 1px solid rgba(255, 255, 255, .25);
+  z-index: 2;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .5);
+}
+
+.fx-fly-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 2px 3px;
+  font-size: 6px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.1;
+  color: #2a1e0a;
+  background: linear-gradient(180deg, transparent, rgba(232, 220, 200, .95));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 2;
 }
 
 .fx-fly-card.card-frame--spell { border-color: #9060b8; }
@@ -321,6 +460,59 @@
 .fx-fly-card.card-frame--legendary {
   border-color: var(--col-gold);
   box-shadow: 0 8px 28px rgba(0, 0, 0, .75), 0 0 16px rgba(232, 160, 32, .4);
+}
+
+/* Opponent hand — class-themed card backs */
+.hand-opp-card {
+  width: 24px;
+  height: 34px;
+  border-radius: 5px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .55);
+  border: 1px solid rgba(255, 255, 255, .12);
+  background: linear-gradient(160deg, #1e5080, #0e2840);
+}
+
+.hand-opp-card::before {
+  content: "📜";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  opacity: .35;
+  filter: grayscale(.2);
+}
+
+.hand-opp-card::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 3px;
+}
+
+.hand-opp-card--mage    { background: linear-gradient(160deg, #1a4088, #0a1838); border-color: var(--mage-col); }
+.hand-opp-card--warrior { background: linear-gradient(160deg, #6a2018, #301008); border-color: var(--warrior-col); }
+.hand-opp-card--priest  { background: linear-gradient(160deg, #5a4818, #302808); border-color: var(--priest-col); }
+.hand-opp-card--rogue   { background: linear-gradient(160deg, #104838, #082820); border-color: var(--rogue-col); }
+.hand-opp-card--paladin { background: linear-gradient(160deg, #584818, #302808); border-color: var(--paladin-col); }
+.hand-opp-card--shaman  { background: linear-gradient(160deg, #104858, #082830); border-color: var(--shaman-col); }
+
+.hand-opp-card:nth-child(odd)  { transform: rotate(-2deg); }
+.hand-opp-card:nth-child(even) { transform: rotate(2deg); }
+
+.board-empty-hint {
+  width: 100%;
+  text-align: center;
+  font-size: 10px;
+  color: var(--col-text-dim);
+  font-family: 'Cinzel', serif;
+  letter-spacing: .06em;
+  padding: 8px 0 4px;
+  opacity: .65;
 }
 
 /* Legacy class aliases — art windows replaced by .card-art */
@@ -337,5 +529,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card-art--legendary .card-art__shine { display: none; }
+  .card-art--legendary .card-art__shine { animation: none; }
+  .minion-card.legendary { animation: none; }
 }

@@ -997,7 +997,7 @@ function renderCardPool() {
     const isFull = count >= maxCopies || draftDeck.length >= DECK_SIZE;
     const div    = document.createElement("div");
     const isClass = card.classes?.length > 0;
-    div.className = `pool-card pool-card--${card.type}${isFull ? " pool-card--full" : ""}${isLegendary ? " pool-card--legendary" : ""}${isClass ? " pool-card--class" : ""} ${CardArt.frameClasses(card, name)}`;
+    div.className = `pool-card pool-card--${card.type}${isFull ? " pool-card--full" : ""}${isLegendary ? " pool-card--legendary" : ""} ${CardArt.frameClasses(card, name)}`;
     div.dataset.name = name;
 
     let statsHtml = "";
@@ -1019,11 +1019,13 @@ function renderCardPool() {
       statsHtml = `<div class="pool-desc">${spellDesc(card, true)}</div>`;
     }
 
+    const typeIcon = CardArt.typeIcon(card.type);
     div.innerHTML = `
       <div class="gem-cost">${card.cost}</div>
       ${count > 0 ? `<div class="gem-count">${count}</div>` : ""}
       ${isLegendary ? `<div class="legendary-crown" title="Legendary — only 1 copy per deck">♦</div>` : ""}
       ${isClass ? `<div class="class-badge" title="${card.classes.join(", ")} only">${card.classes[0].slice(0,3)}</div>` : ""}
+      <div class="pool-type-badge" title="${card.type}">${typeIcon}</div>
       ${CardArt.renderArt(card, name, "pool")}
       <div class="pool-name">${name}</div>
       ${statsHtml}
@@ -1535,7 +1537,7 @@ function buildTooltipHtml(name, card) {
     ? `<div class="tooltip-desc" style="color:var(--col-gold)">${card.classes.join(", ")} class</div>` : "";
 
   return `
-    <div class="tooltip-art-wrap">${CardArt.renderArt(card, name, "tooltip")}</div>
+    <div class="tooltip-art-wrap" style="${CardArt.styleAttr(card)}">${CardArt.renderArt(card, name, "tooltip")}</div>
     <div class="tooltip-name">${name}</div>
     <div class="tooltip-type">${card.type.toUpperCase()} · ${card.cost} Mana</div>
     ${legendaryBadge}
@@ -2341,9 +2343,11 @@ function renderDeckPanel(elId, player) {
 function renderOppHand(p2) {
   const el = document.getElementById("hand-opp");
   el.innerHTML = "";
+  const heroSlug = (p2.hero_class || "Mage").toLowerCase();
   for (let i = 0; i < p2.hand.length; i++) {
     const card = document.createElement("div");
-    card.className = "hand-opp-card";
+    card.className = `hand-opp-card hand-opp-card--${heroSlug}`;
+    card.setAttribute("aria-hidden", "true");
     el.appendChild(card);
   }
 }

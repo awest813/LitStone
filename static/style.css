@@ -938,24 +938,8 @@ body::after {
   border-top: 1px solid var(--col-border);
 }
 
-/* Opponent hand (face-down) */
+/* Opponent hand (face-down) — themed backs in card-frames.css */
 .hand-opp { display: flex; align-items: center; gap: 4px; }
-.hand-opp-card {
-  width: 22px; height: 32px;
-  background: linear-gradient(160deg, #1e5080, #0e2840);
-  border-radius: 4px;
-  border: 1px solid var(--col-mana);
-  box-shadow: 0 2px 6px rgba(0,0,0,.5);
-  position: relative;
-  overflow: hidden;
-}
-.hand-opp-card::after {
-  content: '';
-  position: absolute;
-  inset: 2px;
-  border: 1px solid rgba(74,158,221,.3);
-  border-radius: 2px;
-}
 
 /* Combat log */
 .combat-log {
@@ -1632,11 +1616,6 @@ body::after {
   background: linear-gradient(160deg, #1a1000, #332000);
 }
 
-.pool-card--class {
-  border-color: rgba(0, 119, 182, .45);
-  box-shadow: inset 0 0 10px rgba(0, 119, 182, .08);
-}
-
 .class-badge {
   position: absolute;
   top: 4px;
@@ -1644,9 +1623,9 @@ body::after {
   font-size: 8px;
   font-weight: 700;
   font-family: 'Cinzel', serif;
-  color: #7ec8e3;
-  background: rgba(0, 20, 40, .85);
-  border: 1px solid rgba(0, 119, 182, .5);
+  color: color-mix(in srgb, var(--frame-accent, #7ec8e3) 80%, #fff);
+  background: rgba(0, 12, 24, .88);
+  border: 1px solid color-mix(in srgb, var(--frame-accent, #4a9edd) 55%, transparent);
   border-radius: 4px;
   padding: 1px 4px;
   pointer-events: none;
@@ -2109,37 +2088,6 @@ body::after {
 }
 
 /* ============================================================
-   NEW: IMPROVED POOL CARD hover shimmer
-   ============================================================ */
-.pool-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 10px;
-  background: linear-gradient(135deg,
-    rgba(255,255,255,.0) 30%,
-    rgba(255,255,255,.08) 50%,
-    rgba(255,255,255,.0) 70%
-  );
-  opacity: 0;
-  transition: opacity .2s;
-}
-.pool-card:hover:not(.pool-card--full)::before { opacity: 1; }
-
-/* ============================================================
-   NEW: IMPROVED MINION CARD hover shimmer
-   ============================================================ */
-.minion-card.can-attack::before,
-.hand-card::before {
-  background: linear-gradient(135deg,
-    rgba(255,255,255,.0) 25%,
-    rgba(255,255,255,.1) 50%,
-    rgba(255,255,255,.0) 75%
-  );
-  transition: opacity .15s;
-}
-
-/* ============================================================
    NEW: WINNER OVERLAY — extra rays
    ============================================================ */
 .winner-box::after {
@@ -2211,27 +2159,6 @@ body::after {
     rgba(6,10,22,.35);
   border: 1px solid rgba(40,100,220,.14);
 }
-
-/* ============================================================
-   NEW: EMPTY BOARD hint text
-   ============================================================ */
-.board-empty-hint {
-  font-size: 11px;
-  color: rgba(255,255,255,.12);
-  font-style: italic;
-  letter-spacing: .05em;
-  pointer-events: none;
-  user-select: none;
-}
-
-/* ============================================================
-   NEW: OPPONENT HAND card back design
-   ============================================================ */
-.hand-opp-card {
-  transition: transform .12s;
-}
-.hand-opp-card:nth-child(odd)  { transform: rotate(-2deg); }
-.hand-opp-card:nth-child(even) { transform: rotate(2deg); }
 
 /* ============================================================
    MULLIGAN SCREEN
