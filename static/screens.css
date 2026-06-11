@@ -616,6 +616,16 @@ body.speed-instant .turn-banner.active {
   letter-spacing: .08em;
 }
 
+/* NProgress (MIT) — top bar during match load */
+#nprogress { pointer-events: none; }
+#nprogress .bar {
+  background: var(--col-gold);
+  height: 3px;
+}
+#nprogress .peg {
+  box-shadow: 0 0 10px var(--col-gold), 0 0 5px var(--col-gold);
+}
+
 /* Winner overlay extras */
 .winner-actions {
   display: flex;

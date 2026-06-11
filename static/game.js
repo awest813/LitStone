@@ -442,10 +442,12 @@ function showLoading(text) {
   const msg = document.getElementById("loading-text");
   if (msg) msg.textContent = text || "Loading…";
   el?.classList.remove("hidden");
+  if (typeof NProgress !== "undefined") NProgress.start();
 }
 
 function hideLoading() {
   document.getElementById("loading-overlay")?.classList.add("hidden");
+  if (typeof NProgress !== "undefined") NProgress.done();
 }
 
 function saveLastDeck() {
@@ -625,6 +627,31 @@ function poolCardNames() {
     .map(([name]) => name);
 }
 
+function filterPoolBySearch(entries, query) {
+  const q = (query || "").trim();
+  if (!q) return entries;
+
+  if (typeof fuzzysort !== "undefined") {
+    const items = entries.map(([name, card]) => ({
+      name,
+      type: card.type,
+      desc: spellDesc(card, true),
+      entry: [name, card],
+    }));
+    const hits = fuzzysort.go(q, items, {
+      keys: ["name", "type", "desc"],
+      threshold: -10000,
+    });
+    return hits.map(h => h.obj.entry);
+  }
+
+  const needle = q.toLowerCase();
+  return entries.filter(([name, card]) => {
+    const hay = `${name} ${card.type} ${spellDesc(card, true)}`.toLowerCase();
+    return hay.includes(needle);
+  });
+}
+
 function renderCardPool() {
   const pool = document.getElementById("card-pool");
   if (!pool) return;
@@ -644,10 +671,7 @@ function renderCardPool() {
   }
 
   if (deckSearch) {
-    entries = entries.filter(([name, card]) => {
-      const hay = `${name} ${card.type} ${spellDesc(card, true)}`.toLowerCase();
-      return hay.includes(deckSearch);
-    });
+    entries = filterPoolBySearch(entries, deckSearch);
   }
 
   if (entries.length === 0) {
@@ -2482,6 +2506,10 @@ function syncDeckSizeUi() {
 }
 
 (async function init() {
+  if (typeof NProgress !== "undefined") {
+    NProgress.configure({ showSpinner: false, trickleSpeed: 120 });
+  }
+
   let cardCount = 109;
   try {
     const res  = await fetch("/api/cards");
