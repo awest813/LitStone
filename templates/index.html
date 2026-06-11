@@ -26,6 +26,8 @@
       <button type="button" class="btn btn-primary btn-hub-play" id="btn-hub-play" onclick="goToClassSelect()">
         Play
       </button>
+      <button type="button" class="btn btn-hub-secondary" onclick="goToCampaign()">Campaign</button>
+      <button type="button" class="btn btn-hub-secondary" id="btn-hub-tutorial" onclick="startTutorial()">Tutorial</button>
       <button type="button" class="btn hub-continue hidden" id="btn-hub-continue" onclick="continueLastDeck()">
         Continue Last Deck
       </button>
@@ -33,6 +35,18 @@
     </div>
     <p class="hub-meta" id="hub-meta">6 classes · 109 cards · single-player vs AI</p>
   </div>
+</div>
+
+<!-- =====================  SCREEN: CAMPAIGN  =============================== -->
+<div id="screen-campaign" class="screen">
+  <div class="menu-bg-overlay"></div>
+  <header class="menu-header">
+    <button type="button" class="btn btn-back btn-icon" onclick="goToHub()" title="Back" aria-label="Back to title">←</button>
+    <span class="menu-header-spacer"></span>
+  </header>
+  <h2 class="campaign-title">Literary Campaign</h2>
+  <p class="campaign-subtitle">Defeat five encounters to conquer the anthology.</p>
+  <div class="campaign-map" id="campaign-map"></div>
 </div>
 
 <!-- =====================  SCREEN: HERO SELECT  ========================== -->
@@ -208,6 +222,14 @@
         <div class="saved-decks-list" id="saved-decks-list"></div>
       </div>
 
+      <div class="match-options">
+        <label class="match-option-label" for="match-difficulty">AI difficulty</label>
+        <select id="match-difficulty" class="setting-select match-difficulty-select" aria-label="AI difficulty">
+          <option value="easy">Easy</option>
+          <option value="normal" selected>Normal</option>
+          <option value="hard">Hard</option>
+        </select>
+      </div>
       <button type="button" class="btn btn-primary" id="btn-start-ai" disabled onclick="startGame()">
         ⚔️ Play vs AI
       </button>

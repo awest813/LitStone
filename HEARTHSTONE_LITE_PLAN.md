@@ -142,14 +142,15 @@ flowchart TB
 
 **Goal:** Worth replaying without another human.
 
-| Task | Details |
-|------|---------|
-| AI mulligan | Keep 2–3 cost cards; toss expensive dead draws |
-| Difficulty tiers | Easy (noise ↑), Normal (current), Hard (lookahead 1–2 moves, noise ↓) |
-| AI deck building | Class-appropriate curves instead of pure random |
-| Practice mode | Sandbox: both heroes at custom HP, infinite mana toggle |
-| Tutorial | 3-step guided match: play minion → attack → hero power |
-| Campaign | Map of 5 nodes: 3 normal AI → 1 elite → 1 boss; unlock cosmetic or card |
+| Task | Status |
+|------|--------|
+| AI mulligan | ✅ |
+| Difficulty tiers (Easy / Normal / Hard) | ✅ |
+| AI deck building (mana curve) | ✅ |
+| Boss decks (Van Helsing, Professor Moriarty) | ✅ |
+| Campaign (5 nodes) | ✅ |
+| Tutorial (3-step guided match) | ✅ |
+| Practice mode (sandbox) | ⬜ |
 
 ---
 

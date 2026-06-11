@@ -26,6 +26,12 @@ let isPaused    = false;
 let lastMatchDeck = null; // { heroClass, cards } for Play Again
 let logRenderedCount = 0;
 let deckSearchTimer  = null;
+let activeCampaignNode = null;
+let campaignNodes = [];
+let tutorialActive = false;
+let tutorialStep = 0;
+const CAMPAIGN_PROGRESS_KEY = "litstoneCampaignProgress";
+const TUTORIAL_DONE_KEY = "litstoneTutorialDone";
 
 // Deck-builder constants
 const MANA_CURVE_MAX_COST   = 7;   // buckets 1-7; costs ≥7 are grouped under "7+"
@@ -170,6 +176,15 @@ function updateGameHelpBar() {
     return;
   }
   if (selected) return; // selection-info takes over
+  const tut = tutorialHintText();
+  if (tut) {
+    bar.textContent = tut;
+    return;
+  }
+  if (gameState.mode === "campaign" && gameState.opponent_name) {
+    bar.textContent = `vs ${gameState.opponent_name} · ${gameState.ai_difficulty} AI`;
+    return;
+  }
   bar.textContent = "Play from hand · Attack glowing minions · Esc or right-click to cancel";
 }
 
@@ -197,6 +212,135 @@ function goToHub() {
 
 function goToClassSelect() {
   showScreen("screen-menu");
+}
+
+function getCampaignProgress() {
+  try {
+    return JSON.parse(localStorage.getItem(CAMPAIGN_PROGRESS_KEY) || "[]");
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveCampaignProgress(completedIds) {
+  localStorage.setItem(CAMPAIGN_PROGRESS_KEY, JSON.stringify(completedIds));
+}
+
+function isCampaignNodeUnlocked(nodeId, completed) {
+  const idx = campaignNodes.findIndex(n => n.id === nodeId);
+  if (idx <= 0) return true;
+  const prev = campaignNodes[idx - 1];
+  return completed.includes(prev.id);
+}
+
+async function goToCampaign() {
+  try {
+    const res = await fetch("/api/campaign");
+    const data = await res.json();
+    campaignNodes = data.nodes || [];
+  } catch (_) {
+    campaignNodes = [];
+  }
+  renderCampaignMap();
+  showScreen("screen-campaign");
+}
+
+function renderCampaignMap() {
+  const map = document.getElementById("campaign-map");
+  if (!map) return;
+  const completed = getCampaignProgress();
+  map.innerHTML = "";
+  campaignNodes.forEach((node, i) => {
+    const unlocked = isCampaignNodeUnlocked(node.id, completed);
+    const done = completed.includes(node.id);
+    const isBoss = !!node.boss_id && node.id === "n5";
+    const isElite = !!node.boss_id && !isBoss;
+    let cls = "campaign-node";
+    if (!unlocked) cls += " campaign-node--locked";
+    if (done) cls += " campaign-node--done";
+    if (isBoss) cls += " campaign-node--boss";
+    if (isElite) cls += " campaign-node--elite";
+
+    const div = document.createElement("button");
+    div.type = "button";
+    div.className = cls;
+    div.disabled = !unlocked;
+    div.innerHTML = `
+      <span class="campaign-node-index">${i + 1}</span>
+      <span class="campaign-node-body">
+        <div class="campaign-node-name">${node.name}</div>
+        <div class="campaign-node-sub">${node.subtitle || ""}</div>
+      </span>
+      <span class="campaign-node-badge">${done ? "✓ Done" : node.difficulty}</span>
+    `;
+    if (unlocked) {
+      div.addEventListener("click", () => startCampaignNode(node));
+    }
+    map.appendChild(div);
+  });
+}
+
+function startCampaignNode(node) {
+  activeCampaignNode = node.id;
+  tutorialActive = false;
+  const diffEl = document.getElementById("match-difficulty");
+  if (diffEl && node.difficulty) diffEl.value = node.difficulty;
+  const sub = document.getElementById("deck-subtitle");
+  if (sub) sub.textContent = `Campaign: ${node.name} · ${node.difficulty} AI`;
+  goToClassSelect();
+}
+
+async function startTutorial() {
+  if (localStorage.getItem(TUTORIAL_DONE_KEY) === "1") {
+    if (!confirm("Replay the tutorial?")) return;
+  }
+  activeCampaignNode = null;
+  tutorialActive = true;
+  tutorialStep = 0;
+  const diffEl = document.getElementById("match-difficulty");
+  if (diffEl) diffEl.value = "easy";
+  enterDeckBuilder("Mage", []);
+  loadStarterDeck();
+  const sub = document.getElementById("deck-subtitle");
+  if (sub) sub.textContent = "Tutorial — learn minions, attacks, and turns";
+  await startGame();
+}
+
+function onCampaignVictory() {
+  if (!activeCampaignNode || !gameState || gameState.winner !== "Player") return;
+  const completed = getCampaignProgress();
+  if (!completed.includes(activeCampaignNode)) {
+    completed.push(activeCampaignNode);
+    saveCampaignProgress(completed);
+    showStatusToast("Campaign node cleared!");
+  }
+}
+
+function advanceTutorialFromState() {
+  if (!tutorialActive || !gameState) return;
+  const p1 = gameState.p1;
+  if (tutorialStep === 0 && p1.board.length > 0) {
+    tutorialStep = 1;
+  }
+  if (tutorialStep === 1 && gameState.log) {
+    const recent = gameState.log.slice(-8).join(" ").toLowerCase();
+    if (recent.includes("attacks") && recent.includes("player")) {
+      tutorialStep = 2;
+    }
+  }
+  if (tutorialStep >= 2) {
+    localStorage.setItem(TUTORIAL_DONE_KEY, "1");
+    const btn = document.getElementById("btn-hub-tutorial");
+    if (btn) btn.textContent = "Tutorial ✓";
+  }
+}
+
+function tutorialHintText() {
+  if (!tutorialActive) return null;
+  if (tutorialStep === 0) return "Step 1 — Play a minion from your hand";
+  if (tutorialStep === 1) return "Step 2 — Attack with a glowing minion";
+  if (tutorialStep === 2) return "Step 3 — End turn or use Hero Power when ready";
+  return "Tutorial complete — keep playing!";
 }
 
 function openSettings() {
@@ -342,6 +486,10 @@ function continueLastDeck() {
 function enterDeckBuilder(cls, initialDeck) {
   selectedClass = cls;
   draftDeck = initialDeck ? [...initialDeck] : [];
+  if (!activeCampaignNode && !tutorialActive) {
+    const sub = document.getElementById("deck-subtitle");
+    if (sub) sub.textContent = `${cls} + neutral cards · Max 2 copies · ${DECK_SIZE} cards total`;
+  }
   filterType = "all";
   filterCost = "all";
   sortBy = "cost";
@@ -371,6 +519,9 @@ function enterDeckBuilder(cls, initialDeck) {
 }
 
 function selectClass(cls) {
+  if (!activeCampaignNode && !tutorialActive) {
+    activeCampaignNode = null;
+  }
   enterDeckBuilder(cls, []);
 }
 
@@ -841,12 +992,21 @@ async function startGame() {
   lastMatchDeck = { heroClass: selectedClass, cards: [...draftDeck] };
   const startBtn = document.getElementById("btn-start-ai");
   if (startBtn) startBtn.disabled = true;
-  showLoading("Finding opponent…");
+  const diffEl = document.getElementById("match-difficulty");
+  const difficulty = diffEl?.value || "normal";
+  const payload = {
+    hero_class: selectedClass,
+    deck: draftDeck,
+    difficulty,
+  };
+  if (activeCampaignNode) payload.campaign_node = activeCampaignNode;
+  if (tutorialActive) payload.tutorial = true;
+  showLoading(activeCampaignNode ? "Starting encounter…" : "Finding opponent…");
   try {
     const res  = await fetch("/api/new_game", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ hero_class: selectedClass, deck: draftDeck }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (data.error) {
@@ -877,6 +1037,7 @@ async function startGame() {
 }
 
 function goBack() {
+  if (!tutorialActive) activeCampaignNode = null;
   showScreen("screen-menu");
 }
 
@@ -1528,12 +1689,14 @@ function onGameStateUpdated(data, animCtx) {
   gameId    = data.game_id || gameId;
   CARD_DB   = data.card_db || CARD_DB;
   gameState = data;
+  advanceTutorialFromState();
   renderGame();
   if (animCtx) {
     applyActionAnimations(animCtx);
     applyPostRenderAnimations(animCtx.prevSnap);
     applyHeroAnimations(animCtx.prevHeroSnap);
   }
+  if (data.winner === "Player") onCampaignVictory();
 }
 
 // ---------------------------------------------------------------------------
@@ -2232,6 +2395,8 @@ async function endTurn() {
 
 async function abandonGame() {
   closePause(false);
+  activeCampaignNode = null;
+  tutorialActive = false;
   try {
     if (gameId) {
       await fetch("/api/resign", {
@@ -2264,6 +2429,8 @@ function resetGameState() {
   isActing         = false;
   mulliganSwapSet  = new Set();
   logRenderedCount = 0;
+  tutorialActive   = false;
+  tutorialStep     = 0;
   setAiThinking(false);
 }
 
@@ -2330,7 +2497,11 @@ function syncDeckSizeUi() {
   applyGameSpeedClass();
   updateHubContinue();
   const meta = document.getElementById("hub-meta");
-  if (meta) meta.textContent = `6 classes · ${cardCount} cards · single-player vs AI`;
+  if (meta) meta.textContent = `6 classes · ${cardCount} cards · campaign & tutorial`;
+  if (localStorage.getItem(TUTORIAL_DONE_KEY) === "1") {
+    const tbtn = document.getElementById("btn-hub-tutorial");
+    if (tbtn) tbtn.textContent = "Tutorial ✓";
+  }
   showScreen("screen-hub");
 })();
 

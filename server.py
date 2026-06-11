@@ -11,10 +11,11 @@ from flask import Flask, jsonify, request, render_template
 from game_logic import (
     CARD_DB, HERO_CLASSES, GAME_LOG, DECK_SIZE,
     OPENING_HAND_FIRST, OPENING_HAND_SECOND, COIN_CARD,
-    create_player, draw_card, start_turn, do_mulligan,
+    CAMPAIGN_NODES, create_player, draw_card, start_turn, do_mulligan,
     get_legal_moves, execute_move, check_win,
     run_ai_turn, log_action, give_coin, ai_do_mulligan,
     set_active_log, card_allowed_for_class, cards_for_class,
+    create_ai_opponent, get_campaign_node, normalize_difficulty,
 )
 
 app = Flask(__name__)
@@ -83,6 +84,12 @@ def _state_response(gs: dict, *, include_card_db: bool = False) -> dict:
     }
     if include_card_db:
         resp["card_db"] = CARD_DB
+    resp["ai_difficulty"] = gs.get("ai_difficulty", "normal")
+    resp["opponent_name"] = gs["p2"].get("name", "AI")
+    resp["campaign_node"] = gs.get("campaign_node")
+    resp["boss_id"] = gs.get("boss_id")
+    resp["tutorial"] = gs.get("tutorial", False)
+    resp["mode"] = gs.get("mode", "standard")
     return resp
 
 
@@ -129,7 +136,7 @@ def _finish_mulligan(gs: dict) -> None:
     gs["is_player_turn"] = False
     gs["turn_number"] = 1
     log_action("--- AI goes first ---")
-    run_ai_turn(gs["p2"], gs["p1"], draw=False)
+    run_ai_turn(gs["p2"], gs["p1"], draw=False, difficulty=gs.get("ai_difficulty", "normal"))
     winner = check_win(gs["p1"], gs["p2"])
     if winner:
         log_action(f"=== {winner} wins! ===")
@@ -165,6 +172,48 @@ def cards():
     })
 
 
+def _resolve_match_setup(data: dict) -> dict:
+    """Derive AI opponent, difficulty, and mode flags from a new-game request."""
+    tutorial = bool(data.get("tutorial"))
+    campaign_node = data.get("campaign_node")
+    boss_id = data.get("boss_id")
+    node = get_campaign_node(campaign_node) if campaign_node else None
+
+    if node and node.get("boss_id"):
+        boss_id = node["boss_id"]
+
+    difficulty = normalize_difficulty(data.get("difficulty"))
+    if tutorial:
+        difficulty = "easy"
+    elif node:
+        difficulty = normalize_difficulty(node.get("difficulty", difficulty))
+
+    ai_class = data.get("ai_class")
+    if node and not boss_id:
+        ai_class = node.get("ai_class", ai_class)
+
+    p2 = create_ai_opponent(
+        hero_class=ai_class,
+        boss_id=boss_id,
+        campaign_node=campaign_node if node and not boss_id else None,
+    )
+
+    mode = "tutorial" if tutorial else ("campaign" if campaign_node else "standard")
+    return {
+        "p2": p2,
+        "difficulty": difficulty,
+        "campaign_node": campaign_node,
+        "boss_id": boss_id,
+        "tutorial": tutorial,
+        "mode": mode,
+    }
+
+
+@app.route("/api/campaign", methods=["GET"])
+def campaign_info():
+    return jsonify({"nodes": CAMPAIGN_NODES, "deck_size": DECK_SIZE})
+
+
 @app.route("/api/new_game", methods=["POST"])
 def new_game():
     data       = request.get_json() or {}
@@ -182,21 +231,34 @@ def new_game():
     game_id = str(uuid.uuid4())
     GAME_LOG.clear()
 
+    match = _resolve_match_setup(data)
     player_goes_first = random.choice([True, False])
     gs = {
         "game_id":           game_id,
         "p1":                create_player("Player", player_cls, deck),
-        "p2":                create_player("AI", random.choice(HERO_CLASSES)),
+        "p2":                match["p2"],
         "turn_number":       1,
         "is_player_turn":    True,
         "mulligan_phase":    True,
         "player_goes_first": player_goes_first,
+        "ai_difficulty":     match["difficulty"],
+        "campaign_node":     match["campaign_node"],
+        "boss_id":           match["boss_id"],
+        "tutorial":          match["tutorial"],
+        "mode":              match["mode"],
         "log":               [],
     }
     GAMES[game_id] = gs
 
     with _with_game_log(gs):
         log_action("--- NEW GAME STARTED ---")
+        if gs["mode"] == "campaign" and match["campaign_node"]:
+            node = get_campaign_node(match["campaign_node"])
+            if node:
+                log_action(f"--- Campaign: {node['name']} ---")
+        if gs["tutorial"]:
+            log_action("--- Tutorial Match — follow the hints ---")
+        log_action(f"Opponent: {gs['p2']['name']} ({gs['p2']['hero_class']}) · {gs['ai_difficulty'].title()} AI")
         order = "You go first." if player_goes_first else "AI goes first — you'll receive The Coin."
         log_action(order)
         _deal_opening_hands(gs)
@@ -268,7 +330,7 @@ def do_action():
         if action == "end_turn":
             gs["is_player_turn"] = False
             log_action("--- AI's Turn ---")
-            run_ai_turn(p2, p1)
+            run_ai_turn(p2, p1, difficulty=gs.get("ai_difficulty", "normal"))
             gs["turn_number"] += 1
             winner = check_win(p1, p2)
             if not winner:

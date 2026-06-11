@@ -17,6 +17,8 @@ from game_logic import (
     create_player, draw_card, start_turn, do_mulligan,
     get_legal_moves, execute_move, check_win,
     run_ai_turn, log_action, damage_hero, get_valid_targets,
+    build_curved_ai_deck, select_ai_move, complete_deck_from_core,
+    create_ai_opponent, normalize_difficulty, BOSS_PRESETS,
     cleanup_dead, evaluate_ai_move, give_coin,
     ai_choose_mulligan, ai_do_mulligan,
     card_allowed_for_class, cards_for_class,
@@ -1283,6 +1285,38 @@ class TestStartTurnOptions(unittest.TestCase):
         self.assertEqual(len(p["hand"]), 0)
 
 
+class TestAiDeckAndDifficulty(unittest.TestCase):
+    def test_build_curved_ai_deck_size(self):
+        for cls in ["Mage", "Warrior", "Rogue", "Priest", "Paladin", "Shaman"]:
+            deck = build_curved_ai_deck(cls)
+            self.assertEqual(len(deck), DECK_SIZE)
+            for name in deck:
+                self.assertTrue(card_allowed_for_class(name, cls))
+
+    def test_boss_decks_are_valid(self):
+        for boss_id, preset in BOSS_PRESETS.items():
+            deck = complete_deck_from_core(preset["hero_class"], preset["core"])
+            self.assertEqual(len(deck), DECK_SIZE)
+            opp = create_ai_opponent(boss_id=boss_id)
+            self.assertEqual(opp["name"], preset["display_name"])
+            self.assertEqual(opp["hp"], preset["hp"])
+
+    def test_select_ai_move_easy_can_differ(self):
+        p1 = create_player("P1", "Mage")
+        p2 = create_player("AI", "Warrior")
+        p2["hand"] = ["Town Crier"]
+        p2["mana"] = 10
+        p2["max_mana"] = 10
+        legal = get_legal_moves(p2, p1)
+        self.assertTrue(legal)
+        mv = select_ai_move(legal, p2, p1, "easy")
+        self.assertIn(mv, legal)
+
+    def test_normalize_difficulty(self):
+        self.assertEqual(normalize_difficulty("hard"), "hard")
+        self.assertEqual(normalize_difficulty("bogus"), "normal")
+
+
 class TestServerApi(unittest.TestCase):
     def test_health_endpoint(self):
         from server import app
@@ -1301,6 +1335,29 @@ class TestServerApi(unittest.TestCase):
         res = client.post("/api/new_game", json={"hero_class": "Mage", "deck": bad})
         self.assertEqual(res.status_code, 400)
         self.assertIn("error", res.get_json())
+
+    def test_campaign_endpoint(self):
+        from server import app
+        client = app.test_client()
+        res = client.get("/api/campaign")
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertEqual(len(data["nodes"]), 5)
+
+    def test_new_game_campaign_boss(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        res = client.post("/api/new_game", json={
+            "hero_class": "Mage",
+            "deck": deck,
+            "campaign_node": "n5",
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertEqual(data["boss_id"], "moriarty")
+        self.assertEqual(data["opponent_name"], "Professor Moriarty")
+        self.assertEqual(data["ai_difficulty"], "hard")
 
     def test_action_response_omits_card_db(self):
         from server import app

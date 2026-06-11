@@ -249,6 +249,220 @@ def cards_for_class(hero_class: str) -> list[str]:
     """Collectable card names legal in a deck for the given hero class."""
     return [n for n in CARD_DB if card_allowed_for_class(n, hero_class)]
 
+
+AI_DIFFICULTIES = ("easy", "normal", "hard")
+
+# Target copies per mana bucket for AI deck curves (sums to DECK_SIZE).
+CURVE_TARGETS = {1: 4, 2: 8, 3: 8, 4: 6, 5: 3, 6: 1}
+
+CAMPAIGN_NODES = [
+    {
+        "id": "n1",
+        "name": "Street Urchin",
+        "subtitle": "A quick-fingered Rogue tests your opener.",
+        "difficulty": "easy",
+        "ai_class": "Rogue",
+    },
+    {
+        "id": "n2",
+        "name": "Town Guard",
+        "subtitle": "Taunts and shields slow your assault.",
+        "difficulty": "normal",
+        "ai_class": "Warrior",
+    },
+    {
+        "id": "n3",
+        "name": "Guild Librarian",
+        "subtitle": "Arcane tricks and burn spells.",
+        "difficulty": "normal",
+        "ai_class": "Mage",
+    },
+    {
+        "id": "n4",
+        "name": "Van Helsing",
+        "subtitle": "Elite hunter — charges and armor.",
+        "difficulty": "hard",
+        "boss_id": "van_helsing",
+    },
+    {
+        "id": "n5",
+        "name": "Professor Moriarty",
+        "subtitle": "Final boss — poison, daggers, and schemes.",
+        "difficulty": "hard",
+        "boss_id": "moriarty",
+    },
+]
+
+BOSS_PRESETS = {
+    "van_helsing": {
+        "display_name": "Van Helsing",
+        "hero_class": "Warrior",
+        "hp": 35,
+        "core": [
+            "Van Helsing", "Gawain", "Gawain", "Lancelot", "Lancelot",
+            "Errant Knight", "Errant Knight", "Castle Guard", "Castle Guard",
+            "Templar Captain", "Bulwark Bearer", "Bulwark Bearer",
+            "Shieldwall Sergeant", "Shieldwall Sergeant", "Rampart Raider", "Rampart Raider",
+            "Cleave Chronicle", "Cleave Chronicle", "Fortify", "Fortify",
+            "War Drums", "Ironclad Anvil", "Bulwark Bearer", "Rampart Raider",
+            "Castle Guard", "Errant Knight", "Gawain", "Lancelot", "Fortify", "Cleave Chronicle",
+        ],
+    },
+    "moriarty": {
+        "display_name": "Professor Moriarty",
+        "hero_class": "Rogue",
+        "hp": 32,
+        "core": [
+            "Professor Moriarty", "Back Alley Burglar", "Back Alley Burglar",
+            "Shadowstep Scout", "Shadowstep Scout", "Venomous Valet", "Venomous Valet",
+            "Sherlock Holmes", "Cheap Shot", "Cheap Shot", "Shiv Storm", "Shiv Storm",
+            "Thief's Shiv", "Thief's Shiv", "Assassin's Rapier", "Heist Ledger", "Heist Ledger",
+            "Cave Spider", "Cave Spider", "Rebel's Ambush", "Quill Bolt", "Quill Bolt",
+            "Back Alley Burglar", "Shadowstep Scout", "Cheap Shot", "Shiv Storm",
+            "Venomous Valet", "Heist Ledger", "Thief's Shiv", "Rebel's Ambush",
+        ],
+    },
+}
+
+
+def get_campaign_node(node_id: str) -> dict | None:
+    for node in CAMPAIGN_NODES:
+        if node["id"] == node_id:
+            return node
+    return None
+
+
+def complete_deck_from_core(hero_class: str, core: list[str]) -> list[str]:
+    """Build a legal DECK_SIZE deck starting from themed core cards."""
+    deck: list[str] = []
+    for name in core:
+        if len(deck) >= DECK_SIZE:
+            break
+        if name not in CARD_DB or not card_allowed_for_class(name, hero_class):
+            continue
+        max_copies = 1 if CARD_DB[name].get("legendary") else 2
+        if deck.count(name) < max_copies:
+            deck.append(name)
+    for name in build_curved_ai_deck(hero_class):
+        if len(deck) >= DECK_SIZE:
+            break
+        max_copies = 1 if CARD_DB[name].get("legendary") else 2
+        if deck.count(name) < max_copies:
+            deck.append(name)
+    return deck[:DECK_SIZE]
+
+
+def build_curved_ai_deck(hero_class: str) -> list[str]:
+    """Build a 30-card deck with a playable mana curve for the AI."""
+    pool = [n for n in cards_for_class(hero_class) if not CARD_DB[n].get("legendary")]
+    by_cost: dict[int, list[str]] = {}
+    for name in pool:
+        cost = max(1, min(CARD_DB[name]["cost"], 6))
+        by_cost.setdefault(cost, []).append(name)
+
+    deck: list[str] = []
+
+    def try_add(name: str) -> bool:
+        if len(deck) >= DECK_SIZE:
+            return False
+        max_copies = 1 if CARD_DB[name].get("legendary") else 2
+        if deck.count(name) >= max_copies:
+            return False
+        deck.append(name)
+        return True
+
+    for cost, need in CURVE_TARGETS.items():
+        added = 0
+        candidates = list(by_cost.get(cost, []))
+        random.shuffle(candidates)
+        for name in candidates:
+            while try_add(name) and added < need:
+                added += 1
+            if added >= need:
+                break
+        if added < need:
+            for alt in (cost - 1, cost + 1, cost - 2, cost + 2):
+                if alt < 1 or alt > 6:
+                    continue
+                for name in by_cost.get(alt, []):
+                    while try_add(name) and added < need:
+                        added += 1
+                    if added >= need:
+                        break
+                if added >= need:
+                    break
+
+    guard = 0
+    shuffled = list(pool)
+    random.shuffle(shuffled)
+    while len(deck) < DECK_SIZE and guard < DECK_SIZE * 4:
+        guard += 1
+        try_add(shuffled[guard % len(shuffled)])
+    return deck[:DECK_SIZE]
+
+
+def create_ai_opponent(
+    *,
+    hero_class: str | None = None,
+    boss_id: str | None = None,
+    campaign_node: str | None = None,
+) -> dict:
+    """Create an AI player with a curved or scripted deck."""
+    if boss_id and boss_id in BOSS_PRESETS:
+        preset = BOSS_PRESETS[boss_id]
+        hero_class = preset["hero_class"]
+        deck = complete_deck_from_core(hero_class, preset["core"])
+        player = create_player(preset["display_name"], hero_class, deck)
+        player["hp"] = preset.get("hp", 30)
+        return player
+
+    ai_class = hero_class or "Mage"
+    if campaign_node:
+        node = get_campaign_node(campaign_node)
+        if node and not boss_id:
+            ai_class = node.get("ai_class", ai_class)
+
+    deck = build_curved_ai_deck(ai_class)
+    return create_player("AI", ai_class, deck)
+
+
+def normalize_difficulty(difficulty: str | None) -> str:
+    d = (difficulty or "normal").lower()
+    return d if d in AI_DIFFICULTIES else "normal"
+
+
+def select_ai_move(
+    legal: list,
+    p2: dict,
+    p1: dict,
+    difficulty: str = "normal",
+) -> tuple | None:
+    """Pick a move for the AI based on difficulty tier."""
+    if not legal:
+        return None
+
+    scored = [(evaluate_ai_move(p2, p1, mv), mv) for mv in legal]
+    scored.sort(key=lambda pair: -pair[0])
+
+    if difficulty == "easy":
+        if random.random() < 0.4:
+            return random.choice(legal)
+        pool = scored[: max(1, (len(scored) + 1) // 2)]
+        return random.choice(pool)[1]
+
+    best_score = scored[0][0]
+    if best_score < 0:
+        return None
+
+    if difficulty == "hard":
+        contenders = [mv for score, mv in scored if score >= best_score - 1.5]
+        return max(contenders, key=lambda mv: evaluate_ai_move(p2, p1, mv))
+
+    # normal — slight variety among near-best lines
+    contenders = [mv for score, mv in scored if score >= best_score - 0.75]
+    return random.choice(contenders)
+
+
 KW_COLORS = {
     "taunt": "#E74C3C", "divine_shield": "#F1C40F", "charge": "#2ECC71",
     "poisonous": "#9B59B6", "battlecry": "#3498DB", "deathrattle": "#566573",
@@ -298,13 +512,7 @@ def create_player(name: str, hero_class: str = "Mage",
     if custom_deck is not None:
         deck = custom_deck.copy()
     else:
-        deck = []
-        build_pool = cards_for_class(hero_class)
-        while len(deck) < DECK_SIZE:
-            c = random.choice(build_pool)
-            max_copies = 1 if CARD_DB[c].get("legendary") else 2
-            if deck.count(c) < max_copies:
-                deck.append(c)
+        deck = build_curved_ai_deck(hero_class)
     if shuffle:
         random.shuffle(deck)
     return {
@@ -956,24 +1164,24 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
     return score
 
 
-def run_ai_turn(p2: dict, p1: dict, max_moves: int = 10, *, draw: bool = True) -> list[tuple]:
+def run_ai_turn(
+    p2: dict,
+    p1: dict,
+    max_moves: int = 10,
+    *,
+    draw: bool = True,
+    difficulty: str = "normal",
+) -> list[tuple]:
     """Execute AI turn synchronously. Returns the list of moves made."""
+    difficulty = normalize_difficulty(difficulty)
     start_turn(p2, draw=draw)
     moves_made = []
     for _ in range(max_moves):
         if check_win(p1, p2):
             break
         legal = get_legal_moves(p2, p1)
-        if not legal:
-            break
-        best, best_score = None, -9999.0
-        for mv in legal:
-            s = evaluate_ai_move(p2, p1, mv)
-            if s > best_score:
-                best_score, best = s, mv
-            elif s == best_score and random.random() < 0.5:
-                best = mv
-        if best_score < 0:
+        best = select_ai_move(legal, p2, p1, difficulty)
+        if best is None:
             break
         execute_move(p2, p1, best)
         moves_made.append(best)

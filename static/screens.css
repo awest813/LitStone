@@ -92,6 +92,146 @@
 
 .hub-continue.hidden { display: none; }
 
+/* ---- Campaign map ---- */
+#screen-campaign {
+  background: linear-gradient(180deg, #050a12 0%, #0a1420 100%);
+  z-index: 1;
+  overflow-y: auto;
+  padding-bottom: 32px;
+}
+
+#screen-campaign.active {
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.campaign-title {
+  font-family: 'Cinzel', serif;
+  font-size: 28px;
+  color: var(--col-gold);
+  margin: 8px 0 4px;
+  text-shadow: 0 0 16px rgba(232, 160, 32, .35);
+}
+
+.campaign-subtitle {
+  font-size: 13px;
+  color: var(--col-text-dim);
+  margin-bottom: 24px;
+  text-align: center;
+  padding: 0 16px;
+}
+
+.campaign-map {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(420px, 100%);
+  padding: 0 16px;
+}
+
+.campaign-node {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, var(--col-surface), var(--col-panel));
+  border: 1px solid var(--col-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color .15s, transform .15s, box-shadow .15s;
+  text-align: left;
+}
+
+.campaign-node:hover:not(.campaign-node--locked) {
+  border-color: var(--col-gold);
+  transform: translateX(4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+}
+
+.campaign-node--locked {
+  opacity: .45;
+  cursor: not-allowed;
+  filter: grayscale(.4);
+}
+
+.campaign-node--done {
+  border-color: var(--col-green);
+  box-shadow: inset 0 0 12px rgba(0, 184, 148, .12);
+}
+
+.campaign-node-index {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  font-size: 14px;
+  background: rgba(20, 40, 64, .9);
+  border: 2px solid var(--col-border-bright);
+  flex-shrink: 0;
+}
+
+.campaign-node--boss .campaign-node-index {
+  border-color: var(--col-gold);
+  color: var(--col-gold);
+}
+
+.campaign-node--elite .campaign-node-index {
+  border-color: var(--col-purple-bright);
+  color: var(--col-purple-bright);
+}
+
+.campaign-node-body { flex: 1; min-width: 0; }
+
+.campaign-node-name {
+  font-family: 'Cinzel', serif;
+  font-size: 15px;
+  color: var(--col-text);
+  margin-bottom: 2px;
+}
+
+.campaign-node-sub {
+  font-size: 11px;
+  color: var(--col-text-dim);
+  line-height: 1.35;
+}
+
+.campaign-node-badge {
+  font-size: 9px;
+  font-family: 'Cinzel', serif;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--col-mana-bright);
+  flex-shrink: 0;
+}
+
+.campaign-node--done .campaign-node-badge { color: var(--col-green); }
+
+/* Deck builder match options */
+.match-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.match-option-label {
+  font-size: 11px;
+  color: var(--col-text-dim);
+  font-family: 'Cinzel', serif;
+}
+
+.match-difficulty-select {
+  flex: 1;
+  min-width: 0;
+}
+
 /* ---- Class select header ---- */
 .menu-header {
   display: flex;
