@@ -20,22 +20,50 @@
 <div id="screen-hub" class="screen active">
   <div class="menu-bg-overlay"></div>
   <div class="hub-inner">
-    <div class="hub-emblem" aria-hidden="true">📜</div>
-    <h1 class="game-title">LitStone</h1>
-    <p class="hub-tagline">Literary legends · Arcane duels</p>
-    <div class="hub-actions">
-      <button type="button" class="btn btn-primary btn-hub-play" id="btn-hub-play" onclick="startStandardPlay()">
-        Play
+    <header class="hub-brand">
+      <div class="hub-emblem" aria-hidden="true">📜</div>
+      <h1 class="game-title">LitStone</h1>
+      <p class="hub-tagline">Literary legends · Arcane duels</p>
+    </header>
+
+    <div class="hub-modes" role="group" aria-label="Game modes">
+      <button type="button" class="hub-mode hub-mode--play" id="btn-hub-play" onclick="startStandardPlay()">
+        <span class="hub-mode-icon" aria-hidden="true">⚔️</span>
+        <span class="hub-mode-text">
+          <span class="hub-mode-title">Play</span>
+          <span class="hub-mode-desc">Quick match vs AI</span>
+        </span>
       </button>
-      <button type="button" class="btn btn-hub-secondary" onclick="goToCampaign()">Campaign</button>
-      <button type="button" class="btn btn-hub-secondary" onclick="goToPractice()">Practice</button>
-      <button type="button" class="btn btn-hub-secondary" id="btn-hub-tutorial" onclick="startTutorial()">Tutorial</button>
+      <button type="button" class="hub-mode hub-mode--career" onclick="goToCareer()">
+        <span class="hub-mode-icon" aria-hidden="true">📖</span>
+        <span class="hub-mode-text">
+          <span class="hub-mode-title">Career</span>
+          <span class="hub-mode-desc" id="hub-career-progress">5 chapter duels</span>
+        </span>
+      </button>
+      <button type="button" class="hub-mode hub-mode--practice" onclick="goToPractice()">
+        <span class="hub-mode-icon" aria-hidden="true">🧪</span>
+        <span class="hub-mode-text">
+          <span class="hub-mode-title">Practice</span>
+          <span class="hub-mode-desc">Sandbox · custom HP &amp; mana</span>
+        </span>
+      </button>
+      <button type="button" class="hub-mode hub-mode--tutorial" id="btn-hub-tutorial" onclick="startTutorial()">
+        <span class="hub-mode-icon" aria-hidden="true">🎓</span>
+        <span class="hub-mode-text">
+          <span class="hub-mode-title">Tutorial</span>
+          <span class="hub-mode-desc">Learn the basics</span>
+        </span>
+      </button>
+    </div>
+
+    <div class="hub-footer">
       <button type="button" class="btn hub-continue hidden" id="btn-hub-continue" onclick="continueLastDeck()">
         Continue Last Deck
       </button>
-      <button type="button" class="btn btn-hub-secondary" onclick="openSettings()" aria-label="Settings">Settings</button>
+      <button type="button" class="btn btn-hub-ghost" onclick="openSettings()" aria-label="Settings">⚙️ Settings</button>
+      <p class="hub-meta" id="hub-meta">6 classes · 109 cards · single-player vs AI</p>
     </div>
-    <p class="hub-meta" id="hub-meta">6 classes · 109 cards · single-player vs AI</p>
   </div>
 </div>
 
@@ -65,15 +93,24 @@
   </div>
 </div>
 
-<!-- =====================  SCREEN: CAMPAIGN  =============================== -->
+<!-- =====================  SCREEN: CAREER  ================================= -->
 <div id="screen-campaign" class="screen">
   <div class="menu-bg-overlay"></div>
   <header class="menu-header">
     <button type="button" class="btn btn-back btn-icon" onclick="goToHub()" title="Back" aria-label="Back to title">←</button>
+    <nav class="flow-breadcrumb flow-breadcrumb--header" id="career-flow-breadcrumb" aria-label="Navigation trail"></nav>
     <span class="menu-header-spacer"></span>
   </header>
-  <h2 class="campaign-title">Literary Campaign</h2>
-  <p class="campaign-subtitle">Defeat five encounters to conquer the anthology.</p>
+  <div class="career-hero">
+    <h2 class="campaign-title">Literary Career</h2>
+    <p class="campaign-subtitle">Conquer five chapters of the anthology — each duel unlocks the next.</p>
+    <div class="career-progress-wrap" aria-label="Career progress">
+      <div class="career-progress-track">
+        <div class="career-progress-fill" id="career-progress-fill"></div>
+      </div>
+      <span class="career-progress-label" id="career-progress-label">0 / 5 chapters</span>
+    </div>
+  </div>
   <div class="campaign-map" id="campaign-map"></div>
 </div>
 
@@ -82,13 +119,16 @@
   <div class="menu-bg-overlay"></div>
   <header class="menu-header">
     <button type="button" class="btn btn-back btn-icon" onclick="goBackFromClassSelect()" title="Back" aria-label="Back">←</button>
-    <span class="menu-header-spacer"></span>
+    <nav class="flow-breadcrumb flow-breadcrumb--header" id="class-flow-breadcrumb" aria-label="Navigation trail"></nav>
     <div class="menu-header-actions">
       <button type="button" class="btn btn-icon" onclick="openSettings()" title="Settings" aria-label="Settings">⚙️</button>
     </div>
   </header>
-  <h1 class="game-title">LitStone</h1>
-  <p class="menu-subtitle">Choose Your Class</p>
+  <div class="class-select-intro">
+    <span class="mode-chip" id="class-mode-chip">Quick Play</span>
+    <h1 class="game-title class-select-title">Choose Your Class</h1>
+    <p class="menu-subtitle" id="menu-mode-subtitle">Pick a hero, then build your 30-card deck.</p>
+  </div>
   <div class="hero-grid">
 
     <div class="hero-card" data-class="Mage" role="button" tabindex="0" aria-label="Choose Mage class" onclick="selectClass('Mage')">
@@ -177,15 +217,21 @@
 <!-- =====================  SCREEN: DECK BUILDER  ========================= -->
 <div id="screen-deck" class="screen">
   <header class="deck-header">
-    <button type="button" class="btn btn-back deck-header-back" onclick="goBack()" aria-label="Back to class select">← Classes</button>
+    <button type="button" class="btn btn-back deck-header-back" id="deck-header-back" onclick="goBack()" aria-label="Back">← Classes</button>
     <div class="deck-class-emblem" id="deck-class-emblem" aria-hidden="true">🔮</div>
     <div class="deck-header-main">
+      <nav class="flow-breadcrumb" id="deck-flow-breadcrumb" aria-label="Navigation trail"></nav>
+      <span class="mode-chip mode-chip--deck" id="deck-mode-chip">Quick Play</span>
       <h2 class="deck-title" id="deck-title">Build Your Deck</h2>
       <p class="deck-subtitle" id="deck-subtitle">Click cards to add · Maximum 2 copies · 30 cards total</p>
       <p class="deck-validation" id="deck-validation" aria-live="polite"></p>
     </div>
     <button type="button" class="btn btn-icon" onclick="openSettings()" title="Settings" aria-label="Settings">⚙️</button>
   </header>
+
+  <button type="button" class="deck-sidebar-toggle" id="deck-sidebar-toggle" onclick="toggleDeckSidebar()" aria-expanded="true" aria-controls="deck-sidebar">
+    <span id="deck-sidebar-toggle-label">Hide deck panel</span>
+  </button>
 
   <!-- Filter & sort controls -->
   <div class="deck-controls">
@@ -219,7 +265,7 @@
     <div class="card-pool" id="card-pool"></div>
 
     <!-- Sidebar -->
-    <div class="deck-sidebar">
+    <div class="deck-sidebar" id="deck-sidebar">
       <div class="deck-count-box">
         <span id="deck-count">0</span><span class="deck-count-sep">/</span><span id="deck-size-max">30</span>
         <div class="deck-progress-bar"><div id="deck-progress" class="deck-progress-fill"></div></div>
@@ -258,9 +304,11 @@
           <option value="hard">Hard</option>
         </select>
       </div>
-      <button type="button" class="btn btn-primary" id="btn-start-ai" disabled onclick="startGame()">
-        ⚔️ Play vs AI
-      </button>
+      <div class="deck-start-wrap">
+        <button type="button" class="btn btn-primary btn-start-match" id="btn-start-ai" disabled onclick="startGame()">
+          ⚔️ Start Match
+        </button>
+      </div>
     </div>
   </div>
 

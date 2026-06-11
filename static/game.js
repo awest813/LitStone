@@ -32,6 +32,8 @@ let tutorialActive = false;
 let tutorialStep = 0;
 let practiceActive = false;
 let practiceOptions = { p1_hp: 30, p2_hp: 30, infinite_mana: false };
+let deckSidebarOpen = true;
+let poolTooltipPinned = null;
 const CAMPAIGN_PROGRESS_KEY = "litstoneCampaignProgress";
 const TUTORIAL_DONE_KEY = "litstoneTutorialDone";
 
@@ -157,7 +159,155 @@ function showScreen(id) {
     else s.style.display = "";
   });
   if (id === "screen-game") initGameScreenUi();
-  if (id === "screen-hub") updateHubContinue();
+  if (id === "screen-hub") {
+    updateHubContinue();
+    updateHubCareerProgress();
+  }
+  updateMenuFlowUi(id);
+}
+
+function getPlayMode() {
+  if (tutorialActive) return "tutorial";
+  if (practiceActive) return "practice";
+  if (activeCampaignNode) return "career";
+  return "standard";
+}
+
+function getActiveCareerNode() {
+  return campaignNodes.find(n => n.id === activeCampaignNode) || null;
+}
+
+function getPlayModeInfo() {
+  const mode = getPlayMode();
+  const node = getActiveCareerNode();
+  const info = {
+    standard: { label: "Quick Play", chipClass: "", startLabel: "⚔️ Start Match", backLabel: "← Classes" },
+    career:   { label: "Career", chipClass: "mode-chip--career", startLabel: "⚔️ Begin Encounter", backLabel: "← Career" },
+    practice: { label: "Practice", chipClass: "mode-chip--practice", startLabel: "⚔️ Enter Sandbox", backLabel: "← Practice" },
+    tutorial: { label: "Tutorial", chipClass: "mode-chip--tutorial", startLabel: "⚔️ Start Tutorial", backLabel: "← Menu" },
+  };
+  const base = info[mode] || info.standard;
+  if (mode === "career" && node) {
+    return { ...base, label: `Career · ${node.name}`, nodeName: node.name };
+  }
+  return base;
+}
+
+function renderBreadcrumbHtml(crumbs) {
+  return crumbs.map((c, i) => {
+    const sep = i > 0 ? `<span class="flow-crumb-sep" aria-hidden="true">›</span>` : "";
+    const cls = i === crumbs.length - 1 ? "flow-crumb flow-crumb--current" : "flow-crumb";
+    return `${sep}<span class="${cls}">${c}</span>`;
+  }).join("");
+}
+
+function setBreadcrumb(elId, crumbs) {
+  const el = document.getElementById(elId);
+  if (el) el.innerHTML = renderBreadcrumbHtml(crumbs);
+}
+
+function updateMenuFlowUi(screenId) {
+  const modeInfo = getPlayModeInfo();
+  const mode = getPlayMode();
+
+  if (screenId === "screen-menu") {
+    setBreadcrumb("class-flow-breadcrumb", ["LitStone", modeInfo.label, "Class"]);
+    const chip = document.getElementById("class-mode-chip");
+    if (chip) {
+      chip.textContent = modeInfo.label;
+      chip.className = `mode-chip ${modeInfo.chipClass}`.trim();
+    }
+    const sub = document.getElementById("menu-mode-subtitle");
+    if (sub) {
+      if (mode === "career" && modeInfo.nodeName) {
+        sub.textContent = `${modeInfo.nodeName} — choose your hero, then build a deck for this duel.`;
+      } else if (mode === "practice") {
+        sub.textContent = "Pick a class and deck for your sandbox sparring match.";
+      } else if (mode === "tutorial") {
+        sub.textContent = "A guided Mage duel — we'll walk you through each step.";
+      } else {
+        sub.textContent = "Pick a hero, then build your 30-card deck.";
+      }
+    }
+  }
+
+  if (screenId === "screen-deck") {
+    const crumbs = ["LitStone", modeInfo.label];
+    if (selectedClass) crumbs.push(selectedClass, "Deck");
+    setBreadcrumb("deck-flow-breadcrumb", crumbs);
+    const chip = document.getElementById("deck-mode-chip");
+    if (chip) {
+      chip.textContent = modeInfo.label;
+      chip.className = `mode-chip mode-chip--deck ${modeInfo.chipClass}`.trim();
+    }
+    updateDeckBackLabel();
+    updateStartButtonLabel();
+    const diffWrap = document.querySelector(".match-options");
+    if (diffWrap) diffWrap.classList.toggle("hidden", mode === "career" || mode === "practice" || mode === "tutorial");
+  }
+
+  if (screenId === "screen-campaign") {
+    setBreadcrumb("career-flow-breadcrumb", ["LitStone", "Career"]);
+    updateCareerProgressBar();
+  }
+}
+
+function updateDeckBackLabel() {
+  const btn = document.getElementById("deck-header-back");
+  if (btn) btn.textContent = getPlayModeInfo().backLabel;
+}
+
+function updateStartButtonLabel() {
+  const btn = document.getElementById("btn-start-ai");
+  if (!btn) return;
+  const diffWrap = document.querySelector(".match-options");
+  if (tutorialActive) {
+    btn.textContent = "Tutorial in progress…";
+    btn.disabled = true;
+    if (diffWrap) diffWrap.classList.add("hidden");
+    return;
+  }
+  if (diffWrap) diffWrap.classList.remove("hidden");
+  btn.textContent = getPlayModeInfo().startLabel;
+  btn.disabled = draftDeck.length !== DECK_SIZE;
+}
+
+function toggleDeckSidebar() {
+  deckSidebarOpen = !deckSidebarOpen;
+  const sidebar = document.getElementById("deck-sidebar");
+  const toggle = document.getElementById("deck-sidebar-toggle");
+  const label = document.getElementById("deck-sidebar-toggle-label");
+  if (sidebar) sidebar.classList.toggle("deck-sidebar--collapsed", !deckSidebarOpen);
+  if (toggle) toggle.setAttribute("aria-expanded", deckSidebarOpen ? "true" : "false");
+  if (label) label.textContent = deckSidebarOpen ? "Hide deck panel" : "Show deck panel";
+}
+
+function updateHubCareerProgress() {
+  const el = document.getElementById("hub-career-progress");
+  if (!el) return;
+  const completed = getCampaignProgress().length;
+  const total = campaignNodes.length || 5;
+  if (completed >= total) {
+    el.textContent = "Career complete ✓";
+  } else if (completed > 0) {
+    el.textContent = `${completed}/${total} chapters cleared`;
+  } else {
+    el.textContent = `${total} chapter duels`;
+  }
+}
+
+function updateCareerProgressBar() {
+  const completed = getCampaignProgress();
+  const total = campaignNodes.length || 5;
+  const pct = total ? Math.round((completed.length / total) * 100) : 0;
+  const fill = document.getElementById("career-progress-fill");
+  const label = document.getElementById("career-progress-label");
+  if (fill) fill.style.width = `${pct}%`;
+  if (label) {
+    label.textContent = completed.length >= total
+      ? `Career complete — ${total}/${total} chapters`
+      : `${completed.length} / ${total} chapters`;
+  }
 }
 
 function isNarrowViewport() {
@@ -211,7 +361,7 @@ function updateGameHelpBar() {
     return;
   }
   if (gameState.mode === "campaign" && gameState.opponent_name) {
-    bar.textContent = `vs ${gameState.opponent_name} · ${gameState.ai_difficulty} AI`;
+    bar.textContent = `Career · vs ${gameState.opponent_name} · ${gameState.ai_difficulty} AI`;
     return;
   }
   bar.textContent = "Play from hand · Attack glowing minions · Esc or right-click to cancel";
@@ -294,6 +444,10 @@ function goToClassSelect() {
   showScreen("screen-menu");
 }
 
+function goToCareer() {
+  goToCampaign();
+}
+
 function startStandardPlay() {
   practiceActive = false;
   activeCampaignNode = null;
@@ -357,6 +511,7 @@ async function goToCampaign() {
     showStatusToast("Could not load campaign. Try again.");
   }
   renderCampaignMap();
+  updateCareerProgressBar();
   showScreen("screen-campaign");
 }
 
@@ -395,6 +550,8 @@ function renderCampaignMap() {
     }
     map.appendChild(div);
   });
+  updateCareerProgressBar();
+  updateHubCareerProgress();
 }
 
 function startCampaignNode(node) {
@@ -404,7 +561,6 @@ function startCampaignNode(node) {
   const diffEl = document.getElementById("match-difficulty");
   if (diffEl && node.difficulty) diffEl.value = node.difficulty;
   const sub = document.getElementById("deck-subtitle");
-  if (sub) sub.textContent = `Campaign: ${node.name} · ${node.difficulty} AI`;
   goToClassSelect();
 }
 
@@ -420,8 +576,6 @@ async function startTutorial() {
   if (diffEl) diffEl.value = "easy";
   enterDeckBuilder("Mage", []);
   loadStarterDeck();
-  const sub = document.getElementById("deck-subtitle");
-  if (sub) sub.textContent = "Tutorial — learn minions, attacks, and turns";
   await startGame();
 }
 
@@ -431,7 +585,8 @@ function onCampaignVictory() {
   if (!completed.includes(activeCampaignNode)) {
     completed.push(activeCampaignNode);
     saveCampaignProgress(completed);
-    showStatusToast("Campaign node cleared!");
+    showStatusToast("Career chapter cleared!");
+    updateHubCareerProgress();
   }
 }
 
@@ -605,15 +760,13 @@ function continueLastDeck() {
 }
 
 function deckBuilderSubtitle(cls) {
-  if (tutorialActive) return "Tutorial match · Easy AI · follow the hints";
+  if (tutorialActive) return "Tutorial — follow the hints in the help bar";
   if (practiceActive) {
     const mana = practiceOptions.infinite_mana ? " · infinite mana" : "";
-    return `Practice — ${practiceOptions.p1_hp} HP vs AI ${practiceOptions.p2_hp} HP${mana}`;
+    return `Sandbox · ${practiceOptions.p1_hp} HP vs AI ${practiceOptions.p2_hp} HP${mana}`;
   }
-  if (activeCampaignNode) {
-    const node = campaignNodes.find(n => n.id === activeCampaignNode);
-    if (node) return `Campaign: ${node.name} · ${node.difficulty} AI`;
-  }
+  const node = getActiveCareerNode();
+  if (node) return `Career duel · ${node.name} · ${node.difficulty} AI`;
   return `${cls} + neutral cards · Max 2 copies · ${DECK_SIZE} cards total`;
 }
 
@@ -644,6 +797,12 @@ function enterDeckBuilder(cls, initialDeck) {
   updateDeckSidebar();
   renderSavedDecks();
   updateDeckValidation();
+  updateStartButtonLabel();
+  deckSidebarOpen = true;
+  const sidebar = document.getElementById("deck-sidebar");
+  if (sidebar) sidebar.classList.remove("deck-sidebar--collapsed");
+  const toggle = document.getElementById("deck-sidebar-toggle");
+  if (toggle) toggle.setAttribute("aria-expanded", "true");
 }
 
 function selectClass(cls) {
@@ -857,11 +1016,26 @@ function renderCardPool() {
       <div class="pool-name">${name}</div>
       ${statsHtml}
     `;
-    if (!isFull) {
-      div.addEventListener("click", () => addCardToDeck(name));
-    }
-    div.addEventListener("mouseenter", e => showPoolTooltip(e, name, card));
-    div.addEventListener("mouseleave", () => hideTooltip("card-tooltip"));
+    div.addEventListener("click", e => {
+      if (isNarrowViewport()) {
+        if (poolTooltipPinned === name) {
+          poolTooltipPinned = null;
+          hideTooltip("card-tooltip");
+          if (!isFull) addCardToDeck(name);
+        } else {
+          poolTooltipPinned = name;
+          showPoolTooltip(e, name, card);
+        }
+        return;
+      }
+      if (!isFull) addCardToDeck(name);
+    });
+    div.addEventListener("mouseenter", e => {
+      if (!isNarrowViewport()) showPoolTooltip(e, name, card);
+    });
+    div.addEventListener("mouseleave", () => {
+      if (!isNarrowViewport()) hideTooltip("card-tooltip");
+    });
     frag.appendChild(div);
   });
   pool.appendChild(frag);
@@ -908,10 +1082,14 @@ function updateDeckSidebar() {
     list.appendChild(li);
   });
 
-  document.getElementById("btn-start-ai").disabled = count !== DECK_SIZE;
   const startBtn = document.getElementById("btn-start-ai");
   if (startBtn) {
-    startBtn.textContent = count === DECK_SIZE ? "⚔️ Play vs AI" : `Need ${DECK_SIZE - count} cards`;
+    if (count === DECK_SIZE) {
+      updateStartButtonLabel();
+    } else {
+      startBtn.disabled = true;
+      startBtn.textContent = `Need ${DECK_SIZE - count} more card${DECK_SIZE - count === 1 ? "" : "s"}`;
+    }
   }
   renderManaCurve();
   updateDeckValidation();
@@ -2674,14 +2852,27 @@ function syncDeckSizeUi() {
   applyGameSpeedClass();
   updateHubContinue();
   const meta = document.getElementById("hub-meta");
-  if (meta) meta.textContent = `6 classes · ${cardCount} cards · campaign & tutorial`;
+  if (meta) meta.textContent = `6 classes · ${cardCount} cards · career & practice`;
+  try {
+    const camp = await apiFetch("/api/campaign");
+    campaignNodes = camp.nodes || [];
+  } catch (_) {}
+  updateHubCareerProgress();
   if (localStorage.getItem(TUTORIAL_DONE_KEY) === "1") {
     const tbtn = document.getElementById("btn-hub-tutorial");
-    if (tbtn) tbtn.textContent = "Tutorial ✓";
+    const title = tbtn?.querySelector(".hub-mode-title");
+    if (title) title.textContent = "Tutorial ✓";
   }
   showScreen("screen-hub");
 })();
 
 document.getElementById("settings-modal")?.addEventListener("click", e => {
   if (e.target.id === "settings-modal") closeSettings();
+});
+
+document.addEventListener("click", e => {
+  if (!poolTooltipPinned) return;
+  if (e.target.closest(".pool-card") || e.target.closest("#card-tooltip")) return;
+  poolTooltipPinned = null;
+  hideTooltip("card-tooltip");
 });
