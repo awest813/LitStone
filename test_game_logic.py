@@ -415,6 +415,14 @@ class TestExecuteMove(unittest.TestCase):
         execute_move(p1, p2, ("play", 0, 0))
         self.assertEqual(p2["board"][0]["hp"], 2)
 
+    def test_play_damage_spell_pops_divine_shield(self):
+        p1, p2 = self._setup_game()
+        p2["board"].append(_make_minion("Shielded", 2, 5, divine_shield=True))
+        p1["hand"] = ["Quill Bolt"]
+        execute_move(p1, p2, ("play", 0, 0))
+        self.assertFalse(p2["board"][0].get("divine_shield"))
+        self.assertEqual(p2["board"][0]["hp"], 5)
+
     def test_play_damage_spell_kills_minion(self):
         p1, p2 = self._setup_game()
         p1["hand"] = ["Quill Bolt"]
@@ -1024,6 +1032,74 @@ class TestSilenceMechanic(unittest.TestCase):
         execute_move(p1, p2, ("play", 0, 0))
         # Deathrattle should NOT have fired
         self.assertEqual(p2["hp"], 30, "Silenced deathrattle must not deal damage")
+
+    def test_silence_on_fresh_charge_minion_cannot_attack(self):
+        p1, p2 = self._setup_game()
+        charger = _make_minion("Errant Knight", 3, 3, charge=True, can_attack=True, turns_on_board=0)
+        p2["board"].append(charger)
+        p1["hand"] = ["Tome of Silence"]
+        execute_move(p1, p2, ("play", 0, 0))
+        self.assertFalse(p2["board"][0].get("charge"))
+        self.assertFalse(p2["board"][0]["can_attack"])
+        attack_moves = [m for m in get_legal_moves(p2, p1) if m[0] == "attack"]
+        self.assertEqual(attack_moves, [])
+
+    def test_silence_on_veteran_charge_minion_can_still_attack(self):
+        p1, p2 = self._setup_game()
+        charger = _make_minion("Errant Knight", 3, 3, charge=True, can_attack=True, turns_on_board=1)
+        p2["board"].append(charger)
+        p1["hand"] = ["Tome of Silence"]
+        execute_move(p1, p2, ("play", 0, 0))
+        self.assertFalse(p2["board"][0].get("charge"))
+        self.assertTrue(p2["board"][0]["can_attack"])
+
+
+class TestSpellShieldInteractions(unittest.TestCase):
+    def setUp(self):
+        GAME_LOG.clear()
+
+    def _setup_game(self):
+        p1 = create_player("P1", "Mage")
+        p2 = create_player("AI", "Warrior")
+        p1["mana"] = 10
+        p1["max_mana"] = 10
+        p2["mana"] = 10
+        p2["max_mana"] = 10
+        return p1, p2
+
+    def test_damage_spell_pops_divine_shield_without_hp_loss(self):
+        p1, p2 = self._setup_game()
+        p2["board"].append(_make_minion("Shielded", 2, 5, divine_shield=True))
+        p1["hand"] = ["Quill Bolt"]
+        execute_move(p1, p2, ("play", 0, 0))
+        self.assertFalse(p2["board"][0].get("divine_shield"))
+        self.assertEqual(p2["board"][0]["hp"], 5)
+
+    def test_aoe_pops_divine_shield_without_hp_loss(self):
+        p1, p2 = self._setup_game()
+        p2["board"].append(_make_minion("Shielded", 2, 5, divine_shield=True))
+        p1["hand"] = ["Inkwell Blast"]
+        execute_move(p1, p2, ("play", 0, None))
+        self.assertFalse(p2["board"][0].get("divine_shield"))
+        self.assertEqual(p2["board"][0]["hp"], 5)
+
+    def test_mage_hero_power_pops_divine_shield(self):
+        p1, p2 = self._setup_game()
+        p2["board"].append(_make_minion("Shielded", 2, 5, divine_shield=True))
+        p1["mana"] = 2
+        execute_move(p1, p2, ("hero_power", None, 0))
+        self.assertFalse(p2["board"][0].get("divine_shield"))
+        self.assertEqual(p2["board"][0]["hp"], 5)
+
+    def test_priest_hero_power_heals_friendly_minion(self):
+        p1 = create_player("P1", "Priest")
+        p2 = create_player("AI", "Warrior")
+        p1["mana"] = 2
+        damaged = _make_minion("Acolyte", 1, 3, max_hp=5)
+        damaged["hp"] = 1
+        p1["board"].append(damaged)
+        execute_move(p1, p2, ("hero_power", None, 0))
+        self.assertEqual(p1["board"][0]["hp"], 3)
 
 
 class TestHeroAttackEdgeCases(unittest.TestCase):
@@ -1732,6 +1808,60 @@ class TestServerApi(unittest.TestCase):
         res = client.post("/api/mulligan", json={"game_id": gid, "indices": [0]})
         self.assertEqual(res.status_code, 400)
         self.assertIn("mulligan", res.get_json()["error"].lower())
+
+    def _start_match(self, client, hero_class="Mage", deck=None):
+        deck = deck or create_player("P", hero_class, shuffle=False)["deck"]
+        start = client.post("/api/new_game", json={"hero_class": hero_class, "deck": deck})
+        self.assertEqual(start.status_code, 200)
+        gid = start.get_json()["game_id"]
+        mull = client.post("/api/mulligan", json={"game_id": gid, "indices": []})
+        self.assertEqual(mull.status_code, 200)
+        return gid
+
+    def test_action_missing_game_id_returns_400(self):
+        from server import app
+        client = app.test_client()
+        res = client.post("/api/action", json={"action": "end_turn"})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("No game in progress", res.get_json()["error"])
+
+    def test_action_not_your_turn_returns_400(self):
+        from server import GAMES, app
+        client = app.test_client()
+        gid = self._start_match(client)
+        GAMES[gid]["is_player_turn"] = False
+        res = client.post("/api/action", json={"game_id": gid, "action": "end_turn"})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("Not your turn", res.get_json()["error"])
+
+    def test_play_add_shield_via_api(self):
+        from server import GAMES, app
+        client = app.test_client()
+        gid = self._start_match(client)
+        game = GAMES[gid]
+        game["p1"]["hand"] = ["Enchanted Shield"]
+        game["p1"]["mana"] = 10
+        game["p1"]["board"] = [_make_minion("Town Crier", 1, 2)]
+        res = client.post("/api/action", json={
+            "game_id": gid, "action": "play", "idx": 0, "target": 0,
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(GAMES[gid]["p1"]["board"][0].get("divine_shield"))
+
+    def test_play_silence_via_api(self):
+        from server import GAMES, app
+        client = app.test_client()
+        gid = self._start_match(client)
+        game = GAMES[gid]
+        taunter = _make_minion("Castle Guard", 2, 3, taunt=True)
+        game["p2"]["board"] = [taunter]
+        game["p1"]["hand"] = ["Tome of Silence"]
+        game["p1"]["mana"] = 10
+        res = client.post("/api/action", json={
+            "game_id": gid, "action": "play", "idx": 0, "target": 0,
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(GAMES[gid]["p2"]["board"][0].get("taunt"))
 
 
 class TestCardText(unittest.TestCase):
