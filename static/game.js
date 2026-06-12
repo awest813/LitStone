@@ -43,6 +43,21 @@ const MANA_CURVE_MAX_COST   = 7;   // buckets 1-7; costs ≥7 are grouped under 
 const MAX_AUTOFILL_ATTEMPTS = 500; // safety cap for the random auto-fill loop
 // Ideal curve targets (mirrors game_logic.CURVE_TARGETS + 7+ bucket for 6+ mana)
 const IDEAL_CURVE = { 1: 4, 2: 8, 3: 8, 4: 6, 5: 3, 6: 1 };
+const GAME_LIMITS = {
+  MAX_MANA: 10,
+  MAX_BOARD_SIZE: 7,
+  MAX_HAND_SIZE: 10,
+  HERO_POWER_COST: 2,
+  LOG_DISPLAY_LIMIT: 60,
+  STATUS_TOAST_MS: 2400,
+};
+const SELECTION_ACTION_TYPES = {
+  hand: "play",
+  board: "attack",
+  hero_power: "hero_power",
+  hero_weapon: "hero_attack",
+};
+const SPELL_NO_TARGET_EFFECTS = ["heal", "draw", "damage_all", "buff_all", "heal_all", "coin"];
 
 // UI state
 let isActing          = false; // prevents double-submit during server round-trips
@@ -405,18 +420,23 @@ function updateGameHelpBar() {
   bar.textContent = "Play from hand · Attack glowing minions · Esc or right-click to cancel";
 }
 
+function buildManaGemsHtml(player, { hud = false } = {}) {
+  let gems = "";
+  const gemClass = hud ? "mana-gem mana-gem--hud" : "mana-gem";
+  for (let i = 0; i < GAME_LIMITS.MAX_MANA; i++) {
+    const filled = i < player.mana ? " filled" : (i < player.max_mana ? "" : " empty");
+    gems += `<div class="${gemClass}${filled}"${hud ? ' aria-hidden="true"' : ""}></div>`;
+  }
+  return gems;
+}
+
 function renderManaHud(p1) {
   const hud = document.getElementById("game-mana-hud");
   if (!hud || !p1) return;
-  let gems = "";
-  for (let i = 0; i < 10; i++) {
-    const filled = i < p1.mana ? " filled" : (i < p1.max_mana ? "" : " empty");
-    gems += `<div class="mana-gem mana-gem--hud${filled}" aria-hidden="true"></div>`;
-  }
   hud.innerHTML = `
     <span class="mana-hud-label">Mana</span>
     <span class="mana-hud-count">${p1.mana}/${p1.max_mana}</span>
-    <div class="mana-gems mana-gems--hud">${gems}</div>
+    <div class="mana-gems mana-gems--hud">${buildManaGemsHtml(p1, { hud: true })}</div>
   `;
 }
 
@@ -1189,9 +1209,7 @@ function renderCardPool() {
         <span class="stat-atk">${card.atk}⚔</span>
         <span class="stat-hp">${card.hp}♥</span>
       </div>`;
-      const kws = KW_SHORT.filter(([k]) => card[k]).map(([k, l]) =>
-        `<span class="kw-badge" style="background:${KW_COLORS[k]};color:#fff">${l}</span>`
-      ).join("");
+      const kws = renderKwBadges(card);
       if (kws) statsHtml += `<div class="kw-badges" style="margin-top:2px">${kws}</div>`;
     } else if (card.type === "weapon") {
       statsHtml = `<div class="pool-stats">
@@ -1718,13 +1736,7 @@ async function startGame() {
   lastMatchDeck = { heroClass: selectedClass, cards: [...draftDeck] };
   const prev = getActiveGameMeta();
   if (prev?.gameId) {
-    try {
-      await fetch("/api/resign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ game_id: prev.gameId }),
-      });
-    } catch (_) { /* best effort */ }
+    try { await postResign(prev.gameId); } catch (_) { /* best effort */ }
     clearActiveGame();
   }
   const startBtn = document.getElementById("btn-start-ai");
@@ -1831,7 +1843,7 @@ async function playAgain() {
   await startGame();
 }
 
-function showStatusToast(message, ms = 2400) {
+function showStatusToast(message, ms = GAME_LIMITS.STATUS_TOAST_MS) {
   const toast = document.getElementById("status-toast");
   if (!toast) return;
   toast.textContent = message;
@@ -1871,6 +1883,14 @@ function deathrattleDesc(dr) {
   return "";
 }
 
+function renderKwBadges(card, { tooltip = false } = {}) {
+  return KW_SHORT.filter(([k]) => card[k]).map(([k, l]) =>
+    tooltip
+      ? `<div class="tooltip-kw" style="color:${KW_COLORS[k]}">${l}</div>`
+      : `<span class="kw-badge" style="background:${KW_COLORS[k]};color:#fff">${l}</span>`
+  ).join("");
+}
+
 function buildTooltipHtml(name, card) {
   const isMinion = card.type === "minion";
   const isWeapon = card.type === "weapon";
@@ -1882,9 +1902,7 @@ function buildTooltipHtml(name, card) {
   if (isWeapon) stats = `<div class="tooltip-stats">ATK ${card.atk} &nbsp;·&nbsp; Dur ${card.durability}</div>`;
   if (isSpell)  stats = `<div class="tooltip-desc">${spellDesc(card)}</div>`;
 
-  const kws = KW_SHORT.filter(([k]) => card[k]).map(([k, l]) =>
-    `<div class="tooltip-kw" style="color:${KW_COLORS[k]}">${l}</div>`
-  ).join("");
+  const kws = renderKwBadges(card, { tooltip: true });
 
   const bcText = battlecryDesc(card.battlecry);
   const drText = deathrattleDesc(card.deathrattle);
@@ -1920,18 +1938,19 @@ function positionTooltip(el, x, y) {
   el.style.top  = ty + "px";
 }
 
-function showPoolTooltip(e, name, card) {
-  const tt = document.getElementById("card-tooltip");
+function showTooltip(tooltipId, e, name, card) {
+  const tt = document.getElementById(tooltipId);
   tt.innerHTML = buildTooltipHtml(name, card);
   tt.classList.remove("hidden");
   positionTooltip(tt, e.clientX, e.clientY);
 }
 
+function showPoolTooltip(e, name, card) {
+  showTooltip("card-tooltip", e, name, card);
+}
+
 function showGameTooltip(e, name, card) {
-  const tt = document.getElementById("game-tooltip");
-  tt.innerHTML = buildTooltipHtml(name, card);
-  tt.classList.remove("hidden");
-  positionTooltip(tt, e.clientX, e.clientY);
+  showTooltip("game-tooltip", e, name, card);
 }
 
 function hideTooltip(id) {
@@ -2627,64 +2646,16 @@ function renderHero(elId, player, isOpp) {
 }
 
 function isValidHeroTarget(isOpp) {
-  if (!selected) return false;
-  const lm = getLegalMoves();
-  if (!lm) return false;
-
-  let actionType = null;
-  if (selected.type === "hand")         actionType = "play";
-  if (selected.type === "board")        actionType = "attack";
-  if (selected.type === "hero_power")   actionType = "hero_power";
-  if (selected.type === "hero_weapon")  actionType = "hero_attack";
-
-  if ((actionType === "attack" || actionType === "hero_attack") && !isOpp) return false;
-  if (actionType === "play") {
-    const card = CARD_DB[gameState.p1.hand[selected.idx]];
-    if (card?.effect === "damage" && !isOpp) return false;
-    if (card?.effect === "add_shield") return false;
-    if (card?.effect === "silence") return false;  // silence targets minions only
-  }
-  if (actionType === "hero_power") {
-    if (gameState.p1.hero_class === "Priest" &&  isOpp) return false;
-    if (gameState.p1.hero_class === "Mage"   && !isOpp) return false;
-  }
-
-  return lm.some(([a, i, t]) =>
-    a === actionType &&
-    (selected.idx === undefined || i === selected.idx) &&
-    t === "hero"
-  );
+  return legalMoveMatchesTarget("hero", isOpp);
 }
 
 function isValidMinionTarget(boardIdx, isOpp) {
-  if (!selected) return false;
-  const lm = getLegalMoves();
-  if (!lm) return false;
-
-  let actionType = null;
-  if (selected.type === "hand")        actionType = "play";
-  if (selected.type === "board")       actionType = "attack";
-  if (selected.type === "hero_power")  actionType = "hero_power";
-  if (selected.type === "hero_weapon") actionType = "hero_attack";
-  if (!actionType) return false;
-
-  if ((actionType === "attack" || actionType === "hero_attack") && !isOpp) return false;
-  if (actionType === "play") {
+  if (selected?.type === "play") {
     const card = CARD_DB[gameState.p1.hand[selected.idx]];
-    if (["buff", "add_shield"].includes(card?.effect) &&  isOpp) return false;
-    if (card?.effect === "damage" && !isOpp) return false;
-    if (card?.effect === "silence" && !isOpp) return false;  // silence targets enemy minions
+    if (["buff", "add_shield"].includes(card?.effect) && isOpp) return false;
+    if (card?.effect === "silence" && !isOpp) return false;
   }
-  if (actionType === "hero_power") {
-    if (gameState.p1.hero_class === "Priest" &&  isOpp) return false;
-    if (gameState.p1.hero_class === "Mage"   && !isOpp) return false;
-  }
-
-  return lm.some(([a, i, t]) =>
-    a === actionType &&
-    (selected.idx === undefined || i === selected.idx) &&
-    t === boardIdx
-  );
+  return legalMoveMatchesTarget(boardIdx, isOpp);
 }
 
 /* ---- Mana gems ---- */
@@ -2696,18 +2667,13 @@ function renderHeroMana(trayId, player) {
     manaEl.className = "mana-bar";
     tray.appendChild(manaEl);
   }
-  let gems = "";
-  for (let i = 0; i < 10; i++) {
-    const filled = i < player.mana ? " filled" : (i < player.max_mana ? "" : " empty");
-    gems += `<div class="mana-gem${filled}"></div>`;
-  }
-  manaEl.innerHTML = `<span>${player.mana}/${player.max_mana}</span><div class="mana-gems">${gems}</div>`;
+  manaEl.innerHTML = `<span>${player.mana}/${player.max_mana}</span><div class="mana-gems">${buildManaGemsHtml(player)}</div>`;
 }
 
 /* ---- Hero Power ---- */
 function renderHeroPower(elId, player, isOpp) {
   const el = document.getElementById(elId);
-  const canUse = !player.hero_power_used && clientEffectiveMana(player) >= 2;
+  const canUse = !player.hero_power_used && clientEffectiveMana(player) >= GAME_LIMITS.HERO_POWER_COST;
   const icon   = HERO_POWER_ICONS[player.hero_class] || "⚡";
 
   let cls = "hero-power-panel";
@@ -2771,9 +2737,7 @@ function renderBoard(elId, player, isOpp) {
       else if (isOpp) cls += " invalid-target";
     }
 
-    const kws = KW_SHORT.filter(([k]) => minion[k]).map(([k, l]) =>
-      `<span class="kw-badge" style="background:${KW_COLORS[k]};color:#fff">${l}</span>`
-    ).join("");
+    const kws = renderKwBadges({ ...card, ...minion });
 
     const div = document.createElement("div");
     div.className = cls;
@@ -2826,11 +2790,7 @@ function renderHand(p1) {
                <div class="stat-badge hp">${hpVal}</div>`;
     }
 
-    const kws = card.type === "minion"
-      ? KW_SHORT.filter(([k]) => card[k]).map(([k, l]) =>
-          `<span class="kw-badge" style="background:${KW_COLORS[k]};color:#fff">${l}</span>`
-        ).join("")
-      : "";
+    const kws = card.type === "minion" ? renderKwBadges(card) : "";
 
     const div = document.createElement("div");
     div.className = cls;
@@ -2884,7 +2844,7 @@ function logEntryClass(msg) {
 function renderLog(entries) {
   const el = document.getElementById("log-entries");
   if (!el) return;
-  const slice = entries.slice(-60);
+  const slice = entries.slice(-GAME_LIMITS.LOG_DISPLAY_LIMIT);
   const wasAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30;
 
   if (slice.length < logRenderedCount) {
@@ -2907,6 +2867,62 @@ function renderLog(entries) {
 // ---------------------------------------------------------------------------
 // SELECTION STATE
 // ---------------------------------------------------------------------------
+function selectionActionType(sel = selected) {
+  return SELECTION_ACTION_TYPES[sel?.type] ?? null;
+}
+
+function buildActionFromSelection(sel, target) {
+  const actionType = selectionActionType(sel);
+  if (!actionType) return null;
+  const idx = (sel.type === "hero_power" || sel.type === "hero_weapon") ? null : sel.idx;
+  return [actionType, idx, target];
+}
+
+function passesTargetSideRules(isOpp) {
+  const actionType = selectionActionType();
+  if (!actionType) return false;
+  if ((actionType === "attack" || actionType === "hero_attack") && !isOpp) return false;
+  if (actionType === "play") {
+    const card = CARD_DB[gameState.p1.hand[selected.idx]];
+    if (card?.effect === "damage" && !isOpp) return false;
+    if (card?.effect === "add_shield") return false;
+    if (card?.effect === "silence") return false;
+  }
+  if (actionType === "hero_power") {
+    if (gameState.p1.hero_class === "Priest" && isOpp) return false;
+    if (gameState.p1.hero_class === "Mage" && !isOpp) return false;
+  }
+  return true;
+}
+
+function legalMoveMatchesTarget(target, isOpp) {
+  if (!passesTargetSideRules(isOpp)) return false;
+  const lm = getLegalMoves();
+  if (!lm) return false;
+  const actionType = selectionActionType();
+  return lm.some(([a, i, t]) =>
+    a === actionType &&
+    (selected.idx === undefined || i === selected.idx) &&
+    t === target
+  );
+}
+
+function rejectHandCard(idx, message, color = "var(--col-red)") {
+  const handEl = document.getElementById("hand-player");
+  const cardEls = handEl ? handEl.querySelectorAll(".hand-card") : [];
+  spawnFloat(message, color, cardEls[idx] || null, "small");
+  shakeElement(cardEls[idx]);
+}
+
+async function postResign(id) {
+  if (!id) return;
+  await fetch("/api/resign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ game_id: id }),
+  });
+}
+
 function clearSelection() {
   selected = null;
   updateSelectionInfo();
@@ -2918,11 +2934,7 @@ function getValidTargetsForSelection() {
   const lm = getLegalMoves();
   if (!lm) return [];
 
-  let actionType = null;
-  if (selected.type === "hand") actionType = "play";
-  if (selected.type === "board") actionType = "attack";
-  if (selected.type === "hero_power") actionType = "hero_power";
-  if (selected.type === "hero_weapon") actionType = "hero_attack";
+  const actionType = selectionActionType();
   if (!actionType) return [];
 
   const targets = new Set();
@@ -2985,11 +2997,7 @@ function getLegalMoves() {
 function handleHandClick(idx, p1, name, card, affordable) {
   if (isPaused || !gameState.is_player_turn || gameState.winner) return;
   if (!affordable) {
-    const handEl = document.getElementById("hand-player");
-    const cards  = handEl ? handEl.querySelectorAll(".hand-card") : [];
-    const anchorEl = cards[idx] || null;
-    spawnFloat("Not enough mana!", "var(--col-mana-bright)", anchorEl, "small");
-    shakeElement(cards[idx]);
+    rejectHandCard(idx, "Not enough mana!", "var(--col-mana-bright)");
     return;
   }
 
@@ -3000,11 +3008,8 @@ function handleHandClick(idx, p1, name, card, affordable) {
   clearSelection();
 
   if (card.type === "minion") {
-    const handEl  = document.getElementById("hand-player");
-    const cardEls = handEl ? handEl.querySelectorAll(".hand-card") : [];
-    if (p1.board.length >= 7) {
-      spawnFloat("Board is full!", "var(--col-red)", cardEls[idx] || null, "small");
-      shakeElement(cardEls[idx]);
+    if (p1.board.length >= GAME_LIMITS.MAX_BOARD_SIZE) {
+      rejectHandCard(idx, "Board is full!");
       return;
     }
     sendAction("play", idx, null);
@@ -3015,22 +3020,16 @@ function handleHandClick(idx, p1, name, card, affordable) {
     return;
   }
   if (card.type === "spell") {
-    if (["heal", "draw", "damage_all", "buff_all", "heal_all", "coin"].includes(card.effect)) {
+    if (SPELL_NO_TARGET_EFFECTS.includes(card.effect)) {
       sendAction("play", idx, null);
       return;
     }
     if (["buff", "add_shield"].includes(card.effect) && p1.board.length === 0) {
-      const handEl  = document.getElementById("hand-player");
-      const cardEls = handEl ? handEl.querySelectorAll(".hand-card") : [];
-      spawnFloat("No friendly minions!", "var(--col-red)", cardEls[idx] || null, "small");
-      shakeElement(cardEls[idx]);
+      rejectHandCard(idx, "No friendly minions!");
       return;
     }
     if (card.effect === "silence" && gameState.p2.board.length === 0) {
-      const handEl  = document.getElementById("hand-player");
-      const cardEls = handEl ? handEl.querySelectorAll(".hand-card") : [];
-      spawnFloat("No enemy minions!", "var(--col-red)", cardEls[idx] || null, "small");
-      shakeElement(cardEls[idx]);
+      rejectHandCard(idx, "No enemy minions!");
       return;
     }
     selected = { type: "hand", idx };
@@ -3059,11 +3058,7 @@ function handleMinionClick(idx, isOpp, player, minion) {
       return;
     }
 
-    let action;
-    if (selected.type === "hand")        action = ["play",       selected.idx, idx];
-    if (selected.type === "board")       action = ["attack",     selected.idx, idx];
-    if (selected.type === "hero_power")  action = ["hero_power", null,         idx];
-    if (selected.type === "hero_weapon") action = ["hero_attack",null,         idx];
+    const action = buildActionFromSelection(selected, idx);
     if (action) { clearSelection(); sendAction(...action); }
     return;
   }
@@ -3093,11 +3088,7 @@ function handleHeroClick(isOpp, player) {
       return;
     }
 
-    let action;
-    if (selected.type === "hand")        action = ["play",       selected.idx, "hero"];
-    if (selected.type === "board")       action = ["attack",     selected.idx, "hero"];
-    if (selected.type === "hero_power")  action = ["hero_power", null,         "hero"];
-    if (selected.type === "hero_weapon") action = ["hero_attack",null,         "hero"];
+    const action = buildActionFromSelection(selected, "hero");
     if (action) { clearSelection(); sendAction(...action); }
     return;
   }
@@ -3260,13 +3251,7 @@ async function abandonGame(options = {}) {
     practiceActive = false;
   }
   try {
-    if (gameId) {
-      await fetch("/api/resign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ game_id: gameId }),
-      });
-    }
+    await postResign(gameId);
   } catch (_) {
     // Best-effort — local UI should still reset even if the server is unreachable.
   }

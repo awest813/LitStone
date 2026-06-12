@@ -6,6 +6,7 @@ Serves the browser-based UI and exposes a JSON REST API for all game actions.
 import os
 import random
 import uuid
+from contextlib import contextmanager
 
 from flask import Flask, jsonify, render_template, request
 from whitenoise import WhiteNoise
@@ -16,6 +17,7 @@ from game_logic import (
     CARD_DB,
     CURVE_TARGETS,
     DECK_SIZE,
+    DEFAULT_HERO_HP,
     GAME_LOG,
     HERO_CLASSES,
     OPENING_HAND_FIRST,
@@ -24,6 +26,7 @@ from game_logic import (
     apply_practice_options,
     build_curved_ai_deck,
     card_allowed_for_class,
+    card_max_copies,
     cards_for_class,
     check_win,
     clamp_practice_hp,
@@ -86,7 +89,7 @@ def _validate_deck(deck: list, hero_class: str) -> bool:
         len(deck) == DECK_SIZE and
         all(c in pool for c in deck) and
         all(card_allowed_for_class(c, hero_class) for c in deck) and
-        all(deck.count(c) <= (1 if CARD_DB[c].get("legendary") else 2) for c in deck)
+        all(deck.count(c) <= card_max_copies(c) for c in deck)
     )
 
 
@@ -134,17 +137,34 @@ def _state_response(gs: dict, *, include_card_db: bool = False) -> dict:
     return resp
 
 
+@contextmanager
 def _with_game_log(gs: dict):
-    """Context manager helper — activate per-game logging for rule engine calls."""
-    class _LogCtx:
-        def __enter__(self):
-            set_active_log(gs.setdefault("log", []))
-            return gs
+    """Activate per-game logging for rule engine calls."""
+    set_active_log(gs.setdefault("log", []))
+    try:
+        yield gs
+    finally:
+        set_active_log(None)
 
-        def __exit__(self, *args):
-            set_active_log(None)
 
-    return _LogCtx()
+def _require_game() -> tuple[dict | None, tuple | None]:
+    gs = _get_game(_resolve_game_id())
+    if not gs:
+        return None, (jsonify({"error": "No game in progress"}), 400)
+    return gs, None
+
+
+def _normalize_target(raw) -> int | str | None:
+    if isinstance(raw, int) or raw == "hero":
+        return raw
+    return None
+
+
+def _log_winner_if_any(p1: dict, p2: dict) -> str | None:
+    winner = check_win(p1, p2)
+    if winner:
+        log_action(f"=== {winner} wins! ===")
+    return winner
 
 
 def _deal_opening_hands(gs: dict) -> None:
@@ -171,10 +191,7 @@ def _finish_mulligan(gs: dict) -> None:
         gs["is_player_turn"] = True
         gs["turn_number"] = 1
         start_turn(gs["p1"], draw=False)
-        winner = check_win(gs["p1"], gs["p2"])
-        if winner:
-            log_action(f"=== {winner} wins! ===")
-        else:
+        if not _log_winner_if_any(gs["p1"], gs["p2"]):
             log_action("--- Your Turn (Turn 1) ---")
         return
 
@@ -182,17 +199,12 @@ def _finish_mulligan(gs: dict) -> None:
     gs["turn_number"] = 1
     log_action("--- AI goes first ---")
     run_ai_turn(gs["p2"], gs["p1"], draw=False, difficulty=gs.get("ai_difficulty", "normal"))
-    winner = check_win(gs["p1"], gs["p2"])
-    if winner:
-        log_action(f"=== {winner} wins! ===")
+    if _log_winner_if_any(gs["p1"], gs["p2"]):
         return
     gs["is_player_turn"] = True
     gs["turn_number"] = 2
     start_turn(gs["p1"])
-    winner = check_win(gs["p1"], gs["p2"])
-    if winner:
-        log_action(f"=== {winner} wins! ===")
-    else:
+    if not _log_winner_if_any(gs["p1"], gs["p2"]):
         log_action("--- Your Turn (Turn 2) ---")
 
 
@@ -297,7 +309,7 @@ def _enrich_campaign_nodes() -> list[dict]:
             enriched["opponent_hp"] = preset["hp"]
         elif enriched.get("ai_class"):
             enriched["opponent_class"] = enriched["ai_class"]
-            enriched["opponent_hp"] = 30
+            enriched["opponent_hp"] = DEFAULT_HERO_HP
         nodes.append(enriched)
     return nodes
 
@@ -404,10 +416,9 @@ def new_game():
 
 @app.route("/api/mulligan", methods=["POST"])
 def do_mulligan_route():
-    game_id = _resolve_game_id()
-    gs = _get_game(game_id)
-    if not gs:
-        return jsonify({"error": "No game in progress"}), 400
+    gs, err = _require_game()
+    if err:
+        return err
     if not gs.get("mulligan_phase"):
         return jsonify({"error": "Not in mulligan phase"}), 400
 
@@ -427,19 +438,17 @@ def do_mulligan_route():
 
 @app.route("/api/state", methods=["GET"])
 def get_state():
-    game_id = _resolve_game_id()
-    gs = _get_game(game_id)
-    if not gs:
-        return jsonify({"error": "No game in progress"}), 400
+    gs, err = _require_game()
+    if err:
+        return err
     return jsonify(_state_response(gs))
 
 
 @app.route("/api/action", methods=["POST"])
 def do_action():
-    game_id = _resolve_game_id()
-    gs = _get_game(game_id)
-    if not gs:
-        return jsonify({"error": "No game in progress"}), 400
+    gs, err = _require_game()
+    if err:
+        return err
 
     p1 = gs["p1"]
     p2 = gs["p2"]
@@ -458,29 +467,18 @@ def do_action():
     idx    = data.get("idx")
     target = data.get("target")
 
-    if isinstance(target, int):
-        pass
-    elif target == "hero":
-        pass
-    else:
-        target = None
+    target = _normalize_target(target)
 
     with _with_game_log(gs):
         if action == "end_turn":
             gs["is_player_turn"] = False
             log_action("--- AI's Turn ---")
             run_ai_turn(p2, p1, difficulty=gs.get("ai_difficulty", "normal"))
-            winner = check_win(p1, p2)
-            if winner:
-                log_action(f"=== {winner} wins! ===")
-            else:
+            if not _log_winner_if_any(p1, p2):
                 gs["turn_number"] += 1
                 gs["is_player_turn"] = True
                 start_turn(p1)
-                winner = check_win(p1, p2)
-                if winner:
-                    log_action(f"=== {winner} wins! ===")
-                else:
+                if not _log_winner_if_any(p1, p2):
                     log_action(f"--- Your Turn (Turn {gs['turn_number']}) ---")
             _persist_game(gs)
             return jsonify(_state_response(gs))
@@ -491,10 +489,7 @@ def do_action():
             return jsonify({"error": "Illegal move", "legal": legal}), 400
 
         execute_move(p1, p2, move)
-
-        winner = check_win(p1, p2)
-        if winner:
-            log_action(f"=== {winner} wins! ===")
+        _log_winner_if_any(p1, p2)
         _persist_game(gs)
 
     return jsonify(_state_response(gs))
@@ -502,10 +497,9 @@ def do_action():
 
 @app.route("/api/legal_moves", methods=["GET"])
 def legal_moves():
-    game_id = _resolve_game_id()
-    gs = _get_game(game_id)
-    if not gs:
-        return jsonify({"error": "No game in progress"}), 400
+    gs, err = _require_game()
+    if err:
+        return err
     moves = get_legal_moves(gs["p1"], gs["p2"])
     return jsonify({"moves": moves})
 

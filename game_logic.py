@@ -11,9 +11,14 @@ import random
 # ---------------------------------------------------------------------------
 
 DECK_SIZE = 30
+DEFAULT_HERO_HP = 30
+MAX_MANA = 10
+MAX_BOARD_SIZE = 7
+MAX_HAND_SIZE = 10
 OPENING_HAND_FIRST = 3
 OPENING_HAND_SECOND = 4
 COIN_CARD = "The Coin"
+MINION_TRAITS = ("taunt", "divine_shield", "charge", "poisonous", "battlecry", "deathrattle")
 
 CARD_DB = {
     # ---------- Standard cards ----------
@@ -221,10 +226,6 @@ CARD_DB = {
 }
 
 HERO_CLASSES = ["Mage", "Warrior", "Priest", "Rogue", "Paladin", "Shaman"]
-HERO_ICONS   = {
-    "Mage": "MG", "Warrior": "WR", "Priest": "PR", "Rogue": "RG",
-    "Paladin": "PA", "Shaman": "SH",
-}
 
 SHAMAN_TOTEMS = [
     {"name": "Searing Totem", "type": "minion", "cost": 0, "atk": 1, "hp": 1, "icon": "ST"},
@@ -232,6 +233,10 @@ SHAMAN_TOTEMS = [
     {"name": "Stonefang Totem", "type": "minion", "cost": 0, "atk": 0, "hp": 2, "taunt": True, "icon": "SF"},
     {"name": "Wrath of Air Totem", "type": "minion", "cost": 0, "atk": 0, "hp": 2, "icon": "WA"},
 ]
+
+
+def card_max_copies(name: str) -> int:
+    return 1 if CARD_DB[name].get("legendary") else 2
 
 
 def card_allowed_for_class(card_name: str, hero_class: str) -> bool:
@@ -308,7 +313,7 @@ BOSS_PRESETS = {
         "core": [
             "Victor Frankenstein", "Frankenstein's Monster",
             "Humble Acolyte", "Humble Acolyte",
-            "Bishop of Canterbury", "Bishop of Canterbury",
+            "Cathedral Cleric", "Cathedral Cleric",
             "Castle Guard", "Castle Guard", "Bulwark Bearer", "Bulwark Bearer",
             "Restorative Hymn", "Elixir of Life", "Sacred Salve", "Sacred Salve",
             "Smite Scripture", "Smite Scripture", "Hymn of Hope",
@@ -365,14 +370,12 @@ def complete_deck_from_core(hero_class: str, core: list[str]) -> list[str]:
             break
         if name not in CARD_DB or not card_allowed_for_class(name, hero_class):
             continue
-        max_copies = 1 if CARD_DB[name].get("legendary") else 2
-        if deck.count(name) < max_copies:
+        if deck.count(name) < card_max_copies(name):
             deck.append(name)
     for name in build_curved_ai_deck(hero_class):
         if len(deck) >= DECK_SIZE:
             break
-        max_copies = 1 if CARD_DB[name].get("legendary") else 2
-        if deck.count(name) < max_copies:
+        if deck.count(name) < card_max_copies(name):
             deck.append(name)
     return deck[:DECK_SIZE]
 
@@ -390,8 +393,7 @@ def build_curved_ai_deck(hero_class: str) -> list[str]:
     def try_add(name: str) -> bool:
         if len(deck) >= DECK_SIZE:
             return False
-        max_copies = 1 if CARD_DB[name].get("legendary") else 2
-        if deck.count(name) >= max_copies:
+        if deck.count(name) >= card_max_copies(name):
             return False
         deck.append(name)
         return True
@@ -490,15 +492,6 @@ def select_ai_move(
     return random.choice(contenders)
 
 
-KW_COLORS = {
-    "taunt": "#E74C3C", "divine_shield": "#F1C40F", "charge": "#2ECC71",
-    "poisonous": "#9B59B6", "battlecry": "#3498DB", "deathrattle": "#566573",
-}
-KW_SHORT = [("taunt","TAUNT"),("divine_shield","SHIELD"),("charge","CHARGE"),
-            ("poisonous","POISON"),("battlecry","B.CRY"),("deathrattle","D.RATTLE")]
-KW_LONG  = [("taunt","TAUNT"),("divine_shield","DIVINE SHIELD"),("charge","CHARGE"),
-            ("poisonous","POISONOUS"),("battlecry","BATTLECRY"),("deathrattle","DEATHRATTLE")]
-
 GAME_LOG: list[str] = []
 _ACTIVE_LOG: list[str] | None = None
 
@@ -549,23 +542,23 @@ def apply_practice_options(player: dict, *, hp: int, infinite_mana: bool = False
     player["max_hp"] = player["hp"]
     if infinite_mana:
         player["infinite_mana"] = True
-        player["max_mana"] = 10
-        player["mana"] = 10
+        player["max_mana"] = MAX_MANA
+        player["mana"] = MAX_MANA
 
 
 def refresh_infinite_mana(player: dict) -> None:
     if player.get("infinite_mana"):
-        player["max_mana"] = 10
-        player["mana"] = 10
+        player["max_mana"] = MAX_MANA
+        player["mana"] = MAX_MANA
 
 
 def effective_mana(player: dict) -> int:
-    return 10 if player.get("infinite_mana") else player["mana"]
+    return MAX_MANA if player.get("infinite_mana") else player["mana"]
 
 
 def clamp_heal(player: dict, amount: int) -> int:
     """Heal amount capped by hero max_hp."""
-    cap = player.get("max_hp", 30)
+    cap = player.get("max_hp", DEFAULT_HERO_HP)
     return max(0, min(amount, cap - player["hp"]))
 
 
@@ -580,8 +573,8 @@ def create_player(name: str, hero_class: str = "Mage",
     return {
         "name":            name,
         "hero_class":      hero_class,
-        "hp":              30,
-        "max_hp":          30,
+        "hp":              DEFAULT_HERO_HP,
+        "max_hp":          DEFAULT_HERO_HP,
         "armor":           0,
         "mana":            0,
         "max_mana":        0,
@@ -598,7 +591,7 @@ def create_player(name: str, hero_class: str = "Mage",
 
 def draw_card(player: dict, on_event=None) -> None:
     if player["deck"]:
-        if len(player["hand"]) < 10:
+        if len(player["hand"]) < MAX_HAND_SIZE:
             player["hand"].append(player["deck"].pop(0))
         else:
             burned = player["deck"].pop(0)
@@ -612,11 +605,9 @@ def draw_card(player: dict, on_event=None) -> None:
 
 
 def start_turn(player: dict, on_event=None, *, draw: bool = True) -> None:
-    if player.get("infinite_mana"):
-        player["max_mana"] = 10
-        player["mana"] = 10
-    else:
-        if player["max_mana"] < 10:
+    refresh_infinite_mana(player)
+    if not player.get("infinite_mana"):
+        if player["max_mana"] < MAX_MANA:
             player["max_mana"] += 1
         player["mana"] = player["max_mana"]
     player["hero_power_used"] = False
@@ -642,9 +633,7 @@ def ai_choose_mulligan(player: dict) -> list[int]:
         card = CARD_DB[card_name]
         cost = card.get("cost", 0)
         costs.append(cost)
-        if cost >= 6:
-            swap.append(i)
-        elif cost == 5:
+        if cost >= 5:
             swap.append(i)
         elif cost == 4 and len(player["hand"]) >= 4:
             swap.append(i)
@@ -735,7 +724,7 @@ def get_legal_moves(player: dict, opp: dict) -> list:
         if effective_mana(player) < card["cost"]:
             continue
         if card["type"] == "minion":
-            if len(player["board"]) < 7:
+            if len(player["board"]) < MAX_BOARD_SIZE:
                 moves.append(("play", hand_idx, None))
         elif card["type"] == "spell":
             if card["effect"] in ("heal", "draw", "damage_all", "buff_all", "heal_all", "coin"):
@@ -779,10 +768,10 @@ def get_legal_moves(player: dict, opp: dict) -> list:
         elif cls == "Rogue":
             moves.append(("hero_power", None, None))
         elif cls == "Paladin":
-            if len(player["board"]) < 7:
+            if len(player["board"]) < MAX_BOARD_SIZE:
                 moves.append(("hero_power", None, None))
         elif cls == "Shaman":
-            if len(player["board"]) < 7:
+            if len(player["board"]) < MAX_BOARD_SIZE:
                 moves.append(("hero_power", None, None))
 
     return moves
@@ -923,7 +912,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
                     cleanup_dead(player, opp, on_event)
                     return
                 tm = opp["board"][target]
-                for kw in ("taunt", "divine_shield", "charge", "poisonous", "battlecry", "deathrattle"):
+                for kw in MINION_TRAITS:
                     tm.pop(kw, None)
                 log_action(f"   [SILENCE] {tm['name']} is silenced! All effects removed.")
                 notify("blocked", opp, target, "SILENCED!")
@@ -1105,7 +1094,7 @@ def check_win(p1: dict, p2: dict) -> str | None:
 # ---------------------------------------------------------------------------
 
 def _hero_missing_hp(player: dict) -> int:
-    cap = player.get("max_hp", 30)
+    cap = player.get("max_hp", DEFAULT_HERO_HP)
     return max(0, cap - player["hp"])
 
 
