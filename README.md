@@ -71,6 +71,8 @@ Run tests and lint:
 
 ```bash
 pytest test_game_logic.py test_career_playthrough.py -v
+playwright install chromium   # once, for browser E2E
+pytest test_career_browser.py -v
 ruff check .
 ```
 

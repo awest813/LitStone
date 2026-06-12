@@ -44,6 +44,7 @@ const MANA_CURVE_MAX_COST   = 7;   // buckets 1-7; costs ≥7 are grouped under 
 const MAX_AUTOFILL_ATTEMPTS = 500; // safety cap for the random auto-fill loop
 // Ideal curve targets (mirrors game_logic.CURVE_TARGETS + 7+ bucket for 6+ mana)
 const IDEAL_CURVE = { 1: 4, 2: 8, 3: 8, 4: 6, 5: 3, 6: 1 };
+let idealCurve = { ...IDEAL_CURVE };
 const GAME_LIMITS = {
   MAX_MANA: 10,
   MAX_BOARD_SIZE: 7,
@@ -1684,7 +1685,11 @@ function renderMulligan(state) {
     container.appendChild(div);
   });
 
-  document.getElementById("btn-mulligan-confirm").textContent = "✓ Keep Hand";
+  const confirmBtn = document.getElementById("btn-mulligan-confirm");
+  if (confirmBtn) {
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = "✓ Keep Hand";
+  }
   showScreen("screen-mulligan");
 }
 
@@ -2501,13 +2506,13 @@ function onGameStateUpdated(data, animCtx) {
   advanceTutorialFromState();
   completeTutorialIfReady();
   if (data.turn_number) turnNumber = data.turn_number;
+  if (data.winner === "Player") onCampaignVictory();
   renderGame();
   if (animCtx) {
     applyActionAnimations(animCtx);
     applyPostRenderAnimations(animCtx.prevSnap);
     applyHeroAnimations(animCtx.prevHeroSnap);
   }
-  if (data.winner === "Player") onCampaignVictory();
   if (!data.winner) saveActiveGame();
 }
 

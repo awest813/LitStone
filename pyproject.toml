@@ -14,3 +14,6 @@ ignore = ["E501", "E701"]
 [tool.pytest.ini_options]
 testpaths = ["."]
 python_files = ["test_*.py"]
+markers = [
+    "browser: Playwright browser E2E (requires playwright + chromium)",
+]

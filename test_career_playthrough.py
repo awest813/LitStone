@@ -276,6 +276,28 @@ class TestCareerPlaythrough(unittest.TestCase):
         self.assertTrue(is_career_complete(completed))
         self.assertEqual(len(completed), 6)
 
+    def test_campaign_victory_unlocks_next_chapter_immediately(self):
+        """Mirrors client: beating n1 should unlock n2 before overlay re-render."""
+        completed: list[str] = []
+        nodes = self.client.get("/api/campaign").get_json()["nodes"]
+        start = self.client.post("/api/new_game", json={
+            "hero_class": "Mage",
+            "deck": self.deck,
+            "campaign_node": "n1",
+        })
+        gid = start.get_json()["game_id"]
+        self.client.post("/api/mulligan", json={"game_id": gid, "indices": []})
+        _setup_lethal_turn(GAMES[gid])
+        self.client.post("/api/action", json={
+            "game_id": gid,
+            "action": "attack",
+            "idx": 0,
+            "target": "hero",
+        })
+        completed = mark_campaign_victory("n1", completed)
+        self.assertTrue(is_campaign_node_unlocked("n2", completed, nodes))
+        self.assertFalse(is_campaign_node_unlocked("n3", completed, nodes))
+
     def test_career_nodes_reject_invalid_id(self):
         res = self.client.post("/api/new_game", json={
             "hero_class": "Mage",
