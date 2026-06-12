@@ -11,6 +11,7 @@ from flask import Flask, jsonify, render_template, request
 from whitenoise import WhiteNoise
 
 from game_logic import (
+    BOSS_PRESETS,
     CAMPAIGN_NODES,
     CARD_DB,
     DECK_SIZE,
@@ -286,9 +287,31 @@ def _resolve_match_setup(data: dict) -> dict:
     }
 
 
+def _enrich_campaign_nodes() -> list[dict]:
+    """Attach opponent metadata for the career map UI."""
+    nodes: list[dict] = []
+    for node in CAMPAIGN_NODES:
+        enriched = dict(node)
+        boss_id = enriched.get("boss_id")
+        if boss_id and boss_id in BOSS_PRESETS:
+            preset = BOSS_PRESETS[boss_id]
+            enriched["opponent_name"] = preset["display_name"]
+            enriched["opponent_class"] = preset["hero_class"]
+            enriched["opponent_hp"] = preset["hp"]
+        elif enriched.get("ai_class"):
+            enriched["opponent_class"] = enriched["ai_class"]
+        nodes.append(enriched)
+    return nodes
+
+
 @app.route("/api/campaign", methods=["GET"])
 def campaign_info():
-    return jsonify({"nodes": CAMPAIGN_NODES, "deck_size": DECK_SIZE})
+    nodes = _enrich_campaign_nodes()
+    return jsonify({
+        "nodes": nodes,
+        "deck_size": DECK_SIZE,
+        "total_chapters": len(nodes),
+    })
 
 
 @app.route("/api/starter_deck", methods=["GET"])

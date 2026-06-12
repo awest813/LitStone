@@ -279,13 +279,20 @@ CAMPAIGN_NODES = [
     },
     {
         "id": "n4",
+        "name": "Victor Frankenstein",
+        "subtitle": "Mad science — monsters, heals, and stubborn taunts.",
+        "difficulty": "hard",
+        "boss_id": "frankenstein",
+    },
+    {
+        "id": "n5",
         "name": "Van Helsing",
         "subtitle": "Elite hunter — charges and armor.",
         "difficulty": "hard",
         "boss_id": "van_helsing",
     },
     {
-        "id": "n5",
+        "id": "n6",
         "name": "Professor Moriarty",
         "subtitle": "Final boss — poison, daggers, and schemes.",
         "difficulty": "hard",
@@ -294,6 +301,24 @@ CAMPAIGN_NODES = [
 ]
 
 BOSS_PRESETS = {
+    "frankenstein": {
+        "display_name": "Victor Frankenstein",
+        "hero_class": "Priest",
+        "hp": 33,
+        "core": [
+            "Victor Frankenstein", "Frankenstein's Monster",
+            "Humble Acolyte", "Humble Acolyte",
+            "Bishop of Canterbury", "Bishop of Canterbury",
+            "Castle Guard", "Castle Guard", "Bulwark Bearer", "Bulwark Bearer",
+            "Restorative Hymn", "Elixir of Life", "Sacred Salve", "Sacred Salve",
+            "Smite Scripture", "Smite Scripture", "Hymn of Hope",
+            "Greater Restoration", "Templar Captain", "Templar Captain",
+            "Errant Knight", "Errant Knight", "Highwayman", "Highwayman",
+            "Fortify", "Fortify", "Cleave Chronicle", "Cleave Chronicle",
+            "Bulwark Bearer", "Castle Guard",
+        ],
+    },
+
     "van_helsing": {
         "display_name": "Van Helsing",
         "hero_class": "Warrior",

@@ -81,7 +81,7 @@ class TestCareerPlaythrough(unittest.TestCase):
         camp = self.client.get("/api/campaign")
         self.assertEqual(camp.status_code, 200)
         nodes = camp.get_json()["nodes"]
-        self.assertEqual(len(nodes), 5)
+        self.assertEqual(len(nodes), 6)
         self.assertEqual([n["id"] for n in nodes], [n["id"] for n in CAMPAIGN_NODES])
 
         completed: list[str] = []

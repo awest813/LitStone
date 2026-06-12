@@ -1469,7 +1469,28 @@ class TestServerApi(unittest.TestCase):
         res = client.get("/api/campaign")
         self.assertEqual(res.status_code, 200)
         data = res.get_json()
-        self.assertEqual(len(data["nodes"]), 5)
+        self.assertEqual(len(data["nodes"]), 6)
+        self.assertEqual(data["total_chapters"], 6)
+        frankenstein = next(n for n in data["nodes"] if n["id"] == "n4")
+        self.assertEqual(frankenstein["boss_id"], "frankenstein")
+        self.assertEqual(frankenstein["opponent_hp"], 33)
+        self.assertEqual(frankenstein["opponent_class"], "Priest")
+
+    def test_new_game_campaign_frankenstein_boss(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        res = client.post("/api/new_game", json={
+            "hero_class": "Mage",
+            "deck": deck,
+            "campaign_node": "n4",
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertEqual(data["boss_id"], "frankenstein")
+        self.assertEqual(data["opponent_name"], "Victor Frankenstein")
+        self.assertEqual(data["p2"]["hero_class"], "Priest")
+        self.assertEqual(data["ai_difficulty"], "hard")
 
     def test_new_game_campaign_boss(self):
         from server import app
@@ -1478,7 +1499,7 @@ class TestServerApi(unittest.TestCase):
         res = client.post("/api/new_game", json={
             "hero_class": "Mage",
             "deck": deck,
-            "campaign_node": "n5",
+            "campaign_node": "n6",
         })
         self.assertEqual(res.status_code, 200)
         data = res.get_json()

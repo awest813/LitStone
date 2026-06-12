@@ -303,7 +303,7 @@ function updateHubCareerProgress() {
   const el = document.getElementById("hub-career-progress");
   if (!el) return;
   const completed = getCampaignProgress().length;
-  const total = campaignNodes.length || 5;
+  const total = campaignNodes.length || 6;
   if (completed >= total) {
     el.textContent = "Career complete ✓";
   } else if (completed > 0) {
@@ -315,7 +315,7 @@ function updateHubCareerProgress() {
 
 function updateCareerProgressBar() {
   const completed = getCampaignProgress();
-  const total = campaignNodes.length || 5;
+  const total = campaignNodes.length || 6;
   const pct = total ? Math.round((completed.length / total) * 100) : 0;
   const fill = document.getElementById("career-progress-fill");
   const label = document.getElementById("career-progress-label");
@@ -543,7 +543,7 @@ function renderCampaignMap() {
   campaignNodes.forEach((node, i) => {
     const unlocked = isCampaignNodeUnlocked(node.id, completed);
     const done = completed.includes(node.id);
-    const isBoss = !!node.boss_id && node.id === "n5";
+    const isBoss = node.boss_id === "moriarty";
     const isElite = !!node.boss_id && !isBoss;
     let cls = "campaign-node";
     if (!unlocked) cls += " campaign-node--locked";
@@ -558,8 +558,10 @@ function renderCampaignMap() {
     const status = done ? "completed" : (unlocked ? "unlocked" : "locked");
     div.setAttribute("aria-label", `${node.name}, ${node.difficulty}, ${status}`);
     const oppLabel = node.boss_id
-      ? "Boss encounter"
-      : (node.ai_class ? `${node.ai_class} opponent` : "Duel");
+      ? `Boss · ${node.opponent_class || "?"} · ${node.opponent_hp || 30} HP`
+      : (node.opponent_class || node.ai_class
+        ? `${node.opponent_class || node.ai_class} opponent`
+        : "Duel");
     div.innerHTML = `
       <span class="campaign-node-index">${i + 1}</span>
       <span class="campaign-node-body">
@@ -2890,6 +2892,33 @@ function clearSelection() {
   renderGame();
 }
 
+function getValidTargetsForSelection() {
+  if (!selected || !gameState) return [];
+  const lm = getLegalMoves();
+  if (!lm) return [];
+
+  let actionType = null;
+  if (selected.type === "hand") actionType = "play";
+  if (selected.type === "board") actionType = "attack";
+  if (selected.type === "hero_power") actionType = "hero_power";
+  if (selected.type === "hero_weapon") actionType = "hero_attack";
+  if (!actionType) return [];
+
+  const targets = new Set();
+  lm.forEach(([a, i, t]) => {
+    if (a !== actionType) return;
+    if (selected.idx !== undefined && i !== selected.idx) return;
+    targets.add(t);
+  });
+  return [...targets];
+}
+
+function formatTargetCount(n) {
+  if (n === 0) return "No valid targets";
+  if (n === 1) return "1 valid target";
+  return `${n} valid targets`;
+}
+
 function updateSelectionInfo() {
   const el = document.getElementById("selection-info");
   const help = document.getElementById("game-help-bar");
@@ -2900,19 +2929,28 @@ function updateSelectionInfo() {
   }
   el.classList.remove("hidden");
   if (help) help.classList.add("hidden");
+
+  const cancelHint = " · Esc or right-click to cancel";
+  const targets = getValidTargetsForSelection();
+  const targetHint = targets.length ? ` · ${formatTargetCount(targets.length)}` : "";
+
   let msg = "";
   if (selected.type === "hand") {
     const card = CARD_DB[gameState.p1.hand[selected.idx]] || {};
     const needsTarget = ["damage", "buff", "add_shield", "silence"].includes(card.effect);
     msg = needsTarget
-      ? `Target for ${gameState.p1.hand[selected.idx]} — click a highlighted target (Esc to cancel)`
+      ? `Target for ${gameState.p1.hand[selected.idx]} — click a highlighted target${targetHint}${cancelHint}`
       : `Confirm ${gameState.p1.hand[selected.idx]} — click again to cancel`;
   }
   if (selected.type === "board") {
-    msg = `Attacking with ${gameState.p1.board[selected.idx].name} — click enemy or minion`;
+    msg = `Attacking with ${gameState.p1.board[selected.idx].name} — click enemy hero or minion${targetHint}${cancelHint}`;
   }
-  if (selected.type === "hero_power")  msg = "Hero Power — click a valid target";
-  if (selected.type === "hero_weapon") msg = "Hero attack — click a valid target";
+  if (selected.type === "hero_power") {
+    msg = `Hero Power — click a highlighted target${targetHint}${cancelHint}`;
+  }
+  if (selected.type === "hero_weapon") {
+    msg = `Hero attack — click a highlighted target${targetHint}${cancelHint}`;
+  }
   el.textContent = msg;
 }
 
