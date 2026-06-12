@@ -1685,12 +1685,20 @@ function renderMulligan(state) {
     container.appendChild(div);
   });
 
-  const confirmBtn = document.getElementById("btn-mulligan-confirm");
-  if (confirmBtn) {
-    confirmBtn.disabled = false;
-    confirmBtn.textContent = "✓ Keep Hand";
-  }
+  resetMulliganConfirmBtn();
   showScreen("screen-mulligan");
+}
+
+function mulliganConfirmBtn() {
+  return document.getElementById("btn-mulligan-confirm");
+}
+
+function resetMulliganConfirmBtn(label = "✓ Keep Hand") {
+  const btn = mulliganConfirmBtn();
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
 }
 
 function toggleMulliganCard(el, idx) {
@@ -1706,15 +1714,17 @@ function toggleMulliganCard(el, idx) {
   }
   el.setAttribute("aria-pressed", swapping ? "true" : "false");
   const swapCount = mulliganSwapSet.size;
-  const btn = document.getElementById("btn-mulligan-confirm");
-  btn.textContent = swapCount > 0 ? `↺ Swap ${swapCount} Card${swapCount > 1 ? "s" : ""}` : "✓ Keep Hand";
+  const label = swapCount > 0
+    ? `↺ Swap ${swapCount} Card${swapCount > 1 ? "s" : ""}`
+    : "✓ Keep Hand";
+  resetMulliganConfirmBtn(label);
 }
 
 async function confirmMulligan() {
   if (isActing) return;
   isActing = true;
   const indices = Array.from(mulliganSwapSet);
-  const btn = document.getElementById("btn-mulligan-confirm");
+  const btn = mulliganConfirmBtn();
   if (btn) btn.disabled = true;
   showLoading("Entering match…");
   try {
@@ -3287,13 +3297,17 @@ async function abandonGame(options = {}) {
   updateHubContinue();
 }
 
-function resign() {
-  if (settings.confirmResign && !confirm("Resign and return to menu?")) return;
+function exitToHub({ confirm = false } = {}) {
+  if (confirm && settings.confirmResign && !confirm("Resign and return to menu?")) return;
   abandonGame().then(() => goToHub());
 }
 
+function resign() {
+  exitToHub({ confirm: true });
+}
+
 function returnToMenu() {
-  abandonGame().then(() => goToHub());
+  exitToHub();
 }
 
 function resetGameState() {

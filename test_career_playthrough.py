@@ -8,69 +8,26 @@ Simulates the full client journey:
 
 import unittest
 
-from game_logic import (
-    BOSS_PRESETS,
-    CAMPAIGN_NODES,
-    DECK_SIZE,
-    complete_deck_from_core,
-    create_player,
+from career_test_support import (
+    TOTAL_CHAPTERS,
+    is_campaign_node_unlocked,
+    is_career_complete,
+    mage_deck,
+    mark_campaign_victory,
+    setup_lethal_turn,
 )
+from game_logic import BOSS_PRESETS, CAMPAIGN_NODES, DECK_SIZE, complete_deck_from_core
 from server import GAMES, app
 
 EXPECTED_CHAPTERS = [
-    {"id": "n1", "name": "Street Urchin", "ai_class": "Rogue", "difficulty": "easy"},
-    {"id": "n2", "name": "Town Guard", "ai_class": "Warrior", "difficulty": "normal"},
-    {"id": "n3", "name": "Guild Librarian", "ai_class": "Mage", "difficulty": "normal"},
-    {"id": "n4", "name": "Victor Frankenstein", "boss_id": "frankenstein", "difficulty": "hard"},
-    {"id": "n5", "name": "Van Helsing", "boss_id": "van_helsing", "difficulty": "hard"},
-    {"id": "n6", "name": "Professor Moriarty", "boss_id": "moriarty", "difficulty": "hard"},
+    {
+        "id": n["id"],
+        "name": n["name"],
+        "difficulty": n["difficulty"],
+        **({"boss_id": n["boss_id"]} if n.get("boss_id") else {"ai_class": n["ai_class"]}),
+    }
+    for n in CAMPAIGN_NODES
 ]
-
-
-def _mage_deck() -> list[str]:
-    return create_player("P", "Mage", shuffle=False)["deck"]
-
-
-def is_campaign_node_unlocked(node_id: str, completed: list[str], nodes: list[dict]) -> bool:
-    """Mirror static/game.js isCampaignNodeUnlocked()."""
-    idx = next(i for i, n in enumerate(nodes) if n["id"] == node_id)
-    if idx <= 0:
-        return True
-    return nodes[idx - 1]["id"] in completed
-
-
-def mark_campaign_victory(node_id: str, completed: list[str]) -> list[str]:
-    """Mirror static/game.js onCampaignVictory() progress update."""
-    if node_id not in completed:
-        completed.append(node_id)
-    return completed
-
-
-def is_career_complete(completed: list[str], total_chapters: int = 6) -> bool:
-    """Mirror static/game.js isCareerComplete()."""
-    return len(completed) >= total_chapters
-
-
-def _setup_lethal_turn(gs: dict) -> None:
-    """Give the player a guaranteed lethal attack on the enemy hero."""
-    p1, p2 = gs["p1"], gs["p2"]
-    p1["board"] = [{
-        "name": "Charge Bruiser",
-        "type": "minion",
-        "cost": 5,
-        "atk": 15,
-        "hp": 1,
-        "max_hp": 1,
-        "can_attack": True,
-        "charge": True,
-    }]
-    p1["hand"] = []
-    p1["mana"] = 10
-    p1["max_mana"] = 10
-    p1["hero_power_used"] = False
-    p2["hp"] = 10
-    p2["board"] = []
-    gs["is_player_turn"] = True
 
 
 def _play_career_chapter(client, deck: list[str], node: dict) -> dict:
@@ -88,7 +45,7 @@ def _play_career_chapter(client, deck: list[str], node: dict) -> dict:
     mull = client.post("/api/mulligan", json={"game_id": gid, "indices": []})
     assert mull.status_code == 200, mull.get_json()
 
-    _setup_lethal_turn(GAMES[gid])
+    setup_lethal_turn(GAMES[gid])
     win = client.post("/api/action", json={
         "game_id": gid,
         "action": "attack",
@@ -103,7 +60,7 @@ def _play_career_chapter(client, deck: list[str], node: dict) -> dict:
 class TestCareerPlaythrough(unittest.TestCase):
     def setUp(self):
         self.client = app.test_client()
-        self.deck = _mage_deck()
+        self.deck = mage_deck()
         self.assertEqual(len(self.deck), DECK_SIZE)
         GAMES.clear()
 
@@ -134,10 +91,10 @@ class TestCareerPlaythrough(unittest.TestCase):
         res = self.client.get("/api/campaign")
         self.assertEqual(res.status_code, 200)
         data = res.get_json()
-        self.assertEqual(data["total_chapters"], 6)
+        self.assertEqual(data["total_chapters"], TOTAL_CHAPTERS)
         self.assertEqual(data["deck_size"], DECK_SIZE)
         nodes = data["nodes"]
-        self.assertEqual(len(nodes), 6)
+        self.assertEqual(len(nodes), TOTAL_CHAPTERS)
 
         for expected in EXPECTED_CHAPTERS:
             node = next(n for n in nodes if n["id"] == expected["id"])
@@ -159,8 +116,8 @@ class TestCareerPlaythrough(unittest.TestCase):
         self.assertEqual(camp.status_code, 200)
         camp_data = camp.get_json()
         nodes = camp_data["nodes"]
-        self.assertEqual(len(nodes), 6)
-        self.assertEqual(camp_data["total_chapters"], 6)
+        self.assertEqual(len(nodes), TOTAL_CHAPTERS)
+        self.assertEqual(camp_data["total_chapters"], TOTAL_CHAPTERS)
         self.assertEqual([n["id"] for n in nodes], [n["id"] for n in CAMPAIGN_NODES])
 
         completed: list[str] = []
@@ -209,7 +166,7 @@ class TestCareerPlaythrough(unittest.TestCase):
             self.assertEqual(mull.status_code, 200)
             self.assertFalse(mull.get_json()["mulligan_phase"])
 
-            _setup_lethal_turn(GAMES[gid])
+            setup_lethal_turn(GAMES[gid])
             win = self.client.post("/api/action", json={
                 "game_id": gid,
                 "action": "attack",
@@ -274,7 +231,7 @@ class TestCareerPlaythrough(unittest.TestCase):
             completed = mark_campaign_victory(node["id"], completed)
 
         self.assertTrue(is_career_complete(completed))
-        self.assertEqual(len(completed), 6)
+        self.assertEqual(len(completed), TOTAL_CHAPTERS)
 
     def test_campaign_victory_unlocks_next_chapter_immediately(self):
         """Mirrors client: beating n1 should unlock n2 before overlay re-render."""
@@ -287,7 +244,7 @@ class TestCareerPlaythrough(unittest.TestCase):
         })
         gid = start.get_json()["game_id"]
         self.client.post("/api/mulligan", json={"game_id": gid, "indices": []})
-        _setup_lethal_turn(GAMES[gid])
+        setup_lethal_turn(GAMES[gid])
         self.client.post("/api/action", json={
             "game_id": gid,
             "action": "attack",
