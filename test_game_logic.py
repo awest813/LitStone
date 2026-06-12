@@ -1682,6 +1682,61 @@ class TestServerApi(unittest.TestCase):
         res = client.get("/api/starter_deck?hero_class=Invalid")
         self.assertEqual(res.status_code, 400)
 
+    def test_cards_api_includes_spell_descriptions(self):
+        from server import app
+        client = app.test_client()
+        res = client.get("/api/cards")
+        self.assertEqual(res.status_code, 200)
+        bolt = res.get_json()["card_db"]["Quill Bolt"]
+        self.assertEqual(bolt["desc_short"], "Deal 3 Dmg")
+        self.assertEqual(bolt["desc_long"], "Deal 3 damage.")
+
+    def test_cards_api_includes_battlecry_text(self):
+        from server import app
+        client = app.test_client()
+        res = client.get("/api/cards")
+        holmes = res.get_json()["card_db"]["Sherlock Holmes"]
+        self.assertIn("Battlecry: Draw 2 cards", holmes["battlecry_text"])
+
+    def test_legal_moves_endpoint(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        start = client.post("/api/new_game", json={"hero_class": "Mage", "deck": deck})
+        gid = start.get_json()["game_id"]
+        client.post("/api/mulligan", json={"game_id": gid, "indices": []})
+        state = client.get(f"/api/state?game_id={gid}").get_json()
+        res = client.get(f"/api/legal_moves?game_id={gid}")
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertIn("moves", data)
+        self.assertEqual(data["moves"], state["_legal_moves"])
+
+    def test_mulligan_rejected_after_phase(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        start = client.post("/api/new_game", json={"hero_class": "Mage", "deck": deck})
+        gid = start.get_json()["game_id"]
+        client.post("/api/mulligan", json={"game_id": gid, "indices": []})
+        res = client.post("/api/mulligan", json={"game_id": gid, "indices": [0]})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("mulligan", res.get_json()["error"].lower())
+
+
+class TestCardText(unittest.TestCase):
+    def test_enrich_card_spell(self):
+        from game_logic import enrich_card
+        card = enrich_card(CARD_DB["Inferno Verse"])
+        self.assertEqual(card["desc_short"], "Deal 6 Dmg")
+        self.assertEqual(card["desc_long"], "Deal 6 damage.")
+
+    def test_collectible_card_db_omits_coin(self):
+        from game_logic import collectible_card_db
+        db = collectible_card_db()
+        self.assertNotIn(COIN_CARD, db)
+        self.assertIn("Quill Bolt", db)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

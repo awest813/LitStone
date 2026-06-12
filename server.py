@@ -30,6 +30,7 @@ from game_logic import (
     cards_for_class,
     check_win,
     clamp_practice_hp,
+    collectible_card_db,
     create_ai_opponent,
     create_player,
     do_mulligan,
@@ -125,7 +126,7 @@ def _state_response(gs: dict, *, include_card_db: bool = False) -> dict:
         "mulligan_phase":   mulligan,
     }
     if include_card_db:
-        resp["card_db"] = CARD_DB
+        resp["card_db"] = collectible_card_db()
     resp["ai_difficulty"] = gs.get("ai_difficulty", "normal")
     resp["opponent_name"] = gs["p2"].get("name", "AI")
     resp["campaign_node"] = gs.get("campaign_node")
@@ -232,9 +233,8 @@ def health():
 @app.route("/api/cards", methods=["GET"])
 def cards():
     """Return the card database and hero class list — available before any game starts."""
-    collectibles = {k: v for k, v in CARD_DB.items() if not v.get("uncollectible")}
     return jsonify({
-        "card_db": collectibles,
+        "card_db": collectible_card_db(),
         "hero_classes": HERO_CLASSES,
         "deck_size": DECK_SIZE,
     })

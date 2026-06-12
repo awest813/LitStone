@@ -92,7 +92,7 @@ flowchart TB
 | Coin / first player | Random who goes first; second player gets "The Coin" (temp +1 mana once) | Coin spell in hand, consumed on use |
 | Session IDs | Replace global `GAME_STATE` with per-tab `game_id` (in-memory dict or SQLite) | Two browser tabs = two games |
 | Resign / cleanup | ✅ `POST /api/resign` clears server state | Resign → new game works without refresh |
-| Card text from server | Expose `get_spell_desc()` via API; drop duplicated `spellDesc()` in JS | One source of truth for card text |
+| Card text from server | ✅ `collectible_card_db()` enriches spells/battlecries/deathrattles via API | Client reads `desc_short` / `desc_long` with local fallback |
 
 **Engine keywords to add (priority order):**
 

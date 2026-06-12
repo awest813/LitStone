@@ -517,6 +517,49 @@ def get_spell_desc(card: dict, short: bool = False) -> str:
     return ""
 
 
+def get_battlecry_desc(battlecry: dict | None) -> str:
+    if not battlecry:
+        return ""
+    effect, val = battlecry.get("effect"), battlecry.get("val")
+    if effect == "heal_hero":
+        return f"Battlecry: Restore {val} HP to your hero."
+    if effect == "draw_cards":
+        suffix = "s" if val != 1 else ""
+        return f"Battlecry: Draw {val} card{suffix}."
+    return ""
+
+
+def get_deathrattle_desc(deathrattle: dict | None) -> str:
+    if not deathrattle:
+        return ""
+    if deathrattle.get("effect") == "dmg_hero":
+        return f"Deathrattle: Deal {deathrattle['val']} damage to the enemy hero."
+    return ""
+
+
+def enrich_card(card: dict) -> dict:
+    """Attach display text for API / client consumption."""
+    enriched = dict(card)
+    if card.get("type") == "spell":
+        enriched["desc_short"] = get_spell_desc(card, short=True)
+        enriched["desc_long"] = get_spell_desc(card, short=False)
+    bc = card.get("battlecry")
+    if bc:
+        enriched["battlecry_text"] = get_battlecry_desc(bc)
+    dr = card.get("deathrattle")
+    if dr:
+        enriched["deathrattle_text"] = get_deathrattle_desc(dr)
+    return enriched
+
+
+def collectible_card_db() -> dict[str, dict]:
+    return {
+        name: enrich_card(card)
+        for name, card in CARD_DB.items()
+        if not card.get("uncollectible")
+    }
+
+
 def log_action(msg: str) -> None:
     GAME_LOG.append(msg)
     if _ACTIVE_LOG is not None:

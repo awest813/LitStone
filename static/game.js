@@ -35,6 +35,7 @@ let practiceActive = false;
 let practiceOptions = { p1_hp: 30, p2_hp: 30, infinite_mana: false, difficulty: "normal" };
 let deckSidebarOpen = true;
 let poolTooltipPinned = null;
+let gameTooltipPinned = null;
 const CAMPAIGN_PROGRESS_KEY = "litstoneCampaignProgress";
 const TUTORIAL_DONE_KEY = "litstoneTutorialDone";
 
@@ -364,7 +365,17 @@ function isNarrowViewport() {
 
 function clientEffectiveMana(player) {
   if (!player) return 0;
-  return player.infinite_mana ? 10 : player.mana;
+  return player.infinite_mana ? GAME_LIMITS.MAX_MANA : player.mana;
+}
+
+function enterActiveMatch(data, { showBanner = false } = {}) {
+  selected = null;
+  prevIsPlayerTurn = null;
+  turnNumber = data.turn_number || 1;
+  initGameScreenUi();
+  showScreen("screen-game");
+  if (showBanner) showTurnBanner(true);
+  renderGame();
 }
 
 function initGameScreenUi() {
@@ -903,9 +914,7 @@ async function resumeActiveGame() {
     if (data.mulligan_phase) {
       renderMulligan(data);
     } else {
-      initGameScreenUi();
-      showScreen("screen-game");
-      renderGame();
+      enterActiveMatch(data);
     }
     saveActiveGame();
   } catch (err) {
@@ -1102,6 +1111,7 @@ async function loadStarterDeck() {
     const data = await apiFetch(`/api/starter_deck?hero_class=${encodeURIComponent(selectedClass)}`);
     if (Array.isArray(data.deck) && data.deck.length === DECK_SIZE) {
       draftDeck = [...data.deck];
+      if (data.curve_targets) idealCurve = { ...data.curve_targets };
       renderCardPool();
       updateDeckSidebar();
       showStatusToast("Curved starter loaded — matches AI deck shape");
@@ -1374,7 +1384,7 @@ function renderManaCurve() {
   if (!curveEl) return;
 
   const counts = deckCurveCounts();
-  const idealMax = Math.max(...Object.values(IDEAL_CURVE), IDEAL_CURVE[6] || 1, 1);
+  const idealMax = Math.max(...Object.values(idealCurve), idealCurve[6] || 1, 1);
   const maxCount = Math.max(...Object.values(counts), idealMax, 1);
 
   curveEl.innerHTML = Object.keys(counts).map(costKey => {
@@ -1382,8 +1392,8 @@ function renderManaCurve() {
     const count = counts[cost] || 0;
     const pct = Math.round((count / maxCount) * 100);
     const ideal = cost === MANA_CURVE_MAX_COST
-      ? (IDEAL_CURVE[6] || 0)
-      : (IDEAL_CURVE[cost] || 0);
+      ? (idealCurve[6] || 0)
+      : (idealCurve[cost] || 0);
     const idealPct = Math.round((ideal / maxCount) * 100);
     const label = cost === MANA_CURVE_MAX_COST ? `${cost}+` : cost;
     return `<div class="curve-bar-wrap">
@@ -1717,10 +1727,7 @@ async function confirmMulligan() {
     prevIsPlayerTurn = null;
     turnNumber       = data.turn_number || 1;
     saveActiveGame();
-    initGameScreenUi();
-    showScreen("screen-game");
-    showTurnBanner(true);
-    renderGame();
+    enterActiveMatch(data, { showBanner: true });
   } catch (err) {
     showStatusToast(err.message || "Network error during mulligan.");
     if (btn) btn.disabled = false;
@@ -1776,13 +1783,7 @@ async function startGame() {
     if (data.mulligan_phase) {
       renderMulligan(data);
     } else {
-      selected         = null;
-      prevIsPlayerTurn = null;
-      turnNumber       = data.turn_number || 1;
-      initGameScreenUi();
-      showScreen("screen-game");
-      showTurnBanner(true);
-      renderGame();
+      enterActiveMatch(data, { showBanner: true });
     }
   } catch (err) {
     showStatusToast(err.message || "Failed to start game. Check your connection and try again.");
@@ -1856,6 +1857,8 @@ function showStatusToast(message, ms = GAME_LIMITS.STATUS_TOAST_MS) {
 // TOOLTIP
 // ---------------------------------------------------------------------------
 function spellDesc(card, short = false) {
+  if (short && card.desc_short) return card.desc_short;
+  if (!short && card.desc_long) return card.desc_long;
   const e = card.effect, v = card.val;
   if (e === "coin")       return short ? "+1 Mana"             : `Gain 1 Mana Crystal this turn only.`;
   if (e === "damage")     return short ? `Deal ${v} Dmg`       : `Deal ${v} damage.`;
@@ -1870,14 +1873,16 @@ function spellDesc(card, short = false) {
   return "";
 }
 
-function battlecryDesc(bc) {
+function battlecryDesc(bc, card = null) {
+  if (card?.battlecry_text) return card.battlecry_text;
   if (!bc) return "";
   if (bc.effect === "heal_hero")  return `Battlecry: Restore ${bc.val} HP to your hero.`;
   if (bc.effect === "draw_cards") return `Battlecry: Draw ${bc.val} card${bc.val !== 1 ? "s" : ""}.`;
   return "";
 }
 
-function deathrattleDesc(dr) {
+function deathrattleDesc(dr, card = null) {
+  if (card?.deathrattle_text) return card.deathrattle_text;
   if (!dr) return "";
   if (dr.effect === "dmg_hero") return `Deathrattle: Deal ${dr.val} damage to the enemy hero.`;
   return "";
@@ -1904,8 +1909,8 @@ function buildTooltipHtml(name, card) {
 
   const kws = renderKwBadges(card, { tooltip: true });
 
-  const bcText = battlecryDesc(card.battlecry);
-  const drText = deathrattleDesc(card.deathrattle);
+  const bcText = battlecryDesc(card.battlecry, card);
+  const drText = deathrattleDesc(card.deathrattle, card);
   const abilities = [bcText, drText].filter(Boolean).map(t =>
     `<div class="tooltip-desc" style="margin-top:4px">${t}</div>`
   ).join("");
@@ -2811,9 +2816,26 @@ function renderHand(p1) {
       ${extra}
     `;
 
-    div.addEventListener("click", () => handleHandClick(idx, p1, name, card, affordable));
-    div.addEventListener("mouseenter", e => showGameTooltip(e, name, card));
-    div.addEventListener("mouseleave", () => hideTooltip("game-tooltip"));
+    div.addEventListener("click", e => {
+      if (isNarrowViewport()) {
+        if (gameTooltipPinned === name) {
+          gameTooltipPinned = null;
+          hideTooltip("game-tooltip");
+          handleHandClick(idx, p1, name, card, affordable);
+        } else {
+          gameTooltipPinned = name;
+          showGameTooltip(e, name, card);
+        }
+        return;
+      }
+      handleHandClick(idx, p1, name, card, affordable);
+    });
+    div.addEventListener("mouseenter", e => {
+      if (!isNarrowViewport()) showGameTooltip(e, name, card);
+    });
+    div.addEventListener("mouseleave", () => {
+      if (!isNarrowViewport()) hideTooltip("game-tooltip");
+    });
     el.appendChild(div);
   });
 }
@@ -3370,8 +3392,16 @@ document.getElementById("settings-modal")?.addEventListener("click", e => {
 });
 
 document.addEventListener("click", e => {
-  if (!poolTooltipPinned) return;
-  if (e.target.closest(".pool-card") || e.target.closest("#card-tooltip")) return;
-  poolTooltipPinned = null;
-  hideTooltip("card-tooltip");
+  if (poolTooltipPinned) {
+    if (!e.target.closest(".pool-card") && !e.target.closest("#card-tooltip")) {
+      poolTooltipPinned = null;
+      hideTooltip("card-tooltip");
+    }
+  }
+  if (gameTooltipPinned) {
+    if (!e.target.closest(".hand-card") && !e.target.closest("#game-tooltip")) {
+      gameTooltipPinned = null;
+      hideTooltip("game-tooltip");
+    }
+  }
 });
