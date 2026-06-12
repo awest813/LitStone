@@ -14,6 +14,7 @@ from game_logic import (
     BOSS_PRESETS,
     CAMPAIGN_NODES,
     CARD_DB,
+    CURVE_TARGETS,
     DECK_SIZE,
     GAME_LOG,
     HERO_CLASSES,
@@ -24,7 +25,6 @@ from game_logic import (
     build_curved_ai_deck,
     card_allowed_for_class,
     cards_for_class,
-    CURVE_TARGETS,
     check_win,
     clamp_practice_hp,
     create_ai_opponent,
@@ -243,11 +243,8 @@ def _resolve_match_setup(data: dict) -> dict:
     practice = _parse_practice_options(data)
     tutorial = bool(data.get("tutorial"))
     campaign_node = data.get("campaign_node")
-    boss_id = data.get("boss_id")
     node = get_campaign_node(campaign_node) if campaign_node else None
-
-    if node and node.get("boss_id"):
-        boss_id = node["boss_id"]
+    boss_id = node.get("boss_id") if node else None
 
     difficulty = normalize_difficulty(data.get("difficulty"))
     if practice:
@@ -300,6 +297,7 @@ def _enrich_campaign_nodes() -> list[dict]:
             enriched["opponent_hp"] = preset["hp"]
         elif enriched.get("ai_class"):
             enriched["opponent_class"] = enriched["ai_class"]
+            enriched["opponent_hp"] = 30
         nodes.append(enriched)
     return nodes
 
@@ -335,7 +333,12 @@ def new_game():
     deck       = data.get("deck", [])
 
     if player_cls not in HERO_CLASSES:
-        player_cls = "Mage"
+        return jsonify({"error": f"Unknown hero class: {player_cls}"}), 400
+
+    if data.get("practice") and data.get("tutorial"):
+        return jsonify({"error": "Cannot combine practice and tutorial"}), 400
+    if data.get("campaign_node") and (data.get("practice") or data.get("tutorial")):
+        return jsonify({"error": "Career matches cannot be combined with practice or tutorial"}), 400
 
     if not _validate_deck(deck, player_cls):
         return jsonify({
@@ -381,7 +384,7 @@ def new_game():
         if gs["mode"] == "campaign" and match["campaign_node"]:
             node = get_campaign_node(match["campaign_node"])
             if node:
-                log_action(f"--- Campaign: {node['name']} ---")
+                log_action(f"--- Career: {node['name']} ---")
         if gs["tutorial"]:
             log_action("--- Tutorial Match — follow the hints ---")
         if gs.get("practice"):

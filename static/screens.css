@@ -478,6 +478,11 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
 }
 
+.campaign-node:focus-visible {
+  outline: 2px solid var(--col-gold);
+  outline-offset: 2px;
+}
+
 .campaign-node--locked {
   opacity: .45;
   cursor: not-allowed;

@@ -38,7 +38,7 @@
         <span class="hub-mode-icon" aria-hidden="true">📖</span>
         <span class="hub-mode-text">
           <span class="hub-mode-title">Career</span>
-          <span class="hub-mode-desc" id="hub-career-progress">6 chapter duels</span>
+          <span class="hub-mode-desc" id="hub-career-progress">Career duels</span>
         </span>
       </button>
       <button type="button" class="hub-mode hub-mode--practice" onclick="goToPractice()">
@@ -65,7 +65,7 @@
         Continue Last Deck
       </button>
       <button type="button" class="btn btn-hub-ghost" onclick="openSettings()" aria-label="Settings">⚙️ Settings</button>
-      <p class="hub-meta" id="hub-meta">6 classes · 109 cards · single-player vs AI</p>
+      <p class="hub-meta" id="hub-meta">6 classes · 109 cards · career &amp; practice</p>
     </div>
   </div>
 </div>
@@ -114,12 +114,12 @@
   </header>
   <div class="career-hero">
     <h2 class="campaign-title">Literary Career</h2>
-    <p class="campaign-subtitle">Conquer six chapters of the anthology — each duel unlocks the next.</p>
+    <p class="campaign-subtitle">Conquer the anthology — each duel unlocks the next.</p>
     <div class="career-progress-wrap" aria-label="Career progress">
       <div class="career-progress-track">
         <div class="career-progress-fill" id="career-progress-fill"></div>
       </div>
-      <span class="career-progress-label" id="career-progress-label">0 / 6 chapters</span>
+      <span class="career-progress-label" id="career-progress-label">0 / — chapters</span>
     </div>
   </div>
   <div class="campaign-map" id="campaign-map"></div>
@@ -402,10 +402,10 @@
   <div id="selection-info" class="selection-info hidden"></div>
 
   <!-- Winner overlay -->
-  <div id="winner-overlay" class="winner-overlay hidden">
+  <div id="winner-overlay" class="winner-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="winner-text">
     <div class="winner-box">
-      <div class="winner-crown">👑</div>
-      <h2 id="winner-text">Victory!</h2>
+      <div class="winner-crown" aria-hidden="true">👑</div>
+      <h2 id="winner-text" aria-live="polite">Victory!</h2>
       <p class="winner-subtitle" id="winner-subtitle"></p>
       <div class="winner-actions">
         <button type="button" class="btn btn-play-again hidden" id="btn-winner-next" onclick="startNextCareerChapter()">Next Chapter →</button>

@@ -1463,6 +1463,14 @@ class TestServerApi(unittest.TestCase):
         self.assertEqual(res.status_code, 400)
         self.assertIn("error", res.get_json())
 
+    def test_invalid_hero_class_rejected(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        res = client.post("/api/new_game", json={"hero_class": "Necromancer", "deck": deck})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("Unknown hero class", res.get_json()["error"])
+
     def test_campaign_endpoint(self):
         from server import app
         client = app.test_client()
@@ -1475,6 +1483,9 @@ class TestServerApi(unittest.TestCase):
         self.assertEqual(frankenstein["boss_id"], "frankenstein")
         self.assertEqual(frankenstein["opponent_hp"], 33)
         self.assertEqual(frankenstein["opponent_class"], "Priest")
+        urchin = next(n for n in data["nodes"] if n["id"] == "n1")
+        self.assertEqual(urchin["opponent_hp"], 30)
+        self.assertEqual(urchin["opponent_class"], "Rogue")
 
     def test_new_game_campaign_frankenstein_boss(self):
         from server import app
@@ -1491,6 +1502,21 @@ class TestServerApi(unittest.TestCase):
         self.assertEqual(data["opponent_name"], "Victor Frankenstein")
         self.assertEqual(data["p2"]["hero_class"], "Priest")
         self.assertEqual(data["ai_difficulty"], "hard")
+
+    def test_new_game_campaign_van_helsing_boss(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        res = client.post("/api/new_game", json={
+            "hero_class": "Mage",
+            "deck": deck,
+            "campaign_node": "n5",
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertEqual(data["boss_id"], "van_helsing")
+        self.assertEqual(data["opponent_name"], "Van Helsing")
+        self.assertEqual(data["p2"]["hero_class"], "Warrior")
 
     def test_new_game_campaign_boss(self):
         from server import app
@@ -1512,6 +1538,33 @@ class TestServerApi(unittest.TestCase):
         p2 = create_player("AI", "Warrior", shuffle=False)
         p2["hp"] = 0
         self.assertEqual(get_legal_moves(p1, p2), [])
+
+    def test_boss_id_ignored_without_campaign_node(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        res = client.post("/api/new_game", json={
+            "hero_class": "Mage",
+            "deck": deck,
+            "boss_id": "moriarty",
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertIsNone(data.get("boss_id"))
+        self.assertNotEqual(data["opponent_name"], "Professor Moriarty")
+
+    def test_career_cannot_mix_with_practice(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        res = client.post("/api/new_game", json={
+            "hero_class": "Mage",
+            "deck": deck,
+            "campaign_node": "n1",
+            "practice": True,
+        })
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("Career", res.get_json()["error"])
 
     def test_invalid_campaign_node_rejected(self):
         from server import app

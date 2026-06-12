@@ -64,6 +64,7 @@ class TestCareerPlaythrough(unittest.TestCase):
         self.assertIn("screen-hub", html)
         self.assertIn("Career", html)
         self.assertIn("goToCareer", html)
+        self.assertNotIn("5 chapter", html.lower())
 
     def test_campaign_unlock_order_matches_client(self):
         completed: list[str] = []
@@ -82,6 +83,7 @@ class TestCareerPlaythrough(unittest.TestCase):
         self.assertEqual(camp.status_code, 200)
         nodes = camp.get_json()["nodes"]
         self.assertEqual(len(nodes), 6)
+        self.assertEqual(camp.get_json()["total_chapters"], 6)
         self.assertEqual([n["id"] for n in nodes], [n["id"] for n in CAMPAIGN_NODES])
 
         completed: list[str] = []

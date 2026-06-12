@@ -28,6 +28,7 @@ let logRenderedCount = 0;
 let deckSearchTimer  = null;
 let activeCampaignNode = null;
 let campaignNodes = [];
+let campaignTotalChapters = 6;
 let tutorialActive = false;
 let tutorialStep = 0;
 let practiceActive = false;
@@ -303,7 +304,7 @@ function updateHubCareerProgress() {
   const el = document.getElementById("hub-career-progress");
   if (!el) return;
   const completed = getCampaignProgress().length;
-  const total = campaignNodes.length || 6;
+  const total = campaignChapterCount();
   if (completed >= total) {
     el.textContent = "Career complete ✓";
   } else if (completed > 0) {
@@ -313,9 +314,24 @@ function updateHubCareerProgress() {
   }
 }
 
+function campaignChapterCount() {
+  return campaignTotalChapters || campaignNodes.length || 6;
+}
+
+function isCareerComplete() {
+  return getCampaignProgress().length >= campaignChapterCount();
+}
+
+function updateCampaignSubtitle() {
+  const sub = document.querySelector(".campaign-subtitle");
+  if (!sub) return;
+  const total = campaignChapterCount();
+  sub.textContent = `Conquer ${total} chapters of the anthology — each duel unlocks the next.`;
+}
+
 function updateCareerProgressBar() {
   const completed = getCampaignProgress();
-  const total = campaignNodes.length || 6;
+  const total = campaignChapterCount();
   const pct = total ? Math.round((completed.length / total) * 100) : 0;
   const fill = document.getElementById("career-progress-fill");
   const label = document.getElementById("career-progress-label");
@@ -526,10 +542,12 @@ async function goToCampaign() {
   try {
     const data = await apiFetch("/api/campaign");
     campaignNodes = data.nodes || [];
+    campaignTotalChapters = data.total_chapters || campaignNodes.length || 6;
   } catch (_) {
     campaignNodes = [];
-    showStatusToast("Could not load campaign. Try again.");
+    showStatusToast("Could not load career chapters. Try again.");
   }
+  updateCampaignSubtitle();
   renderCampaignMap();
   updateCareerProgressBar();
   showScreen("screen-campaign");
@@ -557,11 +575,11 @@ function renderCampaignMap() {
     div.disabled = !unlocked;
     const status = done ? "completed" : (unlocked ? "unlocked" : "locked");
     div.setAttribute("aria-label", `${node.name}, ${node.difficulty}, ${status}`);
+    const oppClass = node.opponent_class || node.ai_class;
+    const oppHp = node.opponent_hp || 30;
     const oppLabel = node.boss_id
-      ? `Boss · ${node.opponent_class || "?"} · ${node.opponent_hp || 30} HP`
-      : (node.opponent_class || node.ai_class
-        ? `${node.opponent_class || node.ai_class} opponent`
-        : "Duel");
+      ? `Boss · ${oppClass || "?"} · ${oppHp} HP`
+      : (oppClass ? `${oppClass} opponent · ${oppHp} HP` : "Duel");
     div.innerHTML = `
       <span class="campaign-node-index">${i + 1}</span>
       <span class="campaign-node-body">
@@ -586,7 +604,6 @@ function startCampaignNode(node) {
   tutorialActive = false;
   const diffEl = document.getElementById("match-difficulty");
   if (diffEl && node.difficulty) diffEl.value = node.difficulty;
-  const sub = document.getElementById("deck-subtitle");
   goToClassSelect();
 }
 
@@ -611,8 +628,9 @@ function onCampaignVictory() {
   if (!completed.includes(activeCampaignNode)) {
     completed.push(activeCampaignNode);
     saveCampaignProgress(completed);
-    showStatusToast("Career chapter cleared!");
+    showStatusToast(isCareerComplete() ? "Literary Career complete!" : "Career chapter cleared!");
     updateHubCareerProgress();
+    updateCareerProgressBar();
   }
 }
 
@@ -2521,8 +2539,11 @@ function renderGame() {
     clearActiveGame();
     overlay.classList.remove("hidden");
     const isWin = winner === "Player";
+    const careerFinale = isWin && gameState.mode === "campaign" && isCareerComplete();
     document.getElementById("winner-text").textContent =
-      winner === "DRAW" ? "It's a Draw!" : isWin ? "Victory!" : "Defeat!";
+      winner === "DRAW" ? "It's a Draw!" : isWin
+        ? (careerFinale ? "Anthology Complete!" : "Victory!")
+        : "Defeat!";
     if (subtitle) {
       const vs = gameState.opponent_name || "the AI";
       const turns = gameState.turn_number || turnNumber;
@@ -3347,7 +3368,9 @@ function syncDeckSizeUi() {
   try {
     const camp = await apiFetch("/api/campaign");
     campaignNodes = camp.nodes || [];
+    campaignTotalChapters = camp.total_chapters || campaignNodes.length || 6;
   } catch (_) {}
+  updateCampaignSubtitle();
   updateHubCareerProgress();
   if (localStorage.getItem(TUTORIAL_DONE_KEY) === "1") {
     const tbtn = document.getElementById("btn-hub-tutorial");

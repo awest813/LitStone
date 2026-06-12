@@ -6,7 +6,7 @@ This document defines what **Hearthstone Lite** means for LitStone and lays out 
 
 ## Audit Summary (June 2026 — updated)
 
-LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collectable cards, campaign/tutorial/practice modes, SQLite session persistence, animations, SFX, responsive UI polish, and **146 unit tests**.
+LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collectable cards, career/tutorial/practice modes, SQLite session persistence, animations, SFX, responsive UI polish, and **164+ tests** (`test_game_logic.py`, `test_career_playthrough.py`).
 
 ### What already feels good
 
@@ -21,17 +21,17 @@ LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collec
 | In-match UX (mana HUD, help bar, collapsible log, mobile hand/tray) | ✅ Partial |
 | Animations + Web Audio SFX (mute toggle) | ✅ Complete |
 | Procedural card art — class-themed frames, motifs, tooltip previews | ✅ Complete |
-| Rules tests | ✅ 146 tests in `test_game_logic.py` |
+| Rules tests | ✅ 164+ tests in `test_game_logic.py` + `test_career_playthrough.py` |
 
 ### Remaining gaps vs. Shippable Lite
 
 | Gap | Impact |
 |-----|--------|
 | Procedural card frames (no bespoke illustrated art per card) | Good readability; less immersion than full art |
-| AI difficulty tiers; reduced random noise | Flat replay challenge |
+| Reduced random noise at Hard difficulty | Flat replay at Easy |
 | Practice sandbox polish (deck presets, no-AI solo) | Nice-to-have |
 | No discover / secrets / windfury / lifesteal | Missing HS texture |
-| Pool card tooltips are hover-only (no tap path) | Harder card preview on touch |
+| In-match card tooltips are hover-only (deck pool has tap preview) | Harder card preview on touch in duels |
 | Illustrated card art (beyond procedural frames) | Less immersion |
 
 ---
@@ -134,7 +134,7 @@ flowchart TB
 | Balance pass | Curve benchmarks per class; remove auto-win AI lines |
 | Boss decks | 3 scripted AI bosses with unique hero powers and fixed decks |
 
-**Content target for Lite launch:** **~100 cards** (40 neutral + 12×5 class cards).
+**Content target for Lite launch:** **~100 cards** (61 neutral + 8×6 class cards — exceeded at 109).
 
 ---
 
@@ -147,8 +147,8 @@ flowchart TB
 | AI mulligan | ✅ |
 | Difficulty tiers (Easy / Normal / Hard) | ✅ |
 | AI deck building (mana curve) | ✅ |
-| Boss decks (Van Helsing, Professor Moriarty) | ✅ |
-| Campaign (5 nodes) | ✅ |
+| Boss decks (Frankenstein, Van Helsing, Moriarty) | ✅ |
+| Career (6 chapters) | ✅ |
 | Tutorial (3-step guided match) | ✅ |
 | Practice mode (sandbox) | ✅ |
 
@@ -248,7 +248,7 @@ Add new mechanics in Python with tests **before** wiring UI.
 5. ~~**Animation spike**~~ — ✅ play arc, attack lunge, death burst, weapon swing, spell flash.
 6. ~~**Sound effects**~~ — ✅ Web Audio API with mute toggle (`localStorage`).
 7. ~~**Class card schema**~~ — ✅ `"classes": ["Mage"]` on 48 class-exclusive cards; deck builder filters by hero.
-8. **Boss encounters** — 3 scripted AI bosses with unique decks (campaign stretch).
+8. ~~**Boss encounters**~~ — ✅ 3 scripted AI bosses with unique decks (Frankenstein, Van Helsing, Moriarty).
 
 ---
 
@@ -259,7 +259,7 @@ Add new mechanics in Python with tests **before** wiring UI.
 | Average game length | 8–15 turns |
 | New player completes tutorial | > 80% |
 | Mobile deck build (375px width) | No horizontal scroll |
-| Unit test count | 200+ |
+| Unit test count | 164+ (200+ stretch) |
 | AI win rate vs default deck (Normal) | 45–55% |
 | Lighthouse performance (desktop) | > 80 |
 

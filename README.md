@@ -13,7 +13,7 @@ A lightweight, browser-based card game inspired by Hearthstone. Play against an 
 - **Literary Legends** — Legendary minions inspired by Sherlock Holmes, Dr. John Watson, Professor Moriarty, Van Helsing, Victor Frankenstein, Frankenstein's Monster, Alice, The Mad Hatter, The White Rabbit, The Queen of Hearts, The Cheshire Cat, Snow White, Rapunzel, Sleeping Beauty, Little Red Riding Hood, Rumpelstiltskin, The Big Bad Wolf, Pied Piper, Baba Yaga, Bluebeard, King Arthur, Merlin, Lancelot, Guinevere, Morgan le Fay, Mordred, Gawain, Robin Hood, Maid Marian, Friar Tuck, Little John, Will Scarlet, Ebenezer Scrooge, Oliver Twist, Ivanhoe, Quasimodo, and Don Quixote (max 1 copy per deck)
 - **Deck Builder** — Build a custom 30-card deck (max 2 copies per card; max 1 copy of Legendary cards) before each game
 - **AI opponent** — Heuristic-driven AI with Easy / Normal / Hard difficulty and curved decks
-- **Campaign & tutorial** — 5-node literary campaign, guided tutorial, and practice sandbox
+- **Career & tutorial** — 6-chapter Literary Career (3 boss duels: Frankenstein, Van Helsing, Moriarty), guided tutorial, and practice sandbox
 - **Session persistence** — active games saved to SQLite and restored after server restart
 - **Combat log** — Real-time log of every action taken during the game
 - **Fatigue system** — Players take increasing damage when their deck runs out
@@ -70,7 +70,7 @@ Open [http://localhost:5000](http://localhost:5000) in your browser.
 Run tests and lint:
 
 ```bash
-pytest test_game_logic.py -v
+pytest test_game_logic.py test_career_playthrough.py -v
 ruff check .
 ```
 
@@ -78,7 +78,7 @@ Third-party licenses: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 ## How to Play
 
-1. From the **title hub**, pick **Play**, **Campaign**, **Practice**, or **Tutorial**.
+1. From the **title hub**, pick **Play**, **Career**, **Practice**, or **Tutorial**.
 2. **Choose a hero class**, then **build a 30-card deck** (up to 2 copies each; legendaries max 1).
 3. **Mulligan** any opening-hand cards you want to replace, then confirm.
 4. On your turn, play cards, attack with minions or your hero, and use your hero power.
@@ -186,7 +186,8 @@ LitStone/
 ├── game_logic.py        # Pure Python game rules, AI, and card database
 ├── game_store.py        # SQLite persistence for active sessions
 ├── server.py            # Flask server and REST API
-├── test_game_logic.py   # Unit tests (150 tests)
+├── test_game_logic.py   # Unit tests (game logic + API)
+├── test_career_playthrough.py  # End-to-end career flow via API
 ├── requirements.txt     # Python runtime dependencies
 ├── requirements-dev.txt # pytest, Ruff, and runtime deps
 ├── THIRD_PARTY_NOTICES.md  # MIT and other OSS attributions
@@ -211,7 +212,8 @@ LitStone/
 |--------|--------------------|----------------------------------|
 | GET    | `/`                | Serves the game UI               |
 | GET    | `/api/health`      | Server health check              |
-| GET    | `/api/campaign`    | Campaign node list for single-player |
+| GET    | `/api/campaign`    | Career chapter list with opponent metadata |
+| GET    | `/api/starter_deck`| Curved 30-card starter list for a hero class |
 | GET    | `/api/cards`       | Returns the full card database   |
 | POST   | `/api/new_game`    | Starts a new game session        |
 | POST   | `/api/mulligan`    | Submit mulligan card swaps       |

@@ -26,7 +26,7 @@ The current state of the project establishes the core gameplay loop.
 - [x] Mulligan phase (player)
 - [x] Deck filter/sort, mana curve, save/load decks (localStorage)
 - [x] Legendary minions (37 literary legends)
-- [x] Unit tests — 150 tests covering game logic, AI, campaign API, and edge cases (`test_game_logic.py`)
+- [x] Unit tests — 164+ tests covering game logic, AI, career API, and edge cases (`test_game_logic.py`, `test_career_playthrough.py`)
 
 ---
 
@@ -61,7 +61,7 @@ Goals: deepen the card pool and hero variety.
 - [x] **30-card decks** — standard CCG deck size
 - [x] **The Coin** — second-player gains +1 mana crystal (once)
 - [x] **First-player randomization** — coin flip for who goes first
-- [x] **Adventure / campaign mode** — 5-node campaign with 2 boss encounters and progress tracking
+- [x] **Literary Career mode** — 6-chapter career with 3 boss encounters (Frankenstein, Van Helsing, Moriarty) and progress tracking
 
 ---
 
