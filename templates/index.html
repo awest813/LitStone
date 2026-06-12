@@ -231,11 +231,12 @@
 
   <button type="button" class="deck-sidebar-toggle" id="deck-sidebar-toggle" onclick="toggleDeckSidebar()" aria-expanded="true" aria-controls="deck-sidebar">
     <span id="deck-sidebar-toggle-label">Hide deck panel</span>
+    <span class="deck-sidebar-toggle-badge" id="deck-sidebar-toggle-badge">0/30</span>
   </button>
 
   <!-- Filter & sort controls -->
   <div class="deck-controls">
-    <input type="search" id="deck-search" class="deck-search" placeholder="Search cards…"
+    <input type="search" id="deck-search" class="deck-search" placeholder="Search cards…  (/ to focus)"
            aria-label="Search cards" oninput="setDeckSearch(this.value)" autocomplete="off" />
     <div class="filter-group" role="group" aria-label="Filter by card type">
       <button class="filter-btn active" data-filter="all"    aria-pressed="true"  onclick="setFilter('all')">All</button>
@@ -258,6 +259,7 @@
       <button type="button" class="cost-filter-btn" data-cost="5" aria-pressed="false" onclick="setCostFilter('5')">5</button>
       <button type="button" class="cost-filter-btn" data-cost="6plus" aria-pressed="false" onclick="setCostFilter('6plus')">6+</button>
     </div>
+    <div class="deck-controls-meta" id="deck-controls-meta" aria-live="polite"></div>
   </div>
 
   <div class="deck-layout">
@@ -269,6 +271,7 @@
       <div class="deck-count-box">
         <span id="deck-count">0</span><span class="deck-count-sep">/</span><span id="deck-size-max">30</span>
         <div class="deck-progress-bar"><div id="deck-progress" class="deck-progress-fill"></div></div>
+        <p class="deck-composition" id="deck-composition" aria-live="polite"></p>
       </div>
 
       <!-- Mana curve -->
@@ -283,7 +286,7 @@
       <!-- Quick actions -->
       <div class="deck-quick-actions">
         <button type="button" class="btn btn-starter-deck" onclick="loadStarterDeck()" title="Load a balanced starter list" aria-label="Load starter deck">📋 Starter</button>
-        <button type="button" class="btn btn-autofill" onclick="autoFillDeck()" title="Randomly fill remaining slots" aria-label="Auto-fill deck">⚡ Fill</button>
+        <button type="button" class="btn btn-autofill" id="btn-autofill" onclick="autoFillDeck()" title="Randomly fill remaining slots" aria-label="Fill remaining deck slots">⚡ Fill rest</button>
         <button type="button" class="btn btn-clear-deck" onclick="clearDeck()" title="Remove all cards from deck" aria-label="Clear deck">🗑</button>
       </div>
 
@@ -291,7 +294,7 @@
       <div class="deck-save-section">
         <div class="deck-save-row">
           <input type="text" id="save-deck-name" class="deck-name-input"
-                 placeholder="Deck name…" maxlength="24" aria-label="Deck name" />
+                 placeholder="Name (optional at 30)" maxlength="24" aria-label="Deck name" />
           <button class="btn btn-save-deck" onclick="saveDeck()" title="Save deck">💾</button>
         </div>
         <div class="saved-decks-list" id="saved-decks-list"></div>

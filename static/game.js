@@ -276,12 +276,25 @@ function updateStartButtonLabel() {
 
 function toggleDeckSidebar() {
   deckSidebarOpen = !deckSidebarOpen;
+  updateDeckSidebarToggleLabel();
   const sidebar = document.getElementById("deck-sidebar");
   const toggle = document.getElementById("deck-sidebar-toggle");
-  const label = document.getElementById("deck-sidebar-toggle-label");
   if (sidebar) sidebar.classList.toggle("deck-sidebar--collapsed", !deckSidebarOpen);
   if (toggle) toggle.setAttribute("aria-expanded", deckSidebarOpen ? "true" : "false");
-  if (label) label.textContent = deckSidebarOpen ? "Hide deck panel" : "Show deck panel";
+}
+
+function updateDeckSidebarToggleLabel() {
+  const label = document.getElementById("deck-sidebar-toggle-label");
+  const badge = document.getElementById("deck-sidebar-toggle-badge");
+  const count = draftDeck.length;
+  const ready = count === DECK_SIZE;
+  if (label) {
+    label.textContent = deckSidebarOpen ? "Hide deck panel" : "Show deck panel";
+  }
+  if (badge) {
+    badge.textContent = `${count}/${DECK_SIZE}`;
+    badge.classList.toggle("deck-sidebar-toggle-badge--ready", ready);
+  }
 }
 
 function updateHubCareerProgress() {
@@ -827,6 +840,7 @@ function enterDeckBuilder(cls, initialDeck) {
   if (sidebar) sidebar.classList.remove("deck-sidebar--collapsed");
   const toggle = document.getElementById("deck-sidebar-toggle");
   if (toggle) toggle.setAttribute("aria-expanded", "true");
+  updateDeckSidebarToggleLabel();
 }
 
 function selectClass(cls) {
@@ -873,6 +887,78 @@ function setCostFilter(cost) {
     b.setAttribute("aria-pressed", on ? "true" : "false");
   });
   renderCardPool();
+}
+
+function deckFiltersActive() {
+  return filterType !== "all" || filterCost !== "all" || deckSearch.length > 0;
+}
+
+function clearDeckFilters() {
+  filterType = "all";
+  filterCost = "all";
+  deckSearch = "";
+  clearTimeout(deckSearchTimer);
+  const searchEl = document.getElementById("deck-search");
+  if (searchEl) searchEl.value = "";
+  document.querySelectorAll(".filter-btn").forEach(b => {
+    const on = b.dataset.filter === "all";
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+  document.querySelectorAll(".cost-filter-btn").forEach(b => {
+    const on = b.dataset.cost === "all";
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+  renderCardPool();
+}
+
+function buildPoolEntries() {
+  let entries = Object.entries(CARD_DB).filter(([, card]) =>
+    cardAllowedForClass(card, selectedClass)
+  );
+  if (filterType !== "all") {
+    entries = entries.filter(([, card]) => card.type === filterType);
+  }
+  if (filterCost !== "all") {
+    entries = entries.filter(([, card]) => cardMatchesCostFilter(card));
+  }
+  if (deckSearch) {
+    entries = filterPoolBySearch(entries, deckSearch);
+  }
+  return entries;
+}
+
+function updateDeckControlsMeta(shown, total) {
+  const el = document.getElementById("deck-controls-meta");
+  if (!el) return;
+  const parts = [`Showing <strong>${shown}</strong> of ${total} cards`];
+  if (deckFiltersActive()) {
+    const chips = [];
+    if (filterType !== "all") chips.push(filterType);
+    if (filterCost !== "all") chips.push(`cost ${filterCost === "6plus" ? "6+" : filterCost}`);
+    if (deckSearch) chips.push(`“${deckSearch}”`);
+    parts.push(`<span class="deck-filter-chips">${chips.map(c => `<span class="deck-filter-chip">${c}</span>`).join("")}</span>`);
+    parts.push(`<button type="button" class="deck-clear-filters" onclick="clearDeckFilters()">Clear filters</button>`);
+  }
+  el.innerHTML = parts.join(" · ");
+}
+
+function updateDeckComposition() {
+  const el = document.getElementById("deck-composition");
+  if (!el) return;
+  if (!draftDeck.length) {
+    el.textContent = "";
+    return;
+  }
+  const minions = draftDeck.filter(n => CARD_DB[n]?.type === "minion").length;
+  const spells = draftDeck.filter(n => CARD_DB[n]?.type === "spell").length;
+  const weapons = draftDeck.filter(n => CARD_DB[n]?.type === "weapon").length;
+  const bits = [];
+  if (minions) bits.push(`${minions} minion${minions === 1 ? "" : "s"}`);
+  if (spells) bits.push(`${spells} spell${spells === 1 ? "" : "s"}`);
+  if (weapons) bits.push(`${weapons} weapon${weapons === 1 ? "" : "s"}`);
+  el.textContent = bits.join(" · ");
 }
 
 function cardMatchesCostFilter(card) {
@@ -960,25 +1046,14 @@ function renderCardPool() {
   if (!pool) return;
   pool.innerHTML = "";
 
-  let entries = Object.entries(CARD_DB).filter(([, card]) =>
+  const total = Object.entries(CARD_DB).filter(([, card]) =>
     cardAllowedForClass(card, selectedClass)
-  );
-
-  // Apply type filter
-  if (filterType !== "all") {
-    entries = entries.filter(([, card]) => card.type === filterType);
-  }
-
-  if (filterCost !== "all") {
-    entries = entries.filter(([, card]) => cardMatchesCostFilter(card));
-  }
-
-  if (deckSearch) {
-    entries = filterPoolBySearch(entries, deckSearch);
-  }
+  ).length;
+  let entries = buildPoolEntries();
+  updateDeckControlsMeta(entries.length, total);
 
   if (entries.length === 0) {
-    pool.innerHTML = `<div class="pool-empty-msg">No cards match your filters.</div>`;
+    pool.innerHTML = `<div class="pool-empty-msg">No cards match your filters.<button type="button" class="pool-empty-clear" onclick="clearDeckFilters()">Clear filters</button></div>`;
     return;
   }
 
@@ -997,7 +1072,7 @@ function renderCardPool() {
     const isFull = count >= maxCopies || draftDeck.length >= DECK_SIZE;
     const div    = document.createElement("div");
     const isClass = card.classes?.length > 0;
-    div.className = `pool-card pool-card--${card.type}${isFull ? " pool-card--full" : ""}${isLegendary ? " pool-card--legendary" : ""} ${CardArt.frameClasses(card, name)}`;
+    div.className = `pool-card pool-card--${card.type}${isFull ? " pool-card--full" : ""}${count > 0 ? " pool-card--in-deck" : ""}${isLegendary ? " pool-card--legendary" : ""} ${CardArt.frameClasses(card, name)}`;
     div.dataset.name = name;
 
     let statsHtml = "";
@@ -1026,11 +1101,26 @@ function renderCardPool() {
       ${isLegendary ? `<div class="legendary-crown" title="Legendary — only 1 copy per deck">♦</div>` : ""}
       ${isClass ? `<div class="class-badge" title="${card.classes.join(", ")} only">${card.classes[0].slice(0,3)}</div>` : ""}
       <div class="pool-type-badge" title="${card.type}">${typeIcon}</div>
+      ${count > 0 ? `<button type="button" class="pool-remove-btn" title="Remove one copy" aria-label="Remove ${name}">−</button>` : ""}
       ${CardArt.renderArt(card, name, "pool")}
       <div class="pool-name">${name}</div>
       ${statsHtml}
     `;
+    const removeBtn = div.querySelector(".pool-remove-btn");
+    if (removeBtn) {
+      removeBtn.addEventListener("click", e => {
+        e.stopPropagation();
+        removeFromDeck(name);
+      });
+    }
+    div.addEventListener("contextmenu", e => {
+      if (count > 0) {
+        e.preventDefault();
+        removeFromDeck(name);
+      }
+    });
     div.addEventListener("click", e => {
+      if (e.target.closest(".pool-remove-btn")) return;
       if (isNarrowViewport()) {
         if (poolTooltipPinned === name) {
           poolTooltipPinned = null;
@@ -1082,19 +1172,34 @@ function updateDeckSidebar() {
 
   const list   = document.getElementById("deck-list");
   list.innerHTML = "";
-  const unique = [...new Set(draftDeck)].sort();
-  unique.forEach(name => {
-    const n    = draftDeck.filter(c => c === name).length;
-    const cost = CARD_DB[name]?.cost ?? "?";
-    const li   = document.createElement("li");
-    li.className = "deck-entry";
-    li.innerHTML = `<span class="deck-entry-cost">${cost}</span>
-                    <span class="deck-entry-name">${name}</span>
-                    <span class="deck-entry-count">x${n}</span>
-                    <span class="deck-entry-remove" title="Remove">✕</span>`;
-    li.querySelector(".deck-entry-remove").addEventListener("click", () => removeFromDeck(name));
-    list.appendChild(li);
-  });
+  if (!draftDeck.length) {
+    list.innerHTML = `<li class="deck-empty-hint">No cards yet — add from the pool or tap Starter</li>`;
+  } else {
+    const unique = [...new Set(draftDeck)].sort((a, b) => {
+      const ca = CARD_DB[a]?.cost ?? 0;
+      const cb = CARD_DB[b]?.cost ?? 0;
+      return ca - cb || a.localeCompare(b);
+    });
+    unique.forEach(name => {
+      const card = CARD_DB[name] || {};
+      const n    = draftDeck.filter(c => c === name).length;
+      const cost = card.cost ?? "?";
+      const typeIcon = CardArt.typeIcon(card.type);
+      const li   = document.createElement("li");
+      li.className = `deck-entry deck-entry--${card.type || "minion"}`;
+      li.innerHTML = `<span class="deck-entry-cost">${cost}</span>
+                      <span class="deck-entry-type" title="${card.type}">${typeIcon}</span>
+                      <span class="deck-entry-name">${name}</span>
+                      <span class="deck-entry-count">×${n}</span>
+                      <button type="button" class="deck-entry-remove" title="Remove one" aria-label="Remove ${name}">✕</button>`;
+      li.querySelector(".deck-entry-remove").addEventListener("click", e => {
+        e.stopPropagation();
+        removeFromDeck(name);
+      });
+      li.addEventListener("click", () => removeFromDeck(name));
+      list.appendChild(li);
+    });
+  }
 
   const startBtn = document.getElementById("btn-start-ai");
   if (startBtn) {
@@ -1107,7 +1212,23 @@ function updateDeckSidebar() {
   }
   renderManaCurve();
   updateDeckStrategyHints();
+  updateDeckComposition();
   updateDeckValidation();
+  updateDeckSidebarToggleLabel();
+  updateAutoFillButton();
+}
+
+function updateAutoFillButton() {
+  const btn = document.getElementById("btn-autofill");
+  if (!btn) return;
+  const need = DECK_SIZE - draftDeck.length;
+  if (need <= 0) {
+    btn.disabled = true;
+    btn.textContent = "⚡ Deck full";
+  } else {
+    btn.disabled = false;
+    btn.textContent = `⚡ Fill ${need}`;
+  }
 }
 
 function deckCurveCounts(deck = draftDeck) {
@@ -1178,6 +1299,10 @@ function updateDeckStrategyHints() {
 }
 
 function autoFillDeck() {
+  if (draftDeck.length >= DECK_SIZE) {
+    showStatusToast("Deck is already full.");
+    return;
+  }
   const pool = poolCardNames();
   let tries = 0;
   while (draftDeck.length < DECK_SIZE && tries < MAX_AUTOFILL_ATTEMPTS) {
@@ -1190,12 +1315,16 @@ function autoFillDeck() {
   }
   renderCardPool();
   updateDeckSidebar();
+  showStatusToast(`Filled ${draftDeck.length}/${DECK_SIZE} cards`);
 }
 
 function clearDeck() {
+  if (!draftDeck.length) return;
+  if (!confirm("Clear all cards from your deck?")) return;
   draftDeck = [];
   renderCardPool();
   updateDeckSidebar();
+  showStatusToast("Deck cleared");
 }
 
 // ---------------------------------------------------------------------------
@@ -1211,13 +1340,25 @@ function getSavedDecks() {
 
 function saveDeck() {
   const nameInput = document.getElementById("save-deck-name");
-  const name = nameInput?.value.trim();
-  if (!name || draftDeck.length === 0) return;
+  let name = nameInput?.value.trim();
+  if (draftDeck.length === 0) {
+    showStatusToast("Add cards before saving.");
+    return;
+  }
+  if (draftDeck.length !== DECK_SIZE) {
+    showStatusToast(`Need ${DECK_SIZE} cards to save (${draftDeck.length} now).`);
+    return;
+  }
+  if (!name) {
+    name = `${selectedClass} ${new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+  }
   const saved = getSavedDecks();
+  if (saved[name] && !confirm(`Overwrite saved deck “${name}”?`)) return;
   saved[name] = { heroClass: selectedClass, cards: [...draftDeck] };
   localStorage.setItem("litstoneDecks", JSON.stringify(saved));
-  nameInput.value = "";
+  if (nameInput) nameInput.value = "";
   renderSavedDecks();
+  showStatusToast(`Saved “${name}”`);
 }
 
 function loadDeck(name) {
@@ -1239,10 +1380,12 @@ function loadDeck(name) {
 }
 
 function deleteSavedDeck(name) {
+  if (!confirm(`Delete saved deck “${name}”?`)) return;
   const saved = getSavedDecks();
   delete saved[name];
   localStorage.setItem("litstoneDecks", JSON.stringify(saved));
   renderSavedDecks();
+  showStatusToast(`Deleted “${name}”`);
 }
 
 function renderSavedDecks() {
@@ -2701,6 +2844,22 @@ function handleHeroPowerClick(player, canUse) {
 }
 
 document.addEventListener("keydown", e => {
+  const deckOpen = document.getElementById("screen-deck")?.classList.contains("active");
+  if (deckOpen && e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    const tag = (e.target?.tagName || "").toLowerCase();
+    if (tag !== "input" && tag !== "textarea" && tag !== "select") {
+      e.preventDefault();
+      document.getElementById("deck-search")?.focus();
+      return;
+    }
+  }
+  if (deckOpen && e.key === "Escape" && deckFiltersActive()) {
+    const tag = (e.target?.tagName || "").toLowerCase();
+    if (tag !== "input") {
+      clearDeckFilters();
+      return;
+    }
+  }
   if (e.key !== "Escape") return;
   const settingsOpen = !document.getElementById("settings-modal")?.classList.contains("hidden");
   const pauseOpen = !document.getElementById("pause-overlay")?.classList.contains("hidden");

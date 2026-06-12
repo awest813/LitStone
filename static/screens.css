@@ -382,7 +382,7 @@
   display: none;
   width: 100%;
   margin-bottom: 8px;
-  padding: 10px;
+  padding: 10px 12px;
   font-family: 'Cinzel', serif;
   font-size: 12px;
   background: var(--col-panel);
@@ -390,6 +390,26 @@
   border-radius: 8px;
   color: var(--col-text-dim);
   cursor: pointer;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.deck-sidebar-toggle-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(74, 158, 221, .15);
+  border: 1px solid rgba(74, 158, 221, .35);
+  color: var(--col-mana-bright);
+  flex-shrink: 0;
+}
+
+.deck-sidebar-toggle-badge--ready {
+  background: rgba(0, 184, 148, .15);
+  border-color: rgba(0, 184, 148, .45);
+  color: var(--col-green);
 }
 
 .deck-start-wrap {
@@ -964,7 +984,7 @@ body.speed-instant .turn-banner.active {
   .deck-header { flex-wrap: wrap; }
   .flow-breadcrumb--header { font-size: 9px; }
 
-  .deck-sidebar-toggle { display: block; }
+  .deck-sidebar-toggle { display: flex; }
 
   .deck-sidebar {
     position: sticky;
