@@ -220,13 +220,19 @@
   color: var(--col-text-dim);
 }
 
-.practice-field input {
+.practice-field input,
+.practice-field select {
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid var(--col-border);
   background: rgba(8, 15, 26, .85);
   color: var(--col-text);
   font-size: 16px;
+}
+
+.practice-field select {
+  font-family: inherit;
+  cursor: pointer;
 }
 
 .practice-toggle {

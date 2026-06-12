@@ -250,7 +250,7 @@ def _resolve_match_setup(data: dict) -> dict:
 
     difficulty = normalize_difficulty(data.get("difficulty"))
     if practice:
-        difficulty = "easy"
+        difficulty = normalize_difficulty(data.get("difficulty", "easy"))
     elif tutorial:
         difficulty = "easy"
     elif node:

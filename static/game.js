@@ -31,7 +31,7 @@ let campaignNodes = [];
 let tutorialActive = false;
 let tutorialStep = 0;
 let practiceActive = false;
-let practiceOptions = { p1_hp: 30, p2_hp: 30, infinite_mana: false };
+let practiceOptions = { p1_hp: 30, p2_hp: 30, infinite_mana: false, difficulty: "normal" };
 let deckSidebarOpen = true;
 let poolTooltipPinned = null;
 const CAMPAIGN_PROGRESS_KEY = "litstoneCampaignProgress";
@@ -51,6 +51,8 @@ let audioCtx          = null;
 
 const SETTINGS_KEY    = "litstoneSettings";
 const LAST_DECK_KEY   = "litstoneLastDeck";
+const ACTIVE_GAME_KEY = "litstoneActiveGame";
+const DECK_CODE_PREFIX = "LS1:";
 
 async function apiFetch(url, options = {}) {
   const res = await fetch(url, options);
@@ -411,6 +413,7 @@ function goToHub() {
   tutorialActive = false;
   tutorialStep = 0;
   showScreen("screen-hub");
+  updateHubContinue();
 }
 
 function captureMatchContext() {
@@ -486,18 +489,15 @@ function startPracticeFromSetup() {
   const p1El = document.getElementById("practice-p1-hp");
   const p2El = document.getElementById("practice-p2-hp");
   const manaEl = document.getElementById("practice-infinite-mana");
+  const practiceDiffEl = document.getElementById("practice-difficulty");
   practiceOptions = {
     p1_hp: Math.max(1, Math.min(60, parseInt(p1El?.value, 10) || 30)),
     p2_hp: Math.max(1, Math.min(60, parseInt(p2El?.value, 10) || 30)),
     infinite_mana: !!manaEl?.checked,
+    difficulty: practiceDiffEl?.value || "normal",
   };
-  const sub = document.getElementById("deck-subtitle");
-  if (sub) {
-    const mana = practiceOptions.infinite_mana ? " · infinite mana" : "";
-    sub.textContent = `Practice — ${practiceOptions.p1_hp} HP vs AI ${practiceOptions.p2_hp} HP${mana}`;
-  }
   const diffEl = document.getElementById("match-difficulty");
-  if (diffEl) diffEl.value = "easy";
+  if (diffEl) diffEl.value = practiceOptions.difficulty;
   goToClassSelect();
 }
 
@@ -778,15 +778,102 @@ function getLastDeck() {
   }
 }
 
-function updateHubContinue() {
-  const btn = document.getElementById("btn-hub-continue");
+function saveActiveGame() {
+  if (!gameId || !gameState || gameState.winner) return;
+  localStorage.setItem(ACTIVE_GAME_KEY, JSON.stringify({
+    gameId,
+    heroClass: gameState.p1?.hero_class || selectedClass,
+    mode: gameState.mode || "standard",
+    campaignNode: gameState.campaign_node || activeCampaignNode,
+    opponentName: gameState.opponent_name || "AI",
+    mulliganPhase: !!gameState.mulligan_phase,
+    turnNumber: gameState.turn_number || 1,
+    savedAt: Date.now(),
+  }));
+}
+
+function clearActiveGame() {
+  localStorage.removeItem(ACTIVE_GAME_KEY);
+}
+
+function getActiveGameMeta() {
+  try {
+    return JSON.parse(localStorage.getItem(ACTIVE_GAME_KEY) || "null");
+  } catch (_) {
+    return null;
+  }
+}
+
+async function updateHubContinue() {
+  const deckBtn = document.getElementById("btn-hub-continue");
+  const resumeBtn = document.getElementById("btn-hub-resume");
   const last = getLastDeck();
-  if (!btn) return;
-  if (last?.heroClass && last.cards?.length === DECK_SIZE) {
-    btn.textContent = `Continue — ${last.heroClass} Deck`;
-    btn.classList.remove("hidden");
-  } else {
-    btn.classList.add("hidden");
+  if (deckBtn) {
+    if (last?.heroClass && last.cards?.length === DECK_SIZE) {
+      deckBtn.textContent = `Continue — ${last.heroClass} Deck`;
+      deckBtn.classList.remove("hidden");
+    } else {
+      deckBtn.classList.add("hidden");
+    }
+  }
+  if (!resumeBtn) return;
+  const meta = getActiveGameMeta();
+  if (!meta?.gameId) {
+    resumeBtn.classList.add("hidden");
+    return;
+  }
+  try {
+    const data = await apiFetch(`/api/state?game_id=${encodeURIComponent(meta.gameId)}`);
+    if (data.winner) {
+      clearActiveGame();
+      resumeBtn.classList.add("hidden");
+      return;
+    }
+    const vs = data.opponent_name || meta.opponentName || "AI";
+    const turn = data.turn_number || meta.turnNumber || 1;
+    resumeBtn.textContent = data.mulligan_phase
+      ? `Resume — Mulligan vs ${vs}`
+      : `Resume — Turn ${turn} vs ${vs}`;
+    resumeBtn.classList.remove("hidden");
+  } catch (_) {
+    clearActiveGame();
+    resumeBtn.classList.add("hidden");
+  }
+}
+
+async function resumeActiveGame() {
+  const meta = getActiveGameMeta();
+  if (!meta?.gameId) return;
+  showLoading("Resuming match…");
+  try {
+    const data = await apiFetch(`/api/state?game_id=${encodeURIComponent(meta.gameId)}`);
+    if (data.winner) {
+      clearActiveGame();
+      showStatusToast("That match already ended.");
+      await updateHubContinue();
+      return;
+    }
+    gameId = data.game_id;
+    CARD_DB = data.card_db || CARD_DB;
+    gameState = data;
+    syncNavigationFromGameState(data);
+    selected = null;
+    prevIsPlayerTurn = null;
+    turnNumber = data.turn_number || 1;
+    if (data.mulligan_phase) {
+      renderMulligan(data);
+    } else {
+      initGameScreenUi();
+      showScreen("screen-game");
+      renderGame();
+    }
+    saveActiveGame();
+  } catch (err) {
+    clearActiveGame();
+    showStatusToast(err.message || "Could not resume — match expired.");
+    await updateHubContinue();
+  } finally {
+    hideLoading();
   }
 }
 
@@ -800,7 +887,8 @@ function deckBuilderSubtitle(cls) {
   if (tutorialActive) return "Tutorial — follow the hints in the help bar";
   if (practiceActive) {
     const mana = practiceOptions.infinite_mana ? " · infinite mana" : "";
-    return `Sandbox · ${practiceOptions.p1_hp} HP vs AI ${practiceOptions.p2_hp} HP${mana}`;
+    const diff = practiceOptions.difficulty || "normal";
+    return `Sandbox · ${practiceOptions.p1_hp} HP vs AI ${practiceOptions.p2_hp} HP · ${diff} AI${mana}`;
   }
   const node = getActiveCareerNode();
   if (node) return `Career duel · ${node.name} · ${node.difficulty} AI`;
@@ -1388,6 +1476,81 @@ function deleteSavedDeck(name) {
   showStatusToast(`Deleted “${name}”`);
 }
 
+function encodeDeckCode(heroClass, cards) {
+  const payload = JSON.stringify({ v: 1, c: heroClass, d: cards });
+  return DECK_CODE_PREFIX + btoa(unescape(encodeURIComponent(payload)));
+}
+
+function decodeDeckCode(raw) {
+  const text = (raw || "").trim();
+  if (!text.startsWith(DECK_CODE_PREFIX)) {
+    throw new Error("Invalid deck code — must start with LS1:");
+  }
+  const payload = JSON.parse(decodeURIComponent(escape(atob(text.slice(DECK_CODE_PREFIX.length)))));
+  if (!payload?.c || !Array.isArray(payload.d)) throw new Error("Malformed deck code");
+  return payload;
+}
+
+function validateImportedDeck(heroClass, cards) {
+  if (cards.length !== DECK_SIZE) {
+    return { ok: false, message: `Need ${DECK_SIZE} cards (got ${cards.length}).` };
+  }
+  const legal = cards.filter(c => CARD_DB[c] && cardAllowedForClass(CARD_DB[c], heroClass));
+  if (legal.length !== DECK_SIZE) {
+    return { ok: false, message: "Some cards are invalid for this class." };
+  }
+  for (const name of new Set(cards)) {
+    const max = CARD_DB[name]?.legendary ? 1 : 2;
+    if (cards.filter(c => c === name).length > max) {
+      return { ok: false, message: `Too many copies of ${name}.` };
+    }
+  }
+  return { ok: true, cards: legal };
+}
+
+async function exportDeckCode() {
+  if (!selectedClass || draftDeck.length !== DECK_SIZE) {
+    showStatusToast(`Build a full ${DECK_SIZE}-card deck to export.`);
+    return;
+  }
+  const code = encodeDeckCode(selectedClass, draftDeck);
+  try {
+    await navigator.clipboard.writeText(code);
+    showStatusToast("Deck code copied!");
+  } catch (_) {
+    prompt("Copy this deck code:", code);
+  }
+}
+
+function importDeckCode() {
+  const raw = prompt("Paste a LitStone deck code (LS1:…):");
+  if (!raw) return;
+  try {
+    const { c: heroClass, d: cards } = decodeDeckCode(raw);
+    if (heroClass !== selectedClass) {
+      if (!confirm(`This deck is for ${heroClass}. Switch class and import?`)) return;
+      selectedClass = heroClass;
+      document.getElementById("deck-title").textContent = `Build Your ${heroClass} Deck`;
+      const emblem = document.getElementById("deck-class-emblem");
+      if (emblem) {
+        emblem.textContent = HERO_ICONS[heroClass] || "?";
+        emblem.style.borderColor = HERO_COLORS[heroClass] || "var(--col-border-bright)";
+      }
+    }
+    const check = validateImportedDeck(heroClass, cards);
+    if (!check.ok) {
+      showStatusToast(check.message);
+      return;
+    }
+    draftDeck = [...check.cards];
+    renderCardPool();
+    updateDeckSidebar();
+    showStatusToast(`Imported ${heroClass} deck`);
+  } catch (err) {
+    showStatusToast(err.message || "Could not import deck code.");
+  }
+}
+
 function renderSavedDecks() {
   const el = document.getElementById("saved-decks-list");
   if (!el) return;
@@ -1515,6 +1678,7 @@ async function confirmMulligan() {
     selected         = null;
     prevIsPlayerTurn = null;
     turnNumber       = data.turn_number || 1;
+    saveActiveGame();
     initGameScreenUi();
     showScreen("screen-game");
     showTurnBanner(true);
@@ -1532,6 +1696,17 @@ async function startGame() {
   if (draftDeck.length !== DECK_SIZE) return;
   saveLastDeck();
   lastMatchDeck = { heroClass: selectedClass, cards: [...draftDeck] };
+  const prev = getActiveGameMeta();
+  if (prev?.gameId) {
+    try {
+      await fetch("/api/resign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ game_id: prev.gameId }),
+      });
+    } catch (_) { /* best effort */ }
+    clearActiveGame();
+  }
   const startBtn = document.getElementById("btn-start-ai");
   if (startBtn) startBtn.disabled = true;
   const diffEl = document.getElementById("match-difficulty");
@@ -1548,7 +1723,7 @@ async function startGame() {
     payload.p1_hp = practiceOptions.p1_hp;
     payload.p2_hp = practiceOptions.p2_hp;
     payload.infinite_mana = practiceOptions.infinite_mana;
-    payload.difficulty = "easy";
+    payload.difficulty = practiceOptions.difficulty || "normal";
   }
   const loadMsg = activeCampaignNode
     ? "Starting encounter…"
@@ -1565,6 +1740,7 @@ async function startGame() {
     gameState = data;
     syncNavigationFromGameState(data);
     isActing  = false;
+    saveActiveGame();
     if (data.mulligan_phase) {
       renderMulligan(data);
     } else {
@@ -1601,6 +1777,28 @@ function goBack() {
     return;
   }
   showScreen("screen-menu");
+}
+
+function getNextCareerNode() {
+  if (!activeCampaignNode || !campaignNodes.length) return null;
+  const idx = campaignNodes.findIndex(n => n.id === activeCampaignNode);
+  if (idx < 0 || idx >= campaignNodes.length - 1) return null;
+  const next = campaignNodes[idx + 1];
+  const completed = getCampaignProgress();
+  return isCampaignNodeUnlocked(next.id, completed) ? next : null;
+}
+
+async function startNextCareerChapter() {
+  const next = getNextCareerNode();
+  if (!next || !lastMatchDeck?.cards?.length) return;
+  document.getElementById("winner-overlay")?.classList.add("hidden");
+  activeCampaignNode = next.id;
+  const ctx = captureMatchContext();
+  await abandonGame({ preserveNavigation: true });
+  applyMatchContext(ctx);
+  activeCampaignNode = next.id;
+  enterDeckBuilder(lastMatchDeck.heroClass, lastMatchDeck.cards);
+  await startGame();
 }
 
 async function playAgain() {
@@ -2266,6 +2464,7 @@ function onGameStateUpdated(data, animCtx) {
     applyHeroAnimations(animCtx.prevHeroSnap);
   }
   if (data.winner === "Player") onCampaignVictory();
+  if (!data.winner) saveActiveGame();
 }
 
 // ---------------------------------------------------------------------------
@@ -2313,11 +2512,33 @@ function renderGame() {
 
   // Winner overlay
   const overlay = document.getElementById("winner-overlay");
+  const subtitle = document.getElementById("winner-subtitle");
+  const nextBtn = document.getElementById("btn-winner-next");
+  const againBtn = document.getElementById("btn-winner-again");
   if (winner) {
+    clearActiveGame();
     overlay.classList.remove("hidden");
     const isWin = winner === "Player";
     document.getElementById("winner-text").textContent =
       winner === "DRAW" ? "It's a Draw!" : isWin ? "Victory!" : "Defeat!";
+    if (subtitle) {
+      const vs = gameState.opponent_name || "the AI";
+      const turns = gameState.turn_number || turnNumber;
+      let sub = `vs ${vs} · ${turns} turn${turns === 1 ? "" : "s"}`;
+      if (isWin && gameState.mode === "campaign" && activeCampaignNode) {
+        const node = getActiveCareerNode();
+        if (node) sub = `${node.name} cleared · ${sub}`;
+      }
+      subtitle.textContent = sub;
+    }
+    const nextNode = isWin ? getNextCareerNode() : null;
+    if (nextBtn) {
+      nextBtn.classList.toggle("hidden", !nextNode);
+      if (nextNode) nextBtn.textContent = `Next — ${nextNode.name} →`;
+    }
+    if (againBtn) {
+      againBtn.classList.toggle("hidden", !!nextNode && gameState.mode === "campaign");
+    }
     if (!overlay.dataset.sfxPlayed) {
       playSfx(winner === "DRAW" ? "turn" : isWin ? "victory" : "defeat");
       overlay.dataset.sfxPlayed = "1";
@@ -2325,6 +2546,9 @@ function renderGame() {
   } else {
     overlay.classList.add("hidden");
     delete overlay.dataset.sfxPlayed;
+    if (subtitle) subtitle.textContent = "";
+    if (nextBtn) nextBtn.classList.add("hidden");
+    if (againBtn) againBtn.classList.remove("hidden");
   }
 
   updateSelectionInfo();
@@ -2987,7 +3211,9 @@ async function abandonGame(options = {}) {
   } catch (_) {
     // Best-effort — local UI should still reset even if the server is unreachable.
   }
+  clearActiveGame();
   resetGameState();
+  updateHubContinue();
 }
 
 function resign() {
@@ -3077,7 +3303,7 @@ function syncDeckSizeUi() {
   syncSfxButton();
   syncSettingsUi();
   applyGameSpeedClass();
-  updateHubContinue();
+  await updateHubContinue();
   const meta = document.getElementById("hub-meta");
   if (meta) meta.textContent = `6 classes · ${cardCount} cards · career & practice`;
   try {

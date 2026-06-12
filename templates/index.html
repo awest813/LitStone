@@ -58,6 +58,9 @@
     </div>
 
     <div class="hub-footer">
+      <button type="button" class="btn hub-continue hidden" id="btn-hub-resume" onclick="resumeActiveGame()">
+        Resume Match
+      </button>
       <button type="button" class="btn hub-continue hidden" id="btn-hub-continue" onclick="continueLastDeck()">
         Continue Last Deck
       </button>
@@ -75,7 +78,7 @@
     <span class="menu-header-spacer"></span>
   </header>
   <h2 class="practice-title">Practice Sandbox</h2>
-  <p class="practice-subtitle">Tune hero health and mana, then build a deck and spar with Easy AI.</p>
+  <p class="practice-subtitle">Tune hero health, mana, and AI strength — then build a deck and spar.</p>
   <div class="practice-panel">
     <label class="practice-field">
       <span>Your hero HP</span>
@@ -88,6 +91,14 @@
     <label class="practice-toggle">
       <input type="checkbox" id="practice-infinite-mana" />
       <span>Infinite mana (both players)</span>
+    </label>
+    <label class="practice-field" for="practice-difficulty">
+      <span>AI difficulty</span>
+      <select id="practice-difficulty" class="setting-select">
+        <option value="easy">Easy — learning</option>
+        <option value="normal" selected>Normal — standard</option>
+        <option value="hard">Hard — ruthless</option>
+      </select>
     </label>
     <button type="button" class="btn btn-primary" onclick="startPracticeFromSetup()">Choose Class &amp; Deck</button>
   </div>
@@ -289,6 +300,10 @@
         <button type="button" class="btn btn-autofill" id="btn-autofill" onclick="autoFillDeck()" title="Randomly fill remaining slots" aria-label="Fill remaining deck slots">⚡ Fill rest</button>
         <button type="button" class="btn btn-clear-deck" onclick="clearDeck()" title="Remove all cards from deck" aria-label="Clear deck">🗑</button>
       </div>
+      <div class="deck-code-actions">
+        <button type="button" class="btn btn-deck-code" onclick="exportDeckCode()" title="Copy deck code to clipboard">📤 Export</button>
+        <button type="button" class="btn btn-deck-code" onclick="importDeckCode()" title="Paste a deck code">📥 Import</button>
+      </div>
 
       <!-- Save / load decks (localStorage) -->
       <div class="deck-save-section">
@@ -391,8 +406,10 @@
     <div class="winner-box">
       <div class="winner-crown">👑</div>
       <h2 id="winner-text">Victory!</h2>
+      <p class="winner-subtitle" id="winner-subtitle"></p>
       <div class="winner-actions">
-        <button type="button" class="btn btn-play-again" onclick="playAgain()">Play Again</button>
+        <button type="button" class="btn btn-play-again hidden" id="btn-winner-next" onclick="startNextCareerChapter()">Next Chapter →</button>
+        <button type="button" class="btn btn-play-again" id="btn-winner-again" onclick="playAgain()">Play Again</button>
         <button type="button" class="btn btn-primary" onclick="returnToMenu()">Main Menu</button>
       </div>
     </div>

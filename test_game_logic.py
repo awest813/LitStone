@@ -1553,6 +1553,32 @@ class TestServerApi(unittest.TestCase):
         self.assertEqual(data["p1"]["hp"], 50)
         self.assertTrue(data["p1"].get("infinite_mana") or data.get("practice", {}).get("infinite_mana"))
 
+    def test_practice_mode_respects_difficulty(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        res = client.post("/api/new_game", json={
+            "hero_class": "Mage",
+            "deck": deck,
+            "practice": True,
+            "difficulty": "hard",
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.get_json()["ai_difficulty"], "hard")
+
+    def test_resume_state_endpoint(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        start = client.post("/api/new_game", json={"hero_class": "Mage", "deck": deck})
+        gid = start.get_json()["game_id"]
+        client.post("/api/mulligan", json={"game_id": gid, "indices": []})
+        res = client.get(f"/api/state?game_id={gid}")
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertEqual(data["game_id"], gid)
+        self.assertFalse(data["mulligan_phase"])
+
     def test_action_response_omits_card_db(self):
         from server import app
         client = app.test_client()
