@@ -658,6 +658,7 @@ def start_turn(player: dict, on_event=None, *, draw: bool = True) -> None:
     player["hero_can_attack"] = bool(player["weapon"])
     for m in player["board"]:
         m["can_attack"] = True
+        m["turns_on_board"] = m.get("turns_on_board", 0) + 1
     if draw:
         draw_card(player, on_event)
 
@@ -841,6 +842,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             minion["name"]       = card_name
             minion["max_hp"]     = card["hp"]
             minion["can_attack"] = card.get("charge", False)
+            minion["turns_on_board"] = 0
             player["board"].append(minion)
             if "battlecry" in card:
                 bc = card["battlecry"]
@@ -955,6 +957,8 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
                     cleanup_dead(player, opp, on_event)
                     return
                 tm = opp["board"][target]
+                if tm.get("charge") and tm.get("turns_on_board", 0) == 0:
+                    tm["can_attack"] = False
                 for kw in MINION_TRAITS:
                     tm.pop(kw, None)
                 log_action(f"   [SILENCE] {tm['name']} is silenced! All effects removed.")
@@ -1082,7 +1086,8 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             # Reinforce: summon a 1/1 Silver Hand Recruit
             recruit = {
                 "name": "Silver Hand Recruit", "type": "minion", "cost": 0,
-                "atk": 1, "hp": 1, "max_hp": 1, "can_attack": False, "icon": "SR",
+                "atk": 1, "hp": 1, "max_hp": 1, "can_attack": False,
+                "turns_on_board": 0, "icon": "SR",
             }
             player["board"].append(recruit)
             log_action(f">> {player['name']} uses Reinforce! Summons a 1/1 Silver Hand Recruit.")
@@ -1093,6 +1098,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             totem = dict(totem_tpl)
             totem["max_hp"] = totem["hp"]
             totem["can_attack"] = False
+            totem["turns_on_board"] = 0
             player["board"].append(totem)
             log_action(f">> {player['name']} uses Totemic Call! Summons {totem['name']}.")
             notify("armor", player, "hero", 0)

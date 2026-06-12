@@ -144,6 +144,15 @@ const KW_SHORT = [
   ["taunt","TAUNT"], ["divine_shield","SHIELD"], ["charge","CHARGE"],
   ["poisonous","POISON"], ["battlecry","B.CRY"], ["deathrattle","D.RATTLE"],
 ];
+const BOARD_TRAIT_KEYS = KW_SHORT.map(([k]) => k);
+
+function boardMinionView(card, minion) {
+  const view = { ...card, atk: minion.atk, hp: minion.hp, max_hp: minion.max_hp };
+  for (const k of BOARD_TRAIT_KEYS) {
+    view[k] = !!minion[k];
+  }
+  return view;
+}
 // Hero class accent colors
 const HERO_COLORS = {
   Mage: "#2980b9", Warrior: "#c0392b", Priest: "#d4820a", Rogue: "#1abc9c", Paladin: "#c0a020", Shaman: "#0077b6",
@@ -2757,7 +2766,7 @@ function renderBoard(elId, player, isOpp) {
       else if (isOpp) cls += " invalid-target";
     }
 
-    const kws = renderKwBadges({ ...card, ...minion });
+    const kws = renderKwBadges(boardMinionView(card, minion));
 
     const div = document.createElement("div");
     div.className = cls;
@@ -2770,7 +2779,7 @@ function renderBoard(elId, player, isOpp) {
     `;
 
     div.addEventListener("click", () => handleMinionClick(idx, isOpp, player, minion));
-    div.addEventListener("mouseenter", e => showGameTooltip(e, minion.name, {...card, ...{atk:minion.atk, hp:minion.hp}}));
+    div.addEventListener("mouseenter", e => showGameTooltip(e, minion.name, boardMinionView(card, minion)));
     div.addEventListener("mouseleave", () => hideTooltip("game-tooltip"));
     el.appendChild(div);
   });
@@ -2922,8 +2931,8 @@ function passesTargetSideRules(isOpp) {
   if (actionType === "play") {
     const card = CARD_DB[gameState.p1.hand[selected.idx]];
     if (card?.effect === "damage" && !isOpp) return false;
-    if (card?.effect === "add_shield") return false;
-    if (card?.effect === "silence") return false;
+    if (card?.effect === "add_shield" && isOpp) return false;
+    if (card?.effect === "silence" && !isOpp) return false;
   }
   if (actionType === "hero_power") {
     if (gameState.p1.hero_class === "Priest" && isOpp) return false;
