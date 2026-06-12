@@ -1338,6 +1338,16 @@ class TestAiDeckAndDifficulty(unittest.TestCase):
             self.assertEqual(opp["name"], preset["display_name"])
             self.assertEqual(opp["hp"], preset["hp"])
 
+    def test_boss_core_cards_legal_for_class(self):
+        for boss_id, preset in BOSS_PRESETS.items():
+            hero_class = preset["hero_class"]
+            for name in preset["core"]:
+                self.assertIn(name, CARD_DB, f"{boss_id} core references unknown card: {name}")
+                self.assertTrue(
+                    card_allowed_for_class(name, hero_class),
+                    f"{boss_id} core has {name} illegal for {hero_class}",
+                )
+
     def test_select_ai_move_easy_can_differ(self):
         p1 = create_player("P1", "Mage")
         p2 = create_player("AI", "Warrior")
