@@ -8,7 +8,7 @@ A lightweight, browser-based card game inspired by Hearthstone. Play against an 
 
 - **6 Hero Classes** — Mage, Warrior, Priest, Rogue, Paladin, and Shaman, each with a unique hero power
 - **109-card library** — Neutral literary cards plus 8 class-exclusive cards per hero (48 class cards), including 37 Legendary minions
-- **Rich card mechanics** — Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle
+- **Rich card mechanics** — Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle, Silence
 - **Mulligan phase** — Select any opening-hand cards to redraw before each game starts
 - **Literary Legends** — Legendary minions inspired by Sherlock Holmes, Dr. John Watson, Professor Moriarty, Van Helsing, Victor Frankenstein, Frankenstein's Monster, Alice, The Mad Hatter, The White Rabbit, The Queen of Hearts, The Cheshire Cat, Snow White, Rapunzel, Sleeping Beauty, Little Red Riding Hood, Rumpelstiltskin, The Big Bad Wolf, Pied Piper, Baba Yaga, Bluebeard, King Arthur, Merlin, Lancelot, Guinevere, Morgan le Fay, Mordred, Gawain, Robin Hood, Maid Marian, Friar Tuck, Little John, Will Scarlet, Ebenezer Scrooge, Oliver Twist, Ivanhoe, Quasimodo, and Don Quixote (max 1 copy per deck)
 - **Deck Builder** — Build a custom 30-card deck (max 2 copies per card; max 1 copy of Legendary cards) before each game
@@ -33,7 +33,7 @@ A lightweight, browser-based card game inspired by Hearthstone. Play against an 
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.12+ (matches CI)
 - pip
 
 ### Installation
@@ -70,11 +70,12 @@ Open [http://localhost:5000](http://localhost:5000) in your browser.
 Run tests and lint:
 
 ```bash
-pytest test_game_logic.py test_career_playthrough.py -v
+pytest test_game_logic.py test_career_playthrough.py test_career_browser.py -q
 playwright install chromium   # once, for browser E2E
-pytest test_career_browser.py -v
 ruff check .
 ```
+
+The suite has **193** tests (game logic, career API, and Playwright browser E2E).
 
 Third-party licenses: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
@@ -168,7 +169,7 @@ These legendary minions are based on classic literature and folklore and have a 
 ### Core Set Minions & Spells
 
 - Minions: Town Crier, Castle Guard, Highwayman, Errant Knight, Templar Captain, Storybook Dragon, Cave Spider, Cathedral Cleric, Tinker Alchemist.
-- Spells & weapon: Quill Bolt, Inferno Verse, Restorative Hymn, Deductive Clue, Rebel's Ambush, Fairy Blessing, Inkwell Blast, Tome of Silence, Heroic Blade.
+- Spells & weapon: Quill Bolt, Inferno Verse, Restorative Hymn, Deductive Clue, Rebel's Ambush, Fairy Blessing, Heroic Blade.
 
 ### Keyword Reference
 
@@ -180,6 +181,7 @@ These legendary minions are based on classic literature and folklore and have a 
 | Poisonous     | Destroys any minion it damages |
 | Battlecry     | Triggers an effect when played from hand |
 | Deathrattle   | Triggers an effect when the minion dies |
+| Silence       | Removes all keywords and text from a minion |
 
 ## Project Structure
 
@@ -188,8 +190,11 @@ LitStone/
 ├── game_logic.py        # Pure Python game rules, AI, and card database
 ├── game_store.py        # SQLite persistence for active sessions
 ├── server.py            # Flask server and REST API
+├── career_test_support.py  # Shared helpers for career E2E tests
+├── conftest.py          # Pytest fixtures (live server, Playwright browser)
 ├── test_game_logic.py   # Unit tests (game logic + API)
 ├── test_career_playthrough.py  # End-to-end career flow via API
+├── test_career_browser.py      # Playwright browser E2E for career UI
 ├── requirements.txt     # Python runtime dependencies
 ├── requirements-dev.txt # pytest, Ruff, and runtime deps
 ├── THIRD_PARTY_NOTICES.md  # MIT and other OSS attributions

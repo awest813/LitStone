@@ -6,7 +6,7 @@ This document defines what **Hearthstone Lite** means for LitStone and lays out 
 
 ## Audit Summary (June 2026 — updated)
 
-LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collectable cards, career/tutorial/practice modes, SQLite session persistence, animations, SFX, responsive UI polish, and **164+ tests** (`test_game_logic.py`, `test_career_playthrough.py`).
+LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collectable cards, career/tutorial/practice modes, SQLite session persistence, animations, SFX, responsive UI polish, and **193 tests** (`test_game_logic.py`, `test_career_playthrough.py`, `test_career_browser.py`).
 
 ### What already feels good
 
@@ -21,7 +21,7 @@ LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collec
 | In-match UX (mana HUD, help bar, collapsible log, mobile hand/tray) | ✅ Partial |
 | Animations + Web Audio SFX (mute toggle) | ✅ Complete |
 | Procedural card art — class-themed frames, motifs, tooltip previews | ✅ Complete |
-| Rules tests | ✅ 164+ tests in `test_game_logic.py` + `test_career_playthrough.py` |
+| Rules tests | ✅ 193 tests in `test_game_logic.py` + `test_career_playthrough.py` + `test_career_browser.py` |
 
 ### Remaining gaps vs. Shippable Lite
 
@@ -259,7 +259,7 @@ Add new mechanics in Python with tests **before** wiring UI.
 | Average game length | 8–15 turns |
 | New player completes tutorial | > 80% |
 | Mobile deck build (375px width) | No horizontal scroll |
-| Unit test count | 164+ (200+ stretch) |
+| Unit test count | 193 (200+ stretch) |
 | AI win rate vs default deck (Normal) | 45–55% |
 | Lighthouse performance (desktop) | > 80 |
 
