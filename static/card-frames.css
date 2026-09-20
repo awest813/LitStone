@@ -66,19 +66,22 @@
   line-height: 1;
 }
 
-/* Variant hue shifts for neutral variety */
-.card-art[data-variant="0"] .card-art__bg { filter: hue-rotate(0deg); }
-.card-art[data-variant="1"] .card-art__bg { filter: hue-rotate(18deg); }
-.card-art[data-variant="2"] .card-art__bg { filter: hue-rotate(-22deg); }
-.card-art[data-variant="3"] .card-art__bg { filter: hue-rotate(35deg); }
-.card-art[data-variant="4"] .card-art__bg { filter: hue-rotate(-35deg); }
-.card-art[data-variant="5"] .card-art__bg { filter: hue-rotate(55deg); }
-.card-art[data-variant="6"] .card-art__bg { filter: hue-rotate(-48deg); }
-.card-art[data-variant="7"] .card-art__bg { filter: hue-rotate(72deg); }
-.card-art[data-variant="8"] .card-art__bg { filter: hue-rotate(-65deg); }
-.card-art[data-variant="9"] .card-art__bg { filter: hue-rotate(95deg); }
-.card-art[data-variant="10"] .card-art__bg { filter: hue-rotate(-88deg); }
-.card-art[data-variant="11"] .card-art__bg { filter: hue-rotate(120deg); }
+/* Variant hue shifts for neutral variety.
+   Variants set --vr (consumed below); per-class tints compose with it instead
+   of overriding it, so same-class cards keep hue variety. */
+.card-art__bg { filter: hue-rotate(var(--vr, 0deg)); }
+.card-art[data-variant="0"] { --vr: 0deg; }
+.card-art[data-variant="1"] { --vr: 18deg; }
+.card-art[data-variant="2"] { --vr: -22deg; }
+.card-art[data-variant="3"] { --vr: 35deg; }
+.card-art[data-variant="4"] { --vr: -35deg; }
+.card-art[data-variant="5"] { --vr: 55deg; }
+.card-art[data-variant="6"] { --vr: -48deg; }
+.card-art[data-variant="7"] { --vr: 72deg; }
+.card-art[data-variant="8"] { --vr: -65deg; }
+.card-art[data-variant="9"] { --vr: 95deg; }
+.card-art[data-variant="10"] { --vr: -88deg; }
+.card-art[data-variant="11"] { --vr: 120deg; }
 
 /* Motif patterns (inline SVG) */
 .card-art[data-motif="arcane"] .card-art__motif {
@@ -171,13 +174,13 @@
   50% { opacity: 1; filter: brightness(1.15); }
 }
 
-/* Per-class art saturation tweaks */
-.card-art[data-card-class="Mage"] .card-art__bg { filter: saturate(1.12) brightness(1.02); }
-.card-art[data-card-class="Warrior"] .card-art__bg { filter: saturate(1.08) contrast(1.05); }
-.card-art[data-card-class="Priest"] .card-art__bg { filter: saturate(1.05) brightness(1.04); }
-.card-art[data-card-class="Rogue"] .card-art__bg { filter: saturate(1.1) hue-rotate(-4deg); }
-.card-art[data-card-class="Paladin"] .card-art__bg { filter: saturate(1.08) brightness(1.03); }
-.card-art[data-card-class="Shaman"] .card-art__bg { filter: saturate(1.15) hue-rotate(4deg); }
+/* Per-class art saturation tweaks (compose with the --vr hue above) */
+.card-art[data-card-class="Mage"] .card-art__bg { filter: hue-rotate(var(--vr, 0deg)) saturate(1.12) brightness(1.02); }
+.card-art[data-card-class="Warrior"] .card-art__bg { filter: hue-rotate(var(--vr, 0deg)) saturate(1.08) contrast(1.05); }
+.card-art[data-card-class="Priest"] .card-art__bg { filter: hue-rotate(var(--vr, 0deg)) saturate(1.05) brightness(1.04); }
+.card-art[data-card-class="Rogue"] .card-art__bg { filter: hue-rotate(var(--vr, 0deg)) saturate(1.1) hue-rotate(-4deg); }
+.card-art[data-card-class="Paladin"] .card-art__bg { filter: hue-rotate(var(--vr, 0deg)) saturate(1.08) brightness(1.03); }
+.card-art[data-card-class="Shaman"] .card-art__bg { filter: hue-rotate(var(--vr, 0deg)) saturate(1.15) hue-rotate(4deg); }
 
 /* Size presets */
 .card-art--pool   { width: 100%; height: 56px; margin-bottom: 4px; }
@@ -218,6 +221,9 @@
 
 [class*="card-frame--class-"] {
   box-shadow:
+    inset 0 0 0 1px var(--frame-edge, rgba(255, 255, 255, .08)),
+    inset 0 -18px 24px -20px rgba(0, 0, 0, .35);
+  box-shadow:
     inset 0 0 0 1px color-mix(in srgb, var(--frame-accent, transparent) 40%, transparent),
     inset 0 -18px 24px -20px color-mix(in srgb, var(--frame-accent, transparent) 18%, transparent);
 }
@@ -225,12 +231,15 @@
 /* Pool cards — illustrated frame */
 .pool-card {
   background:
+    linear-gradient(175deg, var(--frame-face, #d8c8b0), #b09a78);
+  background:
     linear-gradient(175deg, var(--frame-face, var(--col-surface)), color-mix(in srgb, var(--frame-face, #d8c8b0) 70%, #000));
   border-color: var(--frame-edge, var(--col-border));
   transition: transform .15s, border-color .18s, box-shadow .18s, background .2s;
 }
 
 .pool-card[class*="card-frame--class-"] {
+  border-color: var(--frame-edge, var(--col-border));
   border-color: color-mix(in srgb, var(--frame-accent) 50%, var(--frame-edge, var(--col-border)));
 }
 
@@ -291,11 +300,13 @@
 
 /* Board minions */
 .minion-card {
+  background: linear-gradient(175deg, var(--frame-face, #e8dcc8), #c8b898);
   background: linear-gradient(175deg, var(--frame-face, #e8dcc8), color-mix(in srgb, var(--frame-face, #d8c8b0) 75%, #a89070));
   border-color: var(--frame-edge, #a09070);
 }
 
 .hand-card:not(.hand-card--spell):not(.hand-card--weapon):not(.hand-card--coin) {
+  background: linear-gradient(175deg, var(--frame-face, #e8dcc8), #c8b898);
   background: linear-gradient(175deg, var(--frame-face, #e8dcc8), color-mix(in srgb, var(--frame-face, #d8c8b0) 78%, #a89070));
   border-color: var(--frame-edge, #a09070);
 }
@@ -323,17 +334,20 @@
   background: linear-gradient(180deg, rgba(0, 0, 0, .06), rgba(0, 0, 0, .12));
   border-radius: 3px;
   padding: 1px 2px;
+  border-left: 2px solid var(--frame-stripe, var(--col-border));
   border-left: 2px solid color-mix(in srgb, var(--frame-stripe, var(--col-border)) 70%, transparent);
 }
 
 [class*="card-frame--class-"] .pool-name,
 [class*="card-frame--class-"] .minion-name,
 [class*="card-frame--class-"] .mulligan-card-name {
+  border-left-color: var(--frame-accent, var(--col-gold));
   border-left-color: color-mix(in srgb, var(--frame-accent, var(--col-gold)) 75%, transparent);
 }
 
 /* Mulligan — full illustrated cards */
 .mulligan-card {
+  background: linear-gradient(175deg, var(--frame-face, #e8dcc8), #c8b898);
   background: linear-gradient(175deg, var(--frame-face, var(--col-card-face)), color-mix(in srgb, var(--frame-face, #e8dcc8) 80%, #a89070));
   border-color: var(--frame-edge, var(--col-border));
   color: #2a1e0a;
@@ -387,7 +401,9 @@
   margin: -2px -2px 10px;
   border-radius: 10px;
   overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .12);
   border: 1px solid color-mix(in srgb, var(--art-accent, rgba(255, 255, 255, .12)) 45%, rgba(255, 255, 255, .08));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .5);
   box-shadow: 0 4px 16px rgba(0, 0, 0, .5), 0 0 12px color-mix(in srgb, var(--art-accent, transparent) 25%, transparent);
 }
 
@@ -515,8 +531,8 @@
   opacity: .65;
 }
 
-/* Legacy class aliases — art windows replaced by .card-art */
-.pool-art, .minion-art, .mulligan-card-art { display: none; }
+/* (Legacy .pool-art / .minion-art / .mulligan-card-art windows were removed —
+   all art renders through .card-art now, so no compatibility rules remain.) */
 
 @media (max-width: 900px) {
   .card-art--board { height: 40px; }

@@ -15,6 +15,7 @@ let gameState = null;        // latest server state snapshot
 let selected  = null;        // { type: "hand"|"board"|"hero_power"|"hero_weapon", idx }
 let draftDeck = [];
 let selectedClass = null;
+let deckWasFull = false; // tracks 30/30 transition for the completion flourish
 
 // Deck-builder UI state
 let filterType  = "all";  // "all" | "minion" | "spell" | "weapon"
@@ -66,6 +67,7 @@ let isActing          = false; // prevents double-submit during server round-tri
 let prevIsPlayerTurn  = null;  // tracks turn transitions for banner
 let turnNumber        = 0;     // client-side turn counter
 let audioCtx          = null;
+let matchEpoch        = 0;     // bumps on every abandon/reset; stale async responses check it
 
 const SETTINGS_KEY    = "litstoneSettings";
 const LAST_DECK_KEY   = "litstoneLastDeck";
@@ -195,6 +197,16 @@ function showScreen(id) {
     updateHubCareerProgress();
   }
   updateMenuFlowUi(id);
+  // Move keyboard focus to the new screen's heading so SR users know where they are.
+  const active = document.getElementById(id);
+  const heading = active?.querySelector("h1, h2");
+  if (heading) {
+    if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
+    heading.focus({ preventScroll: true });
+  } else if (id === "screen-game") {
+    // The board has no heading — land on End Turn so keyboard players start in context.
+    document.getElementById("btn-end-turn")?.focus({ preventScroll: true });
+  }
 }
 
 function getPlayMode() {
@@ -384,7 +396,7 @@ function enterActiveMatch(data, { showBanner = false } = {}) {
   turnNumber = data.turn_number || 1;
   initGameScreenUi();
   showScreen("screen-game");
-  if (showBanner) showTurnBanner(true);
+  if (showBanner) showTurnBanner(true, data.turn_number || turnNumber);
   renderGame();
 }
 
@@ -580,6 +592,7 @@ function isCampaignNodeUnlocked(nodeId, completed) {
 async function goToCampaign() {
   practiceActive = false;
   tutorialActive = false;
+  showLoading("Loading career…");
   try {
     const data = await apiFetch("/api/campaign");
     campaignNodes = data.nodes || [];
@@ -587,6 +600,8 @@ async function goToCampaign() {
   } catch (_) {
     campaignNodes = [];
     showStatusToast("Could not load career chapters. Try again.");
+  } finally {
+    hideLoading();
   }
   updateCampaignSubtitle();
   renderCampaignMap();
@@ -599,6 +614,10 @@ function renderCampaignMap() {
   if (!map) return;
   const completed = getCampaignProgress();
   map.innerHTML = "";
+  if (!campaignNodes.length) {
+    map.innerHTML = `<div class="pool-empty-msg">No chapters available right now.<button type="button" class="pool-empty-clear" onclick="goToCampaign()">Retry</button></div>`;
+    return;
+  }
   campaignNodes.forEach((node, i) => {
     const unlocked = isCampaignNodeUnlocked(node.id, completed);
     const done = completed.includes(node.id);
@@ -613,7 +632,9 @@ function renderCampaignMap() {
     const div = document.createElement("button");
     div.type = "button";
     div.className = cls;
-    div.disabled = !unlocked;
+    // aria-disabled (not disabled) keeps locked chapters focusable so
+    // screen-reader users can still discover upcoming duels.
+    if (!unlocked) div.setAttribute("aria-disabled", "true");
     const status = done ? "completed" : (unlocked ? "unlocked" : "locked");
     div.setAttribute("aria-label", `${node.name}, ${node.difficulty}, ${status}`);
     const oppClass = node.opponent_class || node.ai_class;
@@ -650,7 +671,8 @@ function startCampaignNode(node) {
 
 async function startTutorial() {
   if (localStorage.getItem(TUTORIAL_DONE_KEY) === "1") {
-    if (!confirm("Replay the tutorial?")) return;
+    const again = await confirmDialog("Replay the tutorial?", { title: "Tutorial", okLabel: "Replay", cancelLabel: "Cancel" });
+    if (!again) return;
   }
   activeCampaignNode = null;
   practiceActive = false;
@@ -718,11 +740,17 @@ function tutorialHintText() {
 function openSettings() {
   syncSettingsUi();
   const modal = document.getElementById("settings-modal");
-  if (modal) modal.classList.remove("hidden");
+  if (!modal || !modal.classList.contains("hidden")) return;
+  _rememberModalFocus();
+  modal.classList.remove("hidden");
+  modal.querySelector("button, input, select")?.focus({ preventScroll: true });
 }
 
 function closeSettings() {
-  document.getElementById("settings-modal")?.classList.add("hidden");
+  const modal = document.getElementById("settings-modal");
+  if (!modal || modal.classList.contains("hidden")) return;
+  modal.classList.add("hidden");
+  _restoreModalFocus("btn-pause");
 }
 
 function openSettingsFromPause() {
@@ -788,24 +816,46 @@ function openPause() {
   isPaused = true;
   clearSelection();
   document.getElementById("screen-game")?.classList.add("is-paused");
-  document.getElementById("pause-overlay")?.classList.remove("hidden");
+  const overlay = document.getElementById("pause-overlay");
+  if (overlay && overlay.classList.contains("hidden")) {
+    _rememberModalFocus();
+    overlay.classList.remove("hidden");
+    overlay.querySelector(".btn-primary")?.focus({ preventScroll: true });
+  }
 }
 
 function closePause(focusGame = true) {
   isPaused = false;
   document.getElementById("screen-game")?.classList.remove("is-paused");
-  document.getElementById("pause-overlay")?.classList.add("hidden");
-  if (focusGame) document.getElementById("btn-pause")?.focus();
+  const overlay = document.getElementById("pause-overlay");
+  if (overlay && !overlay.classList.contains("hidden")) overlay.classList.add("hidden");
+  if (focusGame) {
+    if (_modalReturnFocus && document.contains(_modalReturnFocus)) {
+      const t = _modalReturnFocus;
+      _modalReturnFocus = null;
+      t.focus({ preventScroll: true });
+    } else {
+      _modalReturnFocus = null;
+      document.getElementById("btn-pause")?.focus();
+    }
+  }
 }
 
-function resignFromPause() {
+async function resignFromPause() {
+  if (settings.confirmResign) {
+    const leave = await confirmDialog("Resign and return to menu?", { title: "Resign match?", okLabel: "Resign", cancelLabel: "Stay" });
+    if (!leave) return;
+  }
   closePause(false);
-  resign();
+  abandonGame().then(() => goToHub());
 }
 
-function quitToHubFromPause() {
+async function quitToHubFromPause() {
+  if (settings.confirmResign) {
+    const leave = await confirmDialog("Leave match and return to menu?", { title: "Leave match?", okLabel: "Leave", cancelLabel: "Stay" });
+    if (!leave) return;
+  }
   closePause(false);
-  if (settings.confirmResign && !confirm("Leave match and return to menu?")) return;
   abandonGame().then(() => goToHub());
 }
 
@@ -939,6 +989,10 @@ async function resumeActiveGame() {
 function continueLastDeck() {
   const last = getLastDeck();
   if (!last?.heroClass || !last.cards) return;
+  // Hub always means a fresh standard context — never inherit a stale mode.
+  practiceActive = false;
+  activeCampaignNode = null;
+  tutorialActive = false;
   enterDeckBuilder(last.heroClass, last.cards);
 }
 
@@ -957,6 +1011,7 @@ function deckBuilderSubtitle(cls) {
 function enterDeckBuilder(cls, initialDeck) {
   selectedClass = cls;
   draftDeck = initialDeck ? [...initialDeck] : [];
+  deckWasFull = draftDeck.length === DECK_SIZE;
   filterType = "all";
   filterCost = "all";
   sortBy = "cost";
@@ -1222,6 +1277,10 @@ function renderCardPool() {
     const isClass = card.classes?.length > 0;
     div.className = `pool-card pool-card--${card.type}${isFull ? " pool-card--full" : ""}${count > 0 ? " pool-card--in-deck" : ""}${isLegendary ? " pool-card--legendary" : ""} ${CardArt.frameClasses(card, name)}`;
     div.dataset.name = name;
+    div.setAttribute("tabindex", isFull ? "-1" : "0");
+    div.setAttribute("role", "button");
+    div.setAttribute("aria-label", `${name}, ${card.cost} mana${count > 0 ? `, ${count} in deck` : ""}${isFull ? ", limit reached" : ""}`);
+    div.setAttribute("aria-disabled", isFull ? "true" : "false");
 
     let statsHtml = "";
     if (card.type === "minion") {
@@ -1247,7 +1306,7 @@ function renderCardPool() {
       ${isLegendary ? `<div class="legendary-crown" title="Legendary — only 1 copy per deck">♦</div>` : ""}
       ${isClass ? `<div class="class-badge" title="${card.classes.join(", ")} only">${card.classes[0].slice(0,3)}</div>` : ""}
       <div class="pool-type-badge" title="${card.type}">${typeIcon}</div>
-      ${count > 0 ? `<button type="button" class="pool-remove-btn" title="Remove one copy" aria-label="Remove ${name}">−</button>` : ""}
+      ${count > 0 ? `<button type="button" class="pool-remove-btn" title="Remove one copy" aria-label="Remove one ${name} from deck">−</button>` : ""}
       ${CardArt.renderArt(card, name, "pool")}
       <div class="pool-name">${name}</div>
       ${statsHtml}
@@ -1286,6 +1345,17 @@ function renderCardPool() {
     div.addEventListener("mouseleave", () => {
       if (!isNarrowViewport()) hideTooltip("card-tooltip");
     });
+    div.addEventListener("focus", e => {
+      if (!isNarrowViewport()) showPoolTooltip({ clientX: e.target.getBoundingClientRect().right, clientY: e.target.getBoundingClientRect().top }, name, card);
+    });
+    div.addEventListener("blur", () => {
+      if (!isNarrowViewport()) hideTooltip("card-tooltip");
+    });
+    div.addEventListener("keydown", e => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      if (!isFull) addCardToDeck(name);
+    });
     frag.appendChild(div);
   });
   pool.appendChild(frag);
@@ -1298,6 +1368,7 @@ function addCardToDeck(name) {
   const maxCopies = CARD_DB[name]?.legendary ? 1 : 2;
   if (draftDeck.filter(c => c === name).length >= maxCopies) return;
   draftDeck.push(name);
+  playSfx("tap");
   renderCardPool();
   updateDeckSidebar();
 }
@@ -1305,6 +1376,8 @@ function addCardToDeck(name) {
 function removeFromDeck(name) {
   const i = draftDeck.indexOf(name);
   if (i !== -1) draftDeck.splice(i, 1);
+  else return;
+  playSfx("tap");
   renderCardPool();
   updateDeckSidebar();
 }
@@ -1337,7 +1410,7 @@ function updateDeckSidebar() {
                       <span class="deck-entry-type" title="${card.type}">${typeIcon}</span>
                       <span class="deck-entry-name">${name}</span>
                       <span class="deck-entry-count">×${n}</span>
-                      <button type="button" class="deck-entry-remove" title="Remove one" aria-label="Remove ${name}">✕</button>`;
+                      <button type="button" class="deck-entry-remove" title="Remove one" aria-label="Remove one ${name} from deck">✕</button>`;
       li.querySelector(".deck-entry-remove").addEventListener("click", e => {
         e.stopPropagation();
         removeFromDeck(name);
@@ -1348,14 +1421,23 @@ function updateDeckSidebar() {
   }
 
   const startBtn = document.getElementById("btn-start-ai");
+  const isFull = count === DECK_SIZE;
   if (startBtn) {
-    if (count === DECK_SIZE) {
+    if (isFull) {
       updateStartButtonLabel();
     } else {
       startBtn.disabled = true;
       startBtn.textContent = `Need ${DECK_SIZE - count} more card${DECK_SIZE - count === 1 ? "" : "s"}`;
     }
+    startBtn.classList.toggle("btn-start-match--ready", isFull && !startBtn.disabled);
   }
+  // One-time flourish on completing the deck (silent init in enterDeckBuilder
+  // keeps reopening a full deck from celebrating again).
+  if (isFull && !deckWasFull) {
+    showStatusToast("Deck complete — ready to duel!", GAME_LIMITS.STATUS_TOAST_MS, "success");
+    playSfx("play");
+  }
+  deckWasFull = isFull;
   renderManaCurve();
   updateDeckStrategyHints();
   updateDeckComposition();
@@ -1464,9 +1546,10 @@ function autoFillDeck() {
   showStatusToast(`Filled ${draftDeck.length}/${DECK_SIZE} cards`);
 }
 
-function clearDeck() {
+async function clearDeck() {
   if (!draftDeck.length) return;
-  if (!confirm("Clear all cards from your deck?")) return;
+  const ok = await confirmDialog("Clear all cards from your deck?", { title: "Clear deck?", okLabel: "Clear", cancelLabel: "Keep" });
+  if (!ok) return;
   draftDeck = [];
   renderCardPool();
   updateDeckSidebar();
@@ -1484,7 +1567,7 @@ function getSavedDecks() {
   }
 }
 
-function saveDeck() {
+async function saveDeck() {
   const nameInput = document.getElementById("save-deck-name");
   let name = nameInput?.value.trim();
   if (draftDeck.length === 0) {
@@ -1499,7 +1582,10 @@ function saveDeck() {
     name = `${selectedClass} ${new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
   }
   const saved = getSavedDecks();
-  if (saved[name] && !confirm(`Overwrite saved deck “${name}”?`)) return;
+  if (saved[name]) {
+    const ok = await confirmDialog(`Overwrite saved deck “${name}”?`, { title: "Overwrite deck?", okLabel: "Overwrite", cancelLabel: "Cancel" });
+    if (!ok) return;
+  }
   saved[name] = { heroClass: selectedClass, cards: [...draftDeck] };
   localStorage.setItem("litstoneDecks", JSON.stringify(saved));
   if (nameInput) nameInput.value = "";
@@ -1525,8 +1611,9 @@ function loadDeck(name) {
   updateDeckSidebar();
 }
 
-function deleteSavedDeck(name) {
-  if (!confirm(`Delete saved deck “${name}”?`)) return;
+async function deleteSavedDeck(name) {
+  const ok = await confirmDialog(`Delete saved deck “${name}”?`, { title: "Delete deck?", okLabel: "Delete", cancelLabel: "Keep" });
+  if (!ok) return;
   const saved = getSavedDecks();
   delete saved[name];
   localStorage.setItem("litstoneDecks", JSON.stringify(saved));
@@ -1568,45 +1655,165 @@ function validateImportedDeck(heroClass, cards) {
 
 async function exportDeckCode() {
   if (!selectedClass || draftDeck.length !== DECK_SIZE) {
-    showStatusToast(`Build a full ${DECK_SIZE}-card deck to export.`);
+    showStatusToast(`Build a full ${DECK_SIZE}-card deck to export.`, GAME_LIMITS.STATUS_TOAST_MS, "error");
     return;
   }
-  const code = encodeDeckCode(selectedClass, draftDeck);
-  try {
-    await navigator.clipboard.writeText(code);
-    showStatusToast("Deck code copied!");
-  } catch (_) {
-    prompt("Copy this deck code:", code);
-  }
+  openDeckCodeModal("export", encodeDeckCode(selectedClass, draftDeck));
 }
 
 function importDeckCode() {
-  const raw = prompt("Paste a LitStone deck code (LS1:…):");
-  if (!raw) return;
-  try {
-    const { c: heroClass, d: cards } = decodeDeckCode(raw);
-    if (heroClass !== selectedClass) {
-      if (!confirm(`This deck is for ${heroClass}. Switch class and import?`)) return;
-      selectedClass = heroClass;
-      document.getElementById("deck-title").textContent = `Build Your ${heroClass} Deck`;
-      const emblem = document.getElementById("deck-class-emblem");
-      if (emblem) {
-        emblem.textContent = HERO_ICONS[heroClass] || "?";
-        emblem.style.borderColor = HERO_COLORS[heroClass] || "var(--col-border-bright)";
-      }
-    }
-    const check = validateImportedDeck(heroClass, cards);
-    if (!check.ok) {
-      showStatusToast(check.message);
-      return;
-    }
-    draftDeck = [...check.cards];
-    renderCardPool();
-    updateDeckSidebar();
-    showStatusToast(`Imported ${heroClass} deck`);
-  } catch (err) {
-    showStatusToast(err.message || "Could not import deck code.");
+  openDeckCodeModal("import");
+}
+
+// ---------------------------------------------------------------------------
+// DECK-CODE MODAL (replaces native prompt() for import/export)
+// ---------------------------------------------------------------------------
+let _deckCodeMode = "import";
+let _deckCodeReturnFocus = null;
+
+function _setDeckCodeError(message) {
+  const errEl = document.getElementById("deck-code-error");
+  if (!errEl) return;
+  if (!message) {
+    errEl.textContent = "";
+    errEl.classList.add("hidden");
+    return;
   }
+  errEl.textContent = message;
+  errEl.classList.remove("hidden");
+}
+
+function openDeckCodeModal(mode, prefill = "") {
+  const modal = document.getElementById("deck-code-modal");
+  if (!modal) return;
+  const alreadyOpen = !modal.classList.contains("hidden");
+  _deckCodeMode = mode;
+  // Preserve the original invoking element across mode switches while open.
+  if (!alreadyOpen) _deckCodeReturnFocus = document.activeElement;
+  const titleEl = document.getElementById("deck-code-title");
+  const hintEl = document.getElementById("deck-code-hint");
+  const textEl = document.getElementById("deck-code-text");
+  const primaryBtn = document.getElementById("deck-code-primary");
+  _setDeckCodeError(null);
+  if (mode === "export") {
+    if (titleEl) titleEl.textContent = "Export deck";
+    if (hintEl) hintEl.textContent = "Copy this code to share your deck — anyone can import it.";
+    if (textEl) {
+      textEl.value = prefill;
+      textEl.readOnly = true;
+      textEl.placeholder = "";
+    }
+    if (primaryBtn) primaryBtn.textContent = "Copy";
+  } else {
+    if (titleEl) titleEl.textContent = "Import deck";
+    if (hintEl) hintEl.textContent = "Paste a LitStone deck code (LS1:…).";
+    if (textEl) {
+      textEl.value = "";
+      textEl.readOnly = false;
+      textEl.placeholder = "LS1:…";
+    }
+    if (primaryBtn) primaryBtn.textContent = "Import";
+  }
+  modal.classList.remove("hidden");
+  if (textEl) {
+    textEl.focus({ preventScroll: true });
+    // Pre-select export codes so Ctrl+C / copy button grabs everything.
+    if (mode === "export" && prefill) textEl.select();
+  }
+}
+
+function closeDeckCodeModal() {
+  document.getElementById("deck-code-modal")?.classList.add("hidden");
+  if (_deckCodeReturnFocus && document.contains(_deckCodeReturnFocus)) {
+    _deckCodeReturnFocus.focus({ preventScroll: true });
+  }
+  _deckCodeReturnFocus = null;
+}
+
+async function _copyDeckCodeText() {
+  const textEl = document.getElementById("deck-code-text");
+  const code = textEl?.value || "";
+  if (!code) return;
+  try {
+    await navigator.clipboard.writeText(code);
+    showStatusToast("Deck code copied!", GAME_LIMITS.STATUS_TOAST_MS, "success");
+  } catch (_) {
+    // Clipboard API unavailable (permissions / non-secure context) — fall back
+    // to manual selection so the user can copy with Ctrl+C.
+    textEl?.focus();
+    textEl?.select();
+    try {
+      const copied = document.execCommand && document.execCommand("copy");
+      showStatusToast(
+        copied ? "Deck code copied!" : "Select the code and press Ctrl+C to copy.",
+        GAME_LIMITS.STATUS_TOAST_MS,
+        copied ? "success" : ""
+      );
+    } catch (_) {
+      showStatusToast("Select the code and press Ctrl+C to copy.");
+    }
+    return;
+  }
+  closeDeckCodeModal();
+}
+
+async function _submitDeckCodeModal() {
+  if (_deckCodeMode === "export") {
+    await _copyDeckCodeText();
+    return;
+  }
+  const raw = (document.getElementById("deck-code-text")?.value || "").trim();
+  if (!raw) {
+    _setDeckCodeError("Paste a deck code first — it starts with LS1:.");
+    return;
+  }
+  const result = await importDeckCodeFromText(raw, {
+    reportError: msg => _setDeckCodeError(msg),
+  });
+  if (result?.ok) closeDeckCodeModal();
+}
+
+function initDeckCodeModal() {
+  document.getElementById("deck-code-primary")?.addEventListener("click", () => _submitDeckCodeModal());
+  document.getElementById("deck-code-cancel")?.addEventListener("click", () => closeDeckCodeModal());
+  document.getElementById("deck-code-modal")?.addEventListener("click", e => {
+    if (e.target.id === "deck-code-modal") closeDeckCodeModal();
+  });
+  document.getElementById("deck-code-text")?.addEventListener("input", () => _setDeckCodeError(null));
+}
+
+async function importDeckCodeFromText(raw, { reportError } = {}) {
+  const fail = msg => {
+    if (reportError) reportError(msg);
+    else showStatusToast(msg, GAME_LIMITS.STATUS_TOAST_MS, "error");
+    return { ok: false, message: msg };
+  };
+  let heroClass, cards;
+  try {
+    ({ c: heroClass, d: cards } = decodeDeckCode(raw));
+  } catch (err) {
+    return fail(err.message || "Could not import deck code.");
+  }
+  if (heroClass !== selectedClass) {
+    const ok = await confirmDialog(`This deck is for ${heroClass}. Switch class and import?`, { title: "Switch class?", okLabel: "Switch", cancelLabel: "Cancel" });
+    if (!ok) return { ok: false, message: "Import cancelled." };
+    selectedClass = heroClass;
+    document.getElementById("deck-title").textContent = `Build Your ${heroClass} Deck`;
+    const emblem = document.getElementById("deck-class-emblem");
+    if (emblem) {
+      emblem.textContent = HERO_ICONS[heroClass] || "?";
+      emblem.style.borderColor = HERO_COLORS[heroClass] || "var(--col-border-bright)";
+    }
+  }
+  const check = validateImportedDeck(heroClass, cards);
+  if (!check.ok) {
+    return fail(check.message);
+  }
+  draftDeck = [...check.cards];
+  renderCardPool();
+  updateDeckSidebar();
+  showStatusToast(`Imported ${heroClass} deck`, GAME_LIMITS.STATUS_TOAST_MS, "success");
+  return { ok: true };
 }
 
 function renderSavedDecks() {
@@ -1722,6 +1929,7 @@ function toggleMulliganCard(el, idx) {
     el.classList.add("marked-keep");
   }
   el.setAttribute("aria-pressed", swapping ? "true" : "false");
+  playSfx("tap");
   const swapCount = mulliganSwapSet.size;
   const label = swapCount > 0
     ? `↺ Swap ${swapCount} Card${swapCount > 1 ? "s" : ""}`
@@ -1732,6 +1940,7 @@ function toggleMulliganCard(el, idx) {
 async function confirmMulligan() {
   if (isActing) return;
   isActing = true;
+  playSfx("tap");
   const indices = Array.from(mulliganSwapSet);
   const btn = mulliganConfirmBtn();
   if (btn) btn.disabled = true;
@@ -1763,6 +1972,9 @@ async function confirmMulligan() {
 
 async function startGame() {
   if (draftDeck.length !== DECK_SIZE) return;
+  // Fresh match state even if a previous session ended without abandon
+  // (selection, turn tracking, tooltip pins, in-flight request epoch).
+  resetGameState();
   saveLastDeck();
   lastMatchDeck = { heroClass: selectedClass, cards: [...draftDeck] };
   const prev = getActiveGameMeta();
@@ -1868,13 +2080,101 @@ async function playAgain() {
   await startGame();
 }
 
-function showStatusToast(message, ms = GAME_LIMITS.STATUS_TOAST_MS) {
+function showStatusToast(message, ms = GAME_LIMITS.STATUS_TOAST_MS, type = "") {
   const toast = document.getElementById("status-toast");
   if (!toast) return;
   toast.textContent = message;
-  toast.classList.remove("hidden");
+  toast.classList.remove("hidden", "status-toast--error", "status-toast--success");
+  if (type === "error" || type === "success") toast.classList.add(`status-toast--${type}`);
   clearTimeout(showStatusToast._timer);
   showStatusToast._timer = setTimeout(() => toast.classList.add("hidden"), ms);
+}
+
+// ---------------------------------------------------------------------------
+// ACCESSIBLE CONFIRM DIALOG (replaces native confirm())
+// ---------------------------------------------------------------------------
+let _confirmResolve = null;
+let _confirmPromise = null;
+let _confirmReturnFocus = null;
+
+function confirmDialog(message, { title = "Are you sure?", okLabel = "Confirm", cancelLabel = "Cancel" } = {}) {
+  const modal = document.getElementById("confirm-modal");
+  // Fallback to native confirm if the modal is missing (e.g. partial render).
+  if (!modal) return Promise.resolve(window.confirm(message));
+  // Re-entrant call while a confirm is pending: piggyback on the open dialog
+  // instead of overwriting the resolver and orphaning the first promise.
+  if (!modal.classList.contains("hidden") && _confirmPromise) return _confirmPromise;
+  const msgEl = document.getElementById("confirm-message");
+  const titleEl = document.getElementById("confirm-title");
+  const okBtn = document.getElementById("confirm-ok");
+  const cancelBtn = document.getElementById("confirm-cancel");
+  if (titleEl) titleEl.textContent = title;
+  if (msgEl) msgEl.textContent = message;
+  if (okBtn) okBtn.textContent = okLabel;
+  if (cancelBtn) cancelBtn.textContent = cancelLabel;
+  _confirmReturnFocus = document.activeElement;
+  modal.classList.remove("hidden");
+  okBtn?.focus();
+  _confirmPromise = new Promise(resolve => { _confirmResolve = resolve; });
+  return _confirmPromise;
+}
+
+function _resolveConfirm(value) {
+  const modal = document.getElementById("confirm-modal");
+  modal?.classList.add("hidden");
+  const cb = _confirmResolve;
+  _confirmResolve = null;
+  _confirmPromise = null;
+  if (_confirmReturnFocus && document.contains(_confirmReturnFocus)) {
+    _confirmReturnFocus.focus({ preventScroll: true });
+  }
+  _confirmReturnFocus = null;
+  if (cb) cb(value);
+}
+
+function initConfirmModal() {
+  document.getElementById("confirm-ok")?.addEventListener("click", () => _resolveConfirm(true));
+  document.getElementById("confirm-cancel")?.addEventListener("click", () => _resolveConfirm(false));
+  document.getElementById("confirm-modal")?.addEventListener("click", e => {
+    if (e.target.id === "confirm-modal") _resolveConfirm(false);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// MODAL FOCUS HELPERS
+// ---------------------------------------------------------------------------
+let _modalReturnFocus = null;
+
+function _focusablesIn(root) {
+  if (!root) return [];
+  return Array.from(
+    root.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')
+  ).filter(el => el.offsetParent !== null);
+}
+
+function _trapTabIn(root, e) {
+  const items = _focusablesIn(root);
+  if (!items.length) return;
+  const first = items[0], last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+}
+
+function _rememberModalFocus() {
+  if (!_modalReturnFocus) _modalReturnFocus = document.activeElement;
+}
+
+function _restoreModalFocus(fallbackId) {
+  const target = (_modalReturnFocus && document.contains(_modalReturnFocus))
+    ? _modalReturnFocus
+    : (fallbackId ? document.getElementById(fallbackId) : null);
+  _modalReturnFocus = null;
+  target?.focus?.({ preventScroll: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -1888,7 +2188,7 @@ function spellDesc(card, short = false) {
   if (e === "damage")     return short ? `Deal ${v} Dmg`       : `Deal ${v} damage.`;
   if (e === "heal")       return short ? `Heal ${v} HP`        : `Restore ${v} HP.`;
   if (e === "draw")       return short ? `Draw ${v} Cards`     : `Draw ${v} cards.`;
-  if (e === "damage_all") return short ? `AoE ${v} Dmg`        : `Deal ${v} dmg to all enemy minions.`;
+  if (e === "damage_all") return short ? `AoE ${v} Dmg`        : `Deal ${v} damage to all enemy minions.`;
   if (e === "buff")       return short ? `Buff +${v[0]}/+${v[1]}` : `Give a minion +${v[0]}/+${v[1]}.`;
   if (e === "buff_all")   return short ? `Buff All +${v[0]}/+${v[1]}` : `Give all friendly minions +${v[0]}/+${v[1]}.`;
   if (e === "heal_all")   return short ? `Heal All ${v} HP`   : `Restore ${v} HP to all friendly characters.`;
@@ -1990,17 +2290,18 @@ function hideTooltip(id) {
 // TURN BANNER & AI INDICATOR
 // ---------------------------------------------------------------------------
 
-function showTurnBanner(isPlayerTurn) {
+function showTurnBanner(isPlayerTurn, turn = 0) {
   if (gameSpeed === "instant") return;
   const banner = document.getElementById("turn-banner");
   if (!banner) return;
   // Reset: remove active so re-triggering re-plays the animation
   banner.className = `turn-banner turn-banner--${isPlayerTurn ? "player" : "enemy"}`;
-  banner.textContent = isPlayerTurn ? "YOUR TURN" : "ENEMY TURN";
+  const label = isPlayerTurn ? "YOUR TURN" : "ENEMY TURN";
+  banner.textContent = turn > 0 ? `${label} · ${turn}` : label;
   // Force reflow so animation restarts cleanly
   void banner.offsetWidth;
   banner.classList.add("active");
-  playSfx("turn");
+  playSfx(isPlayerTurn ? "turn" : "turn_enemy");
 }
 
 function setAiThinking(active) {
@@ -2168,6 +2469,17 @@ function playSfx(kind) {
       case "turn":
         tone(330, 0.2);
         setTimeout(() => tone(440, 0.15), 100);
+        break;
+      case "turn_enemy":
+        tone(220, 0.2, "triangle", 0.05);
+        setTimeout(() => tone(165, 0.18, "triangle", 0.045), 110);
+        break;
+      case "power":
+        tone(392, 0.12, "sine", 0.05);
+        setTimeout(() => tone(587, 0.14, "sine", 0.045), 70);
+        break;
+      case "tap":
+        tone(520, 0.06, "sine", 0.035);
         break;
       case "victory":
         tone(523, 0.18);
@@ -2466,6 +2778,10 @@ function applyActionAnimations(ctx) {
     else playSfx("attack");
   }
 
+  if (action === "hero_power") {
+    playSfx("power");
+  }
+
   if (action === "hero_attack") {
     let tgtName = "AI";
     if (target !== "hero" && typeof target === "number" && prevSnap?.p2?.[target]) {
@@ -2567,15 +2883,15 @@ function renderGame() {
   etBtn.textContent = is_player_turn ? "End Turn" : "Waiting…";
 
   // Turn banner: fire only when turn ownership changes
+  const displayTurn = gameState.turn_number || turnNumber;
   if (!winner && prevIsPlayerTurn !== null && prevIsPlayerTurn !== is_player_turn) {
     if (is_player_turn) turnNumber++;
-    showTurnBanner(is_player_turn);
+    showTurnBanner(is_player_turn, displayTurn);
   }
   prevIsPlayerTurn = is_player_turn;
 
   // Turn counter badge
   const tcBadge = document.getElementById("turn-counter");
-  const displayTurn = gameState.turn_number || turnNumber;
   if (tcBadge) tcBadge.textContent = displayTurn > 0 ? `Turn ${displayTurn}` : "";
 
   // Winner overlay
@@ -2592,6 +2908,8 @@ function renderGame() {
       winner === "DRAW" ? "It's a Draw!" : isWin
         ? (careerFinale ? "Anthology Complete!" : "Victory!")
         : "Defeat!";
+    const crown = overlay.querySelector(".winner-crown");
+    if (crown) crown.textContent = winner === "DRAW" ? "🤝" : isWin ? "👑" : "💔";
     if (subtitle) {
       const vs = gameState.opponent_name || "the AI";
       const turns = gameState.turn_number || turnNumber;
@@ -2672,6 +2990,14 @@ function renderHero(elId, player, isOpp) {
   `;
 
   el.onclick = () => handleHeroClick(isOpp, player);
+  el.setAttribute("tabindex", "0");
+  el.setAttribute("role", "button");
+  el.setAttribute("aria-label", `${isOpp ? "Enemy" : "Your"} hero, ${player.hero_class}, ${Math.max(0, player.hp)} health`);
+  el.onkeydown = e => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    handleHeroClick(isOpp, player);
+  };
 }
 
 function isValidHeroTarget(isOpp) {
@@ -2707,6 +3033,7 @@ function renderHeroPower(elId, player, isOpp) {
 
   let cls = "hero-power-panel";
   if (!canUse) cls += " used";
+  else if (!isOpp && gameState?.is_player_turn && !gameState?.winner) cls += " ready";
   if (!isOpp && selected?.type === "hero_power") cls += " selected";
 
   el.className = cls;
@@ -2715,6 +3042,21 @@ function renderHeroPower(elId, player, isOpp) {
 
   if (!isOpp) {
     el.onclick = () => handleHeroPowerClick(player, canUse);
+    el.setAttribute("tabindex", canUse ? "0" : "-1");
+    el.setAttribute("role", "button");
+    el.setAttribute("aria-label", `${HERO_POWER_LABELS[player.hero_class] || "Hero power"}, 2 mana${canUse ? "" : ", unavailable"}`);
+    el.setAttribute("aria-disabled", canUse ? "false" : "true");
+    el.onkeydown = e => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      handleHeroPowerClick(player, canUse);
+    };
+  } else {
+    el.removeAttribute("tabindex");
+    el.removeAttribute("role");
+    el.removeAttribute("aria-label");
+    el.onclick = null;
+    el.onkeydown = null;
   }
 }
 
@@ -2770,6 +3112,9 @@ function renderBoard(elId, player, isOpp) {
 
     const div = document.createElement("div");
     div.className = cls;
+    div.setAttribute("tabindex", "0");
+    div.setAttribute("role", "button");
+    div.setAttribute("aria-label", `${minion.name}, ${minion.atk} attack, ${minion.hp} health${minion.taunt ? ", taunt" : ""}${minion.divine_shield ? ", divine shield" : ""}${!isOpp && minion.can_attack ? ", ready to attack" : ""}`);
     div.innerHTML = `
       ${CardArt.renderArt(card, minion.name, "board")}
       <div class="minion-name">${minion.name}</div>
@@ -2779,8 +3124,15 @@ function renderBoard(elId, player, isOpp) {
     `;
 
     div.addEventListener("click", () => handleMinionClick(idx, isOpp, player, minion));
+    div.addEventListener("keydown", e => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      handleMinionClick(idx, isOpp, player, minion);
+    });
     div.addEventListener("mouseenter", e => showGameTooltip(e, minion.name, boardMinionView(card, minion)));
     div.addEventListener("mouseleave", () => hideTooltip("game-tooltip"));
+    div.addEventListener("focus", e => showGameTooltip({ clientX: e.target.getBoundingClientRect().right, clientY: e.target.getBoundingClientRect().top }, minion.name, boardMinionView(card, minion)));
+    div.addEventListener("blur", () => hideTooltip("game-tooltip"));
     el.appendChild(div);
   });
 }
@@ -2823,6 +3175,10 @@ function renderHand(p1) {
 
     const div = document.createElement("div");
     div.className = cls;
+    div.setAttribute("tabindex", "0");
+    div.setAttribute("role", "button");
+    div.setAttribute("aria-label", `${name}, ${card.cost ?? "?"} mana${affordable ? "" : ", not enough mana"}${selected?.type === "hand" && selected.idx === idx ? ", selected" : ""}`);
+    div.setAttribute("aria-disabled", affordable ? "false" : "true");
 
     // Fan rotation: cards spread outward from center
     const rot = total > 1 ? (idx - midIdx) * 3.5 : 0;
@@ -2859,6 +3215,17 @@ function renderHand(p1) {
     });
     div.addEventListener("mouseleave", () => {
       if (!isNarrowViewport()) hideTooltip("game-tooltip");
+    });
+    div.addEventListener("focus", e => {
+      if (!isNarrowViewport()) showGameTooltip({ clientX: e.target.getBoundingClientRect().right, clientY: e.target.getBoundingClientRect().top }, name, card);
+    });
+    div.addEventListener("blur", () => {
+      if (!isNarrowViewport()) hideTooltip("game-tooltip");
+    });
+    div.addEventListener("keydown", e => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      handleHandClick(idx, p1, name, card, affordable);
     });
     el.appendChild(div);
   });
@@ -3164,6 +3531,24 @@ function handleHeroPowerClick(player, canUse) {
 }
 
 document.addEventListener("keydown", e => {
+  const confirmOpen = !document.getElementById("confirm-modal")?.classList.contains("hidden");
+  if (confirmOpen) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      _resolveConfirm(false);
+    }
+    if (e.key === "Tab") _trapTabIn(document.getElementById("confirm-modal"), e);
+    return;
+  }
+  const deckCodeOpen = !document.getElementById("deck-code-modal")?.classList.contains("hidden");
+  if (deckCodeOpen) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeDeckCodeModal();
+    }
+    if (e.key === "Tab") _trapTabIn(document.getElementById("deck-code-modal"), e);
+    return;
+  }
   const deckOpen = document.getElementById("screen-deck")?.classList.contains("active");
   if (deckOpen && e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
     const tag = (e.target?.tagName || "").toLowerCase();
@@ -3173,14 +3558,33 @@ document.addEventListener("keydown", e => {
       return;
     }
   }
-  if (deckOpen && e.key === "Escape" && deckFiltersActive()) {
+  if (deckOpen && e.key === "Escape") {
     const tag = (e.target?.tagName || "").toLowerCase();
-    if (tag !== "input") {
+    if (tag === "input" && e.target.id === "deck-search") {
+      if (e.target.value) {
+        e.target.value = "";
+        setDeckSearch("");
+      } else {
+        e.target.blur();
+      }
+      return;
+    }
+    if (tag !== "input" && deckFiltersActive()) {
       clearDeckFilters();
       return;
     }
   }
-  if (e.key !== "Escape") return;
+  if (e.key !== "Escape") {
+    // Keep Tab cycling inside open dialogs (confirm + deck-code handled above).
+    if (e.key === "Tab") {
+      if (!document.getElementById("settings-modal")?.classList.contains("hidden")) {
+        _trapTabIn(document.getElementById("settings-modal"), e);
+      } else if (!document.getElementById("pause-overlay")?.classList.contains("hidden")) {
+        _trapTabIn(document.getElementById("pause-overlay"), e);
+      }
+    }
+    return;
+  }
   const settingsOpen = !document.getElementById("settings-modal")?.classList.contains("hidden");
   const pauseOpen = !document.getElementById("pause-overlay")?.classList.contains("hidden");
   if (settingsOpen) {
@@ -3240,6 +3644,7 @@ async function sendAction(action, idx, target) {
   etBtn.disabled = true;
 
   const animCtx = buildAnimContext(action, idx, target);
+  const epoch = matchEpoch;
 
   try {
     const data = await apiFetch("/api/action", {
@@ -3247,18 +3652,24 @@ async function sendAction(action, idx, target) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_id: gameId, action, idx, target }),
     });
+    // Resigned or otherwise reset while the request was in flight — drop it
+    // instead of resurrecting a dead match (and its saved meta).
+    if (epoch !== matchEpoch) return;
     onGameStateUpdated(data, animCtx);
   } catch (err) {
+    if (epoch !== matchEpoch) return;
     spawnFloat(err.message || "Network error!", "var(--col-red)", null, "normal");
+    showStatusToast(err.message || "Network error — try again.", GAME_LIMITS.STATUS_TOAST_MS, "error");
   } finally {
     isActing = false;
-    if (gameState?.is_player_turn && !gameState?.winner) etBtn.disabled = false;
+    if (epoch === matchEpoch && gameState?.is_player_turn && !gameState?.winner) etBtn.disabled = false;
   }
 }
 
 async function endTurn() {
   if (isPaused || isActing || !gameState?.is_player_turn || gameState?.winner) return;
   isActing = true;
+  playSfx("tap");
   clearSelection();
 
   const etBtn = document.getElementById("btn-end-turn");
@@ -3266,6 +3677,7 @@ async function endTurn() {
   setAiThinking(true);
 
   const animCtx = buildAnimContext("end_turn", null, null);
+  const epoch = matchEpoch;
 
   try {
     const data = await apiFetch("/api/action", {
@@ -3274,13 +3686,15 @@ async function endTurn() {
       body: JSON.stringify({ game_id: gameId, action: "end_turn", idx: null, target: null }),
     });
     // Guard: player may have resigned while the AI was thinking
-    if (gameState === null) return;
+    if (gameState === null || epoch !== matchEpoch) return;
     setAiThinking(false);
     if (!data.winner) turnNumber = data.turn_number || (turnNumber + 1);
     onGameStateUpdated(data, animCtx);
-    if (!gameState.winner) showTurnBanner(true);
+    if (!gameState.winner) showTurnBanner(true, gameState.turn_number || turnNumber);
   } catch (err) {
+    if (epoch !== matchEpoch) return;
     spawnFloat(err.message || "Network error!", "var(--col-red)", null, "normal");
+    showStatusToast(err.message || "Network error — try again.", GAME_LIMITS.STATUS_TOAST_MS, "error");
     setAiThinking(false);
     etBtn.textContent = "End Turn";
     etBtn.disabled = false;
@@ -3306,8 +3720,11 @@ async function abandonGame(options = {}) {
   updateHubContinue();
 }
 
-function exitToHub({ confirm = false } = {}) {
-  if (confirm && settings.confirmResign && !confirm("Resign and return to menu?")) return;
+async function exitToHub({ confirm = false } = {}) {
+  if (confirm && settings.confirmResign) {
+    const leave = await confirmDialog("Resign and return to menu?", { title: "Resign match?", okLabel: "Resign", cancelLabel: "Stay" });
+    if (!leave) return;
+  }
   abandonGame().then(() => goToHub());
 }
 
@@ -3329,6 +3746,12 @@ function resetGameState() {
   mulliganSwapSet  = new Set();
   logRenderedCount = 0;
   tutorialStep     = 0;
+  matchEpoch++;
+  // Pinned tooltips reference torn-down cards — never carry them across matches.
+  poolTooltipPinned = null;
+  gameTooltipPinned = null;
+  hideTooltip("card-tooltip");
+  hideTooltip("game-tooltip");
   setAiThinking(false);
 }
 
@@ -3397,6 +3820,8 @@ function syncDeckSizeUi() {
   syncSfxButton();
   syncSettingsUi();
   applyGameSpeedClass();
+  initConfirmModal();
+  initDeckCodeModal();
   await updateHubContinue();
   const meta = document.getElementById("hub-meta");
   if (meta) meta.textContent = `6 classes · ${cardCount} cards · career & practice`;

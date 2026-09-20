@@ -508,7 +508,7 @@ def get_spell_desc(card: dict, short: bool = False) -> str:
     if e == "damage":     return f"Deal {v} Dmg"            if short else f"Deal {v} damage."
     if e == "heal":       return f"Heal {v} HP"             if short else f"Restore {v} HP."
     if e == "draw":       return f"Draw {v} Cards"          if short else f"Draw {v} cards."
-    if e == "damage_all": return f"AoE Dmg {v}"             if short else f"Deal {v} dmg to all enemy minions."
+    if e == "damage_all": return f"AoE Dmg {v}"             if short else f"Deal {v} damage to all enemy minions."
     if e == "buff":       return f"Buff +{v[0]}/+{v[1]}"   if short else f"Give a minion +{v[0]}/+{v[1]}."
     if e == "buff_all":   return f"Buff All +{v[0]}/+{v[1]}" if short else f"Give all friendly minions +{v[0]}/+{v[1]}."
     if e == "heal_all":   return f"Heal All {v} HP"         if short else f"Restore {v} HP to all friendly characters."
@@ -1010,7 +1010,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
 
         if target == "hero":
             damage_hero(opp, w_atk)
-            log_action(f">> {player['name']} attacks {opp['name']} with {weapon['name']} for {w_atk} dmg!")
+            log_action(f">> {player['name']} attacks {opp['name']} with {weapon['name']} for {w_atk} damage!")
             notify("damage", opp, "hero", w_atk)
         else:
             defender = opp["board"][target]
@@ -1119,7 +1119,7 @@ def cleanup_dead(player: dict, opp: dict, on_event=None) -> None:
                     dr = m["deathrattle"]
                     if dr["effect"] == "dmg_hero":
                         damage_hero(enemy, dr["val"])
-                        log_action(f"   [D.RATTLE] {m['name']} Deathrattle: Deals {dr['val']} dmg to {enemy['name']}!")
+                        log_action(f"   [D.RATTLE] {m['name']} Deathrattle: Deals {dr['val']} damage to {enemy['name']}!")
                         if on_event:
                             on_event("damage", enemy, "hero", dr["val"])
         return alive

@@ -198,7 +198,7 @@ def _finish_mulligan(gs: dict) -> None:
 
     gs["is_player_turn"] = False
     gs["turn_number"] = 1
-    log_action("--- AI goes first ---")
+    log_action("--- Enemy goes first ---")
     run_ai_turn(gs["p2"], gs["p1"], draw=False, difficulty=gs.get("ai_difficulty", "normal"))
     if _log_winner_if_any(gs["p1"], gs["p2"]):
         return
@@ -406,7 +406,7 @@ def new_game():
                 f"--- Practice Sandbox — You {opts['p1_hp']} HP · AI {opts['p2_hp']} HP{mana_note} ---"
             )
         log_action(f"Opponent: {gs['p2']['name']} ({gs['p2']['hero_class']}) · {gs['ai_difficulty'].title()} AI")
-        order = "You go first." if player_goes_first else "AI goes first — you'll receive The Coin."
+        order = "You go first." if player_goes_first else "Enemy goes first — you'll receive The Coin."
         log_action(order)
         _deal_opening_hands(gs)
         log_action("--- Mulligan Phase: choose cards to replace ---")
@@ -472,7 +472,7 @@ def do_action():
     with _with_game_log(gs):
         if action == "end_turn":
             gs["is_player_turn"] = False
-            log_action("--- AI's Turn ---")
+            log_action("--- Enemy Turn ---")
             run_ai_turn(p2, p1, difficulty=gs.get("ai_difficulty", "normal"))
             if not _log_winner_if_any(p1, p2):
                 gs["turn_number"] += 1

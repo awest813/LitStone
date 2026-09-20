@@ -26,7 +26,7 @@
   --col-heal:         #00b894;
   --col-dmg:          #d63031;
   --col-text:         #dde6f0;
-  --col-text-dim:     #6a88a0;
+  --col-text-dim:     #8ba3bb;
   --col-card-face:    #e8dcc8;
   --col-card-spell:   #e0d0ee;
   --col-card-weap:    #ddd0b8;
@@ -109,6 +109,32 @@ body::after {
 .screen { display: none; width: 100vw; height: 100vh; position: relative; }
 .screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
 
+/* ---------- Accessibility helpers ---------- */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  clip: rect(0 0 0 0); clip-path: inset(50%);
+  overflow: hidden; white-space: nowrap;
+}
+
+.skip-link {
+  position: fixed;
+  top: 8px; left: 8px;
+  z-index: 3000;
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--col-gold);
+  color: #1a1200;
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform .18s ease;
+}
+
+.skip-link:focus-visible { transform: translateY(0); }
+
 /* ---------- Scrollbar ---------- */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: var(--col-border-bright); border-radius: 3px; }
@@ -184,6 +210,12 @@ body::after {
   filter: drop-shadow(0 0 30px rgba(232,160,32,.5)) drop-shadow(0 4px 8px rgba(0,0,0,.8));
   letter-spacing: .12em;
   margin-bottom: 8px;
+  animation: titleGlow 6s ease-in-out infinite;
+}
+
+@keyframes titleGlow {
+  0%, 100% { filter: drop-shadow(0 0 30px rgba(232,160,32,.5)) drop-shadow(0 4px 8px rgba(0,0,0,.8)); }
+  50%       { filter: drop-shadow(0 0 46px rgba(232,160,32,.68)) drop-shadow(0 4px 8px rgba(0,0,0,.8)); }
 }
 
 .menu-subtitle {
@@ -399,18 +431,6 @@ body::after {
 .pool-card--minion { --type-stripe: var(--col-mana-bright); }
 .pool-card--spell  { --type-stripe: var(--col-purple-bright); }
 .pool-card--weapon { --type-stripe: #e67e22; }
-
-.pool-art {
-  height: 44px;
-  border-radius: 6px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 24px;
-  margin-bottom: 4px;
-}
-
-.pool-card--minion .pool-art { background: linear-gradient(160deg, #0a2040, #0e2d56); }
-.pool-card--spell  .pool-art { background: linear-gradient(160deg, #200a40, #3a1566); }
-.pool-card--weapon .pool-art { background: linear-gradient(160deg, #301500, #502500); }
 
 .pool-name { font-size: 10px; font-weight: 600; text-align: center; color: var(--col-text); line-height: 1.2; margin-bottom: 4px; }
 .pool-stats { display: flex; justify-content: space-between; font-size: 9px; }
@@ -1392,6 +1412,14 @@ body::after {
 
 .hero-power-panel.used  { opacity: .3; cursor: not-allowed; }
 .hero-power-panel.selected { border-color: var(--col-gold); box-shadow: 0 0 22px rgba(232,160,32,.7); animation: targetPulse 1.2s ease-in-out infinite; }
+
+/* Soft readiness glow when the power is usable on your turn */
+.hero-power-panel.ready:not(.selected) { animation: hpReadyPulse 2.2s ease-in-out infinite; }
+
+@keyframes hpReadyPulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(142,68,173,.35); }
+  50%       { box-shadow: 0 0 18px rgba(178,110,220,.65); }
+}
 .hero-power-panel.valid-target { border-color: var(--col-gold); box-shadow: 0 0 18px rgba(232,160,32,.6); cursor: pointer; animation: targetPulse 1.2s ease-in-out infinite; }
 
 .hp-icon { font-size: 22px; margin-bottom: 2px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
@@ -1618,18 +1646,6 @@ body::after {
   box-shadow: 0 0 6px rgba(214,48,49,.6);
 }
 
-.minion-art {
-  height: 44px;
-  background: linear-gradient(160deg, rgba(0,0,0,.12), rgba(0,0,0,.05));
-  border-radius: 6px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 26px;
-  margin-bottom: 3px;
-  border: 1px solid rgba(0,0,0,.1);
-  position: relative;
-  z-index: 2;
-}
-
 .minion-name {
   font-size: 8px; font-weight: 700; color: #2a1e0a;
   line-height: 1.1; margin-bottom: 2px;
@@ -1703,20 +1719,13 @@ body::after {
   background: linear-gradient(175deg, #d8c0f0, #b890d8);
   border-color: #9060b8;
 }
-.hand-card--spell .minion-art {
-  background: linear-gradient(160deg, rgba(100,0,160,.2), rgba(60,0,100,.1));
-}
 
 /* Weapon card face — metallic */
 .hand-card--weapon {
   background: linear-gradient(175deg, #d8ccc0, #c0b0a0);
   border-color: #c07020;
 }
-.hand-card--weapon .minion-art {
-  background: linear-gradient(160deg, rgba(100,60,0,.2), rgba(60,30,0,.1));
-}
 
-.hand-card .minion-art  { font-size: 22px; height: 36px; }
 .hand-card .minion-name { font-size: 7.5px; }
 
 /* Card draw animation */
@@ -1784,9 +1793,6 @@ body::after {
   border-color: var(--col-gold-dim);
   box-shadow: 0 0 10px rgba(232,160,32,.25), inset 0 0 8px rgba(232,160,32,.06);
 }
-.pool-card--legendary .pool-art {
-  background: linear-gradient(160deg, #1a1000, #332000);
-}
 
 .class-badge {
   position: absolute;
@@ -1795,8 +1801,10 @@ body::after {
   font-size: 8px;
   font-weight: 700;
   font-family: 'Cinzel', serif;
+  color: #9fd4f0;
   color: color-mix(in srgb, var(--frame-accent, #7ec8e3) 80%, #fff);
   background: rgba(0, 12, 24, .88);
+  border: 1px solid var(--frame-accent, #4a9edd);
   border: 1px solid color-mix(in srgb, var(--frame-accent, #4a9edd) 55%, transparent);
   border-radius: 4px;
   padding: 1px 4px;
@@ -1813,10 +1821,6 @@ body::after {
   background: linear-gradient(175deg, #f4e8c8, #e8d490);
   border-color: var(--col-gold);
   box-shadow: 0 0 10px rgba(232,160,32,.4), inset 0 1px 0 rgba(255,255,255,.5);
-}
-.minion-card.legendary .minion-art {
-  background: linear-gradient(160deg, #2a1800, #1a0e00);
-  border-color: rgba(232,160,32,.3);
 }
 .minion-card.legendary .minion-name {
   color: #3a2600;
@@ -1842,9 +1846,6 @@ body::after {
   background: linear-gradient(175deg, #f4e8c8, #e8d490);
   border-color: var(--col-gold);
   box-shadow: 0 4px 12px rgba(0,0,0,.5), 0 0 10px rgba(232,160,32,.3), inset 0 1px 0 rgba(255,255,255,.5);
-}
-.hand-card.legendary .minion-art {
-  background: linear-gradient(160deg, #2a1800, #1a0e00);
 }
 .hand-card.legendary .minion-name {
   color: #3a2600;
@@ -2040,6 +2041,13 @@ body::after {
     min-width: 44px;
   }
 
+  .selection-info {
+    bottom: auto;
+    top: 52%;
+    font-size: 12px;
+    padding: 8px 14px;
+  }
+
   .minion-card {
     width: 76px;
     padding: 4px 4px 12px;
@@ -2047,7 +2055,6 @@ body::after {
     scroll-snap-align: center;
     touch-action: manipulation;
   }
-  .minion-card .minion-art { height: 36px; font-size: 22px; }
   .hand-card {
     width: 72px;
     touch-action: manipulation;
@@ -2074,12 +2081,16 @@ body::after {
 
 /* Keyboard focus rings */
 .hero-card:focus-visible,
+.hero-panel:focus-visible,
+.hero-power-panel:focus-visible,
 .pool-card:focus-visible,
 .hand-card:focus-visible,
 .minion-card:focus-visible,
+.mulligan-card:focus-visible,
 .btn:focus-visible,
 .filter-btn:focus-visible,
-.sort-btn:focus-visible {
+.sort-btn:focus-visible,
+.cost-filter-btn:focus-visible {
   outline: 2px solid var(--col-gold-bright);
   outline-offset: 2px;
 }
@@ -2102,7 +2113,10 @@ body::after {
   pointer-events: none;
   z-index: 800;
   opacity: 0;
-  white-space: nowrap;
+  white-space: normal;
+  max-width: min(92vw, 560px);
+  text-align: center;
+  line-height: 1.25;
 }
 
 .turn-banner.active {
@@ -2161,6 +2175,21 @@ body::after {
   color: var(--col-text);
   z-index: 975;
   box-shadow: 0 10px 25px rgba(0,0,0,.5);
+  max-width: min(92vw, 520px);
+  text-align: center;
+  transition: opacity .2s ease;
+}
+
+.status-toast.hidden { display: none; }
+
+.status-toast--error {
+  border-color: var(--col-red);
+  box-shadow: 0 10px 25px rgba(0,0,0,.5), 0 0 16px rgba(214,48,49,.35);
+}
+
+.status-toast--success {
+  border-color: var(--col-green);
+  box-shadow: 0 10px 25px rgba(0,0,0,.5), 0 0 16px rgba(0,184,148,.35);
 }
 
 @media (max-width: 1100px) {
@@ -2432,7 +2461,6 @@ body::after {
   box-shadow: 0 0 18px rgba(0, 184, 148, .5);
 }
 
-.mulligan-card-art  { font-size: 40px; margin: 6px 0 4px; }
 .mulligan-card-name { font-family: "Cinzel", serif; font-size: 10px; font-weight: 700; text-align: center; line-height: 1.2; }
 .mulligan-card-cost { position: absolute; top: 6px; left: 6px; width: 26px; height: 26px; border-radius: 50%; background: var(--col-mana); color: #fff; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
 .mulligan-card-type { font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }

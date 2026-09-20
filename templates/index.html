@@ -15,9 +15,10 @@
   <link rel="stylesheet" href="/static/vendor/nprogress.css" />
 </head>
 <body>
+<a class="skip-link" href="#screen-hub">Skip to game menu</a>
 
 <!-- =====================  SCREEN: TITLE HUB  ============================ -->
-<div id="screen-hub" class="screen active">
+<div id="screen-hub" class="screen active" tabindex="-1">
   <div class="menu-bg-overlay"></div>
   <div class="hub-inner">
     <header class="hub-brand">
@@ -82,11 +83,11 @@
   <div class="practice-panel">
     <label class="practice-field">
       <span>Your hero HP</span>
-      <input type="number" id="practice-p1-hp" min="1" max="60" value="30" />
+      <input type="number" id="practice-p1-hp" min="1" max="60" value="30" onkeydown="if(event.key==='Enter')startPracticeFromSetup()" />
     </label>
     <label class="practice-field">
       <span>AI hero HP</span>
-      <input type="number" id="practice-p2-hp" min="1" max="60" value="30" />
+      <input type="number" id="practice-p2-hp" min="1" max="60" value="30" onkeydown="if(event.key==='Enter')startPracticeFromSetup()" />
     </label>
     <label class="practice-toggle">
       <input type="checkbox" id="practice-infinite-mana" />
@@ -215,7 +216,7 @@
 <div id="screen-mulligan" class="screen">
   <div class="mulligan-overlay">
     <h2 class="mulligan-title">Opening Hand</h2>
-    <p class="mulligan-subtitle">Click cards to swap them for new ones, then confirm.</p>
+    <p class="mulligan-subtitle">Mulligan — click cards to swap them for new ones, then confirm.</p>
     <div class="mulligan-cards" id="mulligan-cards"></div>
     <div class="mulligan-actions">
       <button class="btn btn-primary" id="btn-mulligan-confirm" onclick="confirmMulligan()">
@@ -356,7 +357,7 @@
   <div id="game-help-bar" class="game-help-bar" aria-live="polite"></div>
 
   <!-- Turn banner (centre-screen flash) -->
-  <div id="turn-banner" class="turn-banner"></div>
+  <div id="turn-banner" class="turn-banner" role="status" aria-live="polite"></div>
 
   <!-- Opponent tray -->
   <div class="tray tray-opp" id="tray-opp">
@@ -399,7 +400,7 @@
   <div id="fx-layer" class="fx-layer"></div>
 
   <!-- Selection indicator -->
-  <div id="selection-info" class="selection-info hidden"></div>
+  <div id="selection-info" class="selection-info hidden" role="status"></div>
 
   <!-- Winner overlay -->
   <div id="winner-overlay" class="winner-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="winner-text">
@@ -420,6 +421,33 @@
 </div>
 
 <div id="status-toast" class="status-toast hidden" role="status" aria-live="polite"></div>
+
+<!-- Confirm modal (global, replaces native confirm()) -->
+<div id="confirm-modal" class="modal-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+  <div class="modal-panel confirm-panel">
+    <h2 id="confirm-title">Are you sure?</h2>
+    <p class="confirm-message" id="confirm-message"></p>
+    <div class="modal-actions confirm-actions">
+      <button type="button" class="btn btn-primary" id="confirm-ok">Confirm</button>
+      <button type="button" class="btn btn-back" id="confirm-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Deck-code modal (global, replaces native prompt() for import/export) -->
+<div id="deck-code-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="deck-code-title" aria-describedby="deck-code-hint">
+  <div class="modal-panel deck-code-panel">
+    <h2 id="deck-code-title">Deck code</h2>
+    <p class="deck-code-hint" id="deck-code-hint"></p>
+    <textarea id="deck-code-text" class="deck-code-text" rows="4" spellcheck="false"
+      aria-label="Deck code" placeholder="LS1:…"></textarea>
+    <p class="deck-code-error hidden" id="deck-code-error" role="alert"></p>
+    <div class="modal-actions deck-code-actions">
+      <button type="button" class="btn btn-primary" id="deck-code-primary">Done</button>
+      <button type="button" class="btn btn-back" id="deck-code-cancel">Close</button>
+    </div>
+  </div>
+</div>
 
 <!-- Settings modal (global) -->
 <div id="settings-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">

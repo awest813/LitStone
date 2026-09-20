@@ -80,11 +80,36 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
 }
 
+.hub-mode:focus-visible {
+  outline: 2px solid var(--col-gold-bright);
+  outline-offset: 2px;
+}
+
 .hub-mode--play {
   grid-column: 1 / -1;
   padding: 18px 20px;
   background: linear-gradient(145deg, #0e3a6a, #1a5fa0);
   border-color: #4a9edd;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Slow light sweep across the primary tile */
+.hub-mode--play::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 45%;
+  left: -60%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .09), transparent);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: hubPlaySheen 5.5s ease-in-out infinite;
+}
+
+@keyframes hubPlaySheen {
+  0%          { left: -60%; }
+  55%, 100%   { left: 130%; }
 }
 
 .hub-mode--play:hover:not(:disabled) {
@@ -228,6 +253,13 @@
   background: rgba(8, 15, 26, .85);
   color: var(--col-text);
   font-size: 16px;
+}
+
+.practice-field input:focus,
+.practice-field select:focus {
+  outline: none;
+  border-color: var(--col-mana-bright);
+  box-shadow: 0 0 0 2px rgba(74, 158, 221, .25);
 }
 
 .practice-field select {
@@ -428,6 +460,16 @@
   font-size: 15px;
   padding: 12px 16px;
   letter-spacing: .06em;
+}
+
+/* Gentle glow once the deck is complete and the button is live */
+.btn-start-match--ready:not(:disabled) {
+  animation: startReadyPulse 2.2s ease-in-out infinite;
+}
+
+@keyframes startReadyPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(0, 184, 148, .35); }
+  50%       { box-shadow: 0 0 22px rgba(0, 212, 170, .6); }
 }
 
 .campaign-map {
@@ -988,12 +1030,76 @@ body.speed-instant .turn-banner.active {
   color: #d8eeff;
 }
 
+/* ---- Confirm modal ---- */
+#confirm-modal { z-index: 2100; }
+
+.confirm-panel { text-align: center; }
+
+.confirm-message {
+  font-size: 14px;
+  color: var(--col-text);
+  line-height: 1.5;
+  margin: 0 0 4px;
+}
+
+.confirm-actions { margin-top: 20px; }
+
+/* ---- Deck-code modal ---- */
+.deck-code-panel { text-align: left; }
+
+.deck-code-hint {
+  font-size: 13px;
+  color: var(--col-text-dim);
+  line-height: 1.5;
+  margin: 0 0 12px;
+  text-align: center;
+}
+
+.deck-code-text {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--col-border-bright);
+  background: rgba(8, 15, 26, .9);
+  color: var(--col-text);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.deck-code-text:focus {
+  outline: none;
+  border-color: var(--col-mana-bright);
+  box-shadow: 0 0 0 2px rgba(74, 158, 221, .25);
+}
+
+.deck-code-text[readonly] { cursor: text; }
+
+.deck-code-error {
+  font-size: 12px;
+  color: #f08080;
+  line-height: 1.45;
+  margin: 8px 0 0;
+}
+
+.deck-code-error.hidden { display: none; }
+
+.deck-code-actions { margin-top: 16px; }
+
 @media (max-width: 900px) {
   .hub-emblem { font-size: 56px; }
   .hub-modes { max-width: 100%; }
   .menu-header { padding: 8px 12px 0; }
   .deck-header { flex-wrap: wrap; }
   .flow-breadcrumb--header { font-size: 9px; }
+
+  .filter-btn, .sort-btn, .cost-filter-btn {
+    min-height: 40px;
+    min-width: 40px;
+  }
 
   .deck-sidebar-toggle { display: flex; }
 

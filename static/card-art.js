@@ -64,8 +64,17 @@ function hashStr(s) {
   return Math.abs(h);
 }
 
+const _missingIconWarned = new Set();
+
 function emoji(icon) {
-  return CARD_EMOJIS[icon] || icon || "?";
+  const glyph = CARD_EMOJIS[icon];
+  if (glyph) return glyph;
+  // Dev signal for future card additions: warn once, still render something.
+  if (icon && !_missingIconWarned.has(icon)) {
+    _missingIconWarned.add(icon);
+    if (typeof console !== "undefined") console.warn(`[LitStone] no card art for icon "${icon}"`);
+  }
+  return icon || "?";
 }
 
 function typeIcon(type) {
