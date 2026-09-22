@@ -66,6 +66,74 @@
   line-height: 1;
 }
 
+.card-art__custom-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 4px;
+  z-index: 5;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .75));
+  transition: transform .2s ease;
+}
+
+.card-art__custom-img--portrait {
+  object-fit: cover;
+  object-position: center 20%;
+  padding: 0;
+  border-radius: inherit;
+}
+
+.card-art__custom-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  z-index: 5;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .75));
+}
+
+.card-art__graphic {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .75)) drop-shadow(0 0 10px var(--art-accent, rgba(74, 158, 221, .35)));
+  transition: transform .18s ease;
+}
+
+.card-art__graphic .card-svg {
+  width: 76%;
+  height: 76%;
+  display: block;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, .6));
+}
+
+.pool-card:hover .card-art__graphic,
+.hand-card:hover .card-art__graphic,
+.minion-card:hover .card-art__graphic {
+  transform: scale(1.08);
+}
+
+.card-art--pool .card-art__graphic .card-svg   { width: 78%; height: 78%; }
+.card-art--hand .card-art__graphic .card-svg   { width: 80%; height: 80%; }
+.card-art--board .card-art__graphic .card-svg  { width: 80%; height: 80%; }
+.card-art--mulligan .card-art__graphic .card-svg { width: 74%; height: 74%; }
+.card-art--tooltip .card-art__graphic .card-svg { width: 70%; height: 70%; }
+.card-art--fly .card-art__graphic .card-svg   { width: 76%; height: 76%; }
+
 /* Variant hue shifts for neutral variety.
    Variants set --vr (consumed below); per-class tints compose with it instead
    of overriding it, so same-class cards keep hue variety. */
@@ -155,10 +223,14 @@
 }
 
 .card-art[data-motif="coin"] .card-art__bg {
-  background: radial-gradient(circle at 50% 40%, #ffe890 0%, #e8a020 45%, #a06010 100%);
+  background: radial-gradient(circle at 50% 40%, #fffbeb 0%, #fde047 35%, #ca8a04 70%, #713f12 100%);
 }
 .card-art[data-motif="coin"] .card-art__motif { opacity: 0; }
 .card-art--coin .card-art__glyph { filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .5)); }
+.card-art--coin .card-art__custom-img {
+  padding: 3px;
+  filter: drop-shadow(0 0 10px rgba(253, 224, 71, 0.55)) drop-shadow(0 4px 10px rgba(0, 0, 0, .8));
+}
 
 .card-art--legendary .card-art__rim {
   border-color: rgba(255, 208, 96, .55);
@@ -478,44 +550,51 @@
   box-shadow: 0 8px 28px rgba(0, 0, 0, .75), 0 0 16px rgba(232, 160, 32, .4);
 }
 
-/* Opponent hand — class-themed card backs */
+/* Opponent hand — ornate vector card backs with class tinting */
 .hand-opp-card {
-  width: 24px;
-  height: 34px;
-  border-radius: 5px;
+  width: 26px;
+  height: 36px;
+  border-radius: 4px;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .55);
-  border: 1px solid rgba(255, 255, 255, .12);
-  background: linear-gradient(160deg, #1e5080, #0e2840);
-}
-
-.hand-opp-card::before {
-  content: "📜";
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  opacity: .35;
-  filter: grayscale(.2);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, .65), 0 0 0 1px rgba(255, 215, 0, .2);
+  background-color: #081220;
+  background-image: url('/static/assets/card-back.svg');
+  background-size: cover;
+  background-position: center;
+  border: 1px solid rgba(212, 168, 64, .4);
+  transition: transform .2s ease, box-shadow .2s ease;
+  flex-shrink: 0;
 }
 
 .hand-opp-card::after {
   content: '';
   position: absolute;
-  inset: 3px;
-  border: 1px solid rgba(255, 255, 255, .14);
+  inset: 0;
   border-radius: 3px;
+  pointer-events: none;
+  box-shadow: inset 0 0 5px rgba(0, 0, 0, .5);
 }
 
-.hand-opp-card--mage    { background: linear-gradient(160deg, #1a4088, #0a1838); border-color: var(--mage-col); }
-.hand-opp-card--warrior { background: linear-gradient(160deg, #6a2018, #301008); border-color: var(--warrior-col); }
-.hand-opp-card--priest  { background: linear-gradient(160deg, #5a4818, #302808); border-color: var(--priest-col); }
-.hand-opp-card--rogue   { background: linear-gradient(160deg, #104838, #082820); border-color: var(--rogue-col); }
-.hand-opp-card--paladin { background: linear-gradient(160deg, #584818, #302808); border-color: var(--paladin-col); }
-.hand-opp-card--shaman  { background: linear-gradient(160deg, #104858, #082830); border-color: var(--shaman-col); }
+.hand-opp-card:hover {
+  transform: translateY(-4px) scale(1.1) !important;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, .75), 0 0 8px rgba(232, 160, 32, .4);
+  z-index: 5;
+}
+
+.hand-opp-card--mage    { border-color: var(--mage-col); box-shadow: 0 3px 10px rgba(0,0,0,.65), 0 0 6px rgba(74, 158, 221, .35); }
+.hand-opp-card--warrior { border-color: var(--warrior-col); box-shadow: 0 3px 10px rgba(0,0,0,.65), 0 0 6px rgba(192, 57, 43, .35); }
+.hand-opp-card--priest  { border-color: var(--priest-col); box-shadow: 0 3px 10px rgba(0,0,0,.65), 0 0 6px rgba(243, 156, 18, .35); }
+.hand-opp-card--rogue   { border-color: var(--rogue-col); box-shadow: 0 3px 10px rgba(0,0,0,.65), 0 0 6px rgba(39, 174, 96, .35); }
+.hand-opp-card--paladin { border-color: var(--paladin-col); box-shadow: 0 3px 10px rgba(0,0,0,.65), 0 0 6px rgba(212, 168, 64, .35); }
+.hand-opp-card--shaman  { border-color: var(--shaman-col); box-shadow: 0 3px 10px rgba(0,0,0,.65), 0 0 6px rgba(52, 152, 219, .35); }
+
+.hand-opp-card--mage::after    { background: radial-gradient(circle at 50% 50%, rgba(52,152,219,.18) 0%, transparent 75%); }
+.hand-opp-card--warrior::after { background: radial-gradient(circle at 50% 50%, rgba(192,57,43,.22) 0%, transparent 75%); }
+.hand-opp-card--priest::after  { background: radial-gradient(circle at 50% 50%, rgba(243,156,18,.20) 0%, transparent 75%); }
+.hand-opp-card--rogue::after   { background: radial-gradient(circle at 50% 50%, rgba(39,174,96,.20) 0%, transparent 75%); }
+.hand-opp-card--paladin::after { background: radial-gradient(circle at 50% 50%, rgba(212,168,64,.22) 0%, transparent 75%); }
+.hand-opp-card--shaman::after  { background: radial-gradient(circle at 50% 50%, rgba(26,188,156,.22) 0%, transparent 75%); }
 
 .hand-opp-card:nth-child(odd)  { transform: rotate(-2deg); }
 .hand-opp-card:nth-child(even) { transform: rotate(2deg); }

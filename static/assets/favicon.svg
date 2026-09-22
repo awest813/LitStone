@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bookCover" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="50%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="goldTrim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="50%" stop-color="#eab308"/>
+      <stop offset="100%" stop-color="#854d0e"/>
+    </linearGradient>
+    <linearGradient id="arcaneRune" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#67e8f9"/>
+      <stop offset="60%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <filter id="runeGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Grimoire Back / Shadow -->
+  <rect x="7" y="5" width="50" height="54" rx="6" fill="#000000" opacity="0.45"/>
+
+  <!-- Book Cover with Gold Border -->
+  <rect x="9" y="6" width="46" height="52" rx="5" fill="url(#bookCover)" stroke="url(#goldTrim)" stroke-width="2"/>
+  <rect x="13" y="10" width="38" height="44" rx="3" fill="none" stroke="url(#goldTrim)" stroke-width="1" stroke-opacity="0.45"/>
+
+  <!-- Book Spine Ribbon -->
+  <path d="M9 11c3 0 4-1 4-3v48c0 2-1 2-4 2z" fill="url(#goldTrim)" opacity="0.6"/>
+
+  <!-- Corner Gilded Accents -->
+  <path d="M14 11h6v2h-4v4h-2zm36 0h-6v2h4v4h2zm0 42h-6v-2h4v-4h2zm-36 0h6v-2h-4v-4h-2z" fill="url(#goldTrim)" opacity="0.75"/>
+
+  <!-- Arcane Central Seal -->
+  <circle cx="32" cy="32" r="14" fill="#0b1324" stroke="url(#goldTrim)" stroke-width="1.2"/>
+  <circle cx="32" cy="32" r="11" fill="none" stroke="url(#arcaneRune)" stroke-width="0.8" stroke-dasharray="2 1.5" opacity="0.8"/>
+
+  <!-- Illuminated Rune Symbol -->
+  <g filter="url(#runeGlow)">
+    <!-- Central 8-point Arcane Star -->
+    <path d="M32 23l2.2 6 6 2.2-6 2.2-2.2 6-2.2-6-6-2.2 6-2.2z" fill="url(#arcaneRune)"/>
+    <circle cx="32" cy="32" r="2.5" fill="#ecfeff"/>
+  </g>
+
+  <!-- Star Glint -->
+  <path d="M43 15l1 3 3 1-3 1-1 3-1-3-3-1 3-1z" fill="#fef08a" opacity="0.9"/>
+</svg>

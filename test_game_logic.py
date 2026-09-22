@@ -1529,6 +1529,13 @@ class TestGameStore(unittest.TestCase):
             self.assertEqual(store.load_all(), {})
 
 
+try:
+    import flask
+except ImportError:
+    flask = None
+
+
+@unittest.skipIf(flask is None, "Flask is not installed in current environment")
 class TestServerApi(unittest.TestCase):
     def test_health_endpoint(self):
         from server import app

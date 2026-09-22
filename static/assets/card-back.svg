@@ -1,0 +1,182 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 280" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradients -->
+    <radialGradient id="cb-bg" cx="50%" cy="50%" r="65%">
+      <stop offset="0%" stop-color="#183d66"/>
+      <stop offset="45%" stop-color="#0e233d"/>
+      <stop offset="85%" stop-color="#071220"/>
+      <stop offset="100%" stop-color="#040910"/>
+    </radialGradient>
+    <radialGradient id="cb-gem-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#4ae0ff" stop-opacity="0.9"/>
+      <stop offset="35%" stop-color="#00a8ea" stop-opacity="0.5"/>
+      <stop offset="70%" stop-color="#0055aa" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#002255" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Metallic Gold Gradients -->
+    <linearGradient id="cb-gold-outer" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffeaa7"/>
+      <stop offset="25%" stop-color="#d49024"/>
+      <stop offset="50%" stop-color="#8c5810"/>
+      <stop offset="75%" stop-color="#e8a832"/>
+      <stop offset="100%" stop-color="#ffd56b"/>
+    </linearGradient>
+    <linearGradient id="cb-gold-mid" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#9a6414"/>
+      <stop offset="30%" stop-color="#e2a83b"/>
+      <stop offset="70%" stop-color="#fff2b2"/>
+      <stop offset="100%" stop-color="#7a4608"/>
+    </linearGradient>
+    <linearGradient id="cb-bronze" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3a2208"/>
+      <stop offset="50%" stop-color="#6e4513"/>
+      <stop offset="100%" stop-color="#2a1604"/>
+    </linearGradient>
+
+    <!-- Gem Gradients -->
+    <radialGradient id="cb-gem" cx="35%" cy="30%" r="65%">
+      <stop offset="0%" stop-color="#e2f8ff"/>
+      <stop offset="30%" stop-color="#4ae0ff"/>
+      <stop offset="70%" stop-color="#0077c8"/>
+      <stop offset="100%" stop-color="#003366"/>
+    </radialGradient>
+
+    <!-- Shading Filter -->
+    <filter id="cb-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.7"/>
+    </filter>
+  </defs>
+
+  <!-- Card Base -->
+  <rect x="2" y="2" width="196" height="276" rx="14" fill="#060e18" stroke="#162a40" stroke-width="2"/>
+  
+  <!-- Outer Bevel Rim -->
+  <rect x="6" y="6" width="188" height="268" rx="10" fill="url(#cb-bronze)" stroke="url(#cb-gold-outer)" stroke-width="2"/>
+  
+  <!-- Inner Field Background -->
+  <rect x="12" y="12" width="176" height="256" rx="7" fill="url(#cb-bg)"/>
+
+  <!-- Geometric Arcane Starburst Pattern (Subtle) -->
+  <g opacity="0.12" stroke="#4ae0ff" stroke-width="0.8">
+    <line x1="100" y1="12" x2="100" y2="268"/>
+    <line x1="12" y1="140" x2="188" y2="140"/>
+    <line x1="12" y1="12" x2="188" y2="268"/>
+    <line x1="188" y1="12" x2="12" y2="268"/>
+    <circle cx="100" cy="140" r="75" fill="none" stroke-dasharray="3,3"/>
+    <circle cx="100" cy="140" r="95" fill="none" stroke-dasharray="2,4"/>
+  </g>
+
+  <!-- Corner Filigree Flourishes -->
+  <!-- Top Left -->
+  <g transform="translate(14, 14)">
+    <path d="M0,0 L32,0 C24,4 18,10 14,18 C10,26 8,36 8,44 L0,44 Z" fill="url(#cb-gold-mid)" opacity="0.85"/>
+    <circle cx="6" cy="6" r="2.5" fill="#ffeaa7"/>
+    <path d="M4,18 Q14,14 18,4" stroke="#ffeaa7" stroke-width="1.2" fill="none"/>
+    <circle cx="14" cy="14" r="1.5" fill="#e8a020"/>
+  </g>
+  <!-- Top Right -->
+  <g transform="translate(186, 14) scale(-1, 1)">
+    <path d="M0,0 L32,0 C24,4 18,10 14,18 C10,26 8,36 8,44 L0,44 Z" fill="url(#cb-gold-mid)" opacity="0.85"/>
+    <circle cx="6" cy="6" r="2.5" fill="#ffeaa7"/>
+    <path d="M4,18 Q14,14 18,4" stroke="#ffeaa7" stroke-width="1.2" fill="none"/>
+    <circle cx="14" cy="14" r="1.5" fill="#e8a020"/>
+  </g>
+  <!-- Bottom Left -->
+  <g transform="translate(14, 266) scale(1, -1)">
+    <path d="M0,0 L32,0 C24,4 18,10 14,18 C10,26 8,36 8,44 L0,44 Z" fill="url(#cb-gold-mid)" opacity="0.85"/>
+    <circle cx="6" cy="6" r="2.5" fill="#ffeaa7"/>
+    <path d="M4,18 Q14,14 18,4" stroke="#ffeaa7" stroke-width="1.2" fill="none"/>
+    <circle cx="14" cy="14" r="1.5" fill="#e8a020"/>
+  </g>
+  <!-- Bottom Right -->
+  <g transform="translate(186, 266) scale(-1, -1)">
+    <path d="M0,0 L32,0 C24,4 18,10 14,18 C10,26 8,36 8,44 L0,44 Z" fill="url(#cb-gold-mid)" opacity="0.85"/>
+    <circle cx="6" cy="6" r="2.5" fill="#ffeaa7"/>
+    <path d="M4,18 Q14,14 18,4" stroke="#ffeaa7" stroke-width="1.2" fill="none"/>
+    <circle cx="14" cy="14" r="1.5" fill="#e8a020"/>
+  </g>
+
+  <!-- Inner Ornate Inset Frame -->
+  <rect x="22" y="22" width="156" height="236" rx="5" fill="none" stroke="url(#cb-gold-outer)" stroke-width="1.6" filter="url(#cb-shadow)"/>
+  <rect x="26" y="26" width="148" height="228" rx="3" fill="none" stroke="#e8a020" stroke-width="0.8" stroke-dasharray="6,3" opacity="0.7"/>
+
+  <!-- Top / Bottom Arch Accents -->
+  <path d="M70,22 Q100,34 130,22" fill="none" stroke="url(#cb-gold-mid)" stroke-width="2.5"/>
+  <circle cx="100" cy="27" r="3" fill="url(#cb-gem)"/>
+  <path d="M70,258 Q100,246 130,258" fill="none" stroke="url(#cb-gold-mid)" stroke-width="2.5"/>
+  <circle cx="100" cy="253" r="3" fill="url(#cb-gem)"/>
+
+  <!-- Side Knot Accents -->
+  <path d="M22,120 Q32,140 22,160" fill="none" stroke="url(#cb-gold-mid)" stroke-width="2.5"/>
+  <circle cx="26" cy="140" r="2.5" fill="url(#cb-gem)"/>
+  <path d="M178,120 Q168,140 178,160" fill="none" stroke="url(#cb-gold-mid)" stroke-width="2.5"/>
+  <circle cx="174" cy="140" r="2.5" fill="url(#cb-gem)"/>
+
+  <!-- CENTER MEDALLION -->
+  <!-- Ambient Gem Glow -->
+  <circle cx="100" cy="140" r="62" fill="url(#cb-gem-glow)"/>
+
+  <!-- Outer Ring with Studs -->
+  <circle cx="100" cy="140" r="52" fill="#0b1e33" stroke="url(#cb-gold-outer)" stroke-width="3" filter="url(#cb-shadow)"/>
+  
+  <!-- Rivets around outer ring -->
+  <g fill="#ffeaa7">
+    <circle cx="100" cy="91" r="1.8"/>
+    <circle cx="135" cy="105" r="1.8"/>
+    <circle cx="149" cy="140" r="1.8"/>
+    <circle cx="135" cy="175" r="1.8"/>
+    <circle cx="100" cy="189" r="1.8"/>
+    <circle cx="65" cy="175" r="1.8"/>
+    <circle cx="51" cy="140" r="1.8"/>
+    <circle cx="65" cy="105" r="1.8"/>
+  </g>
+
+  <!-- 8-Pointed Arcane Starburst -->
+  <g fill="url(#cb-gold-mid)" opacity="0.95" filter="url(#cb-shadow)">
+    <!-- Vertical & Horizontal Points -->
+    <polygon points="100,78 106,128 100,132 94,128"/>
+    <polygon points="100,202 106,152 100,148 94,152"/>
+    <polygon points="38,140 88,146 92,140 88,134"/>
+    <polygon points="162,140 112,146 108,140 112,134"/>
+    <!-- Diagonal Points -->
+    <polygon points="56,96 95,130 92,136 86,133"/>
+    <polygon points="144,184 105,150 108,144 114,147"/>
+    <polygon points="144,96 105,130 108,136 114,133"/>
+    <polygon points="56,184 95,150 92,144 86,147"/>
+  </g>
+
+  <!-- Mid Ring Layer -->
+  <circle cx="100" cy="140" r="36" fill="#061220" stroke="url(#cb-gold-outer)" stroke-width="2.2"/>
+  
+  <!-- Runes / Glyphs in Mid Ring -->
+  <g fill="none" stroke="#4ae0ff" stroke-width="1.2" opacity="0.65">
+    <path d="M100,108 L100,114 M97,111 L103,111"/>
+    <path d="M100,166 L100,172 M97,169 L103,169"/>
+    <path d="M68,140 L74,140 M71,137 L71,143"/>
+    <path d="M126,140 L132,140 M129,137 L129,143"/>
+    <!-- Diagonal notches -->
+    <circle cx="77" cy="117" r="1.2" fill="#4ae0ff"/>
+    <circle cx="123" cy="117" r="1.2" fill="#4ae0ff"/>
+    <circle cx="77" cy="163" r="1.2" fill="#4ae0ff"/>
+    <circle cx="123" cy="163" r="1.2" fill="#4ae0ff"/>
+  </g>
+
+  <!-- Central Tome Emblem (LitStone Signature) -->
+  <g transform="translate(100, 140)">
+    <!-- Book Backing Diamond -->
+    <polygon points="0,-22 22,0 0,22 -22,0" fill="url(#cb-bronze)" stroke="url(#cb-gold-outer)" stroke-width="1.8"/>
+
+    <!-- Open Tome Pages -->
+    <path d="M-15,-9 C-8,-12 -2,-10 0,-7 C2,-10 8,-12 15,-9 L15,10 C8,7 2,8 0,11 C-2,8 -8,7 -15,10 Z" fill="#fff8e8" stroke="#8a5814" stroke-width="1"/>
+    <!-- Book Spine / Rift -->
+    <line x1="0" y1="-7" x2="0" y2="11" stroke="#5c3808" stroke-width="1.2"/>
+    <!-- Page text markings -->
+    <path d="M-12,-4 L-3,-4 M-12,0 L-3,0 M-12,4 L-4,4" stroke="#c0a070" stroke-width="0.7"/>
+    <path d="M3,-4 L12,-4 M3,0 L12,0 M4,4 L12,4" stroke="#c0a070" stroke-width="0.7"/>
+
+    <!-- Glowing Center Gem in Diamond Core -->
+    <polygon points="0,-7 7,0 0,7 -7,0" fill="url(#cb-gem)" stroke="#ffeaa7" stroke-width="1" filter="url(#cb-shadow)"/>
+    <polygon points="0,-4 4,0 0,4 -4,0" fill="#ffffff" opacity="0.6"/>
+  </g>
+</svg>

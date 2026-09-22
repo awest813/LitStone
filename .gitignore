@@ -9,3 +9,4 @@ build/
 litstone.db
 litstone.db-wal
 litstone.db-shm
+scratch/

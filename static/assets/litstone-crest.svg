@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+  <defs>
+    <radialGradient id="crestAura" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.35"/>
+      <stop offset="50%" stop-color="#818cf8" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="goldPlate" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="35%" stop-color="#eab308"/>
+      <stop offset="70%" stop-color="#ca8a04"/>
+      <stop offset="100%" stop-color="#713f12"/>
+    </linearGradient>
+    <linearGradient id="steelBlade" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="50%" stop-color="#94a3b8"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+    <linearGradient id="parchment" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fef3c7"/>
+      <stop offset="100%" stop-color="#d97706" stop-opacity="0.8"/>
+    </linearGradient>
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Ambient magical aura -->
+  <circle cx="80" cy="80" r="76" fill="url(#crestAura)"/>
+
+  <!-- Outer Runic Ring -->
+  <circle cx="80" cy="80" r="70" fill="none" stroke="url(#goldPlate)" stroke-width="1.8" opacity="0.65"/>
+  <circle cx="80" cy="80" r="66" fill="#080f1a" stroke="url(#goldPlate)" stroke-width="2.5"/>
+  <circle cx="80" cy="80" r="62" fill="none" stroke="#38bdf8" stroke-width="0.8" stroke-dasharray="3 4" opacity="0.75"/>
+
+  <!-- Crossed Ancient Weapons behind Tome -->
+  <!-- Runic Sword: Top-Left to Bottom-Right -->
+  <g transform="rotate(-45 80 80)">
+    <!-- Blade -->
+    <path d="M78 22l2-14 2 14v80h-4z" fill="url(#steelBlade)" stroke="#0f172a" stroke-width="0.5"/>
+    <!-- Fuller / Glow -->
+    <line x1="80" y1="22" x2="80" y2="90" stroke="#38bdf8" stroke-width="1" opacity="0.8"/>
+    <!-- Crossguard -->
+    <rect x="71" y="102" width="18" height="5" rx="1.5" fill="url(#goldPlate)"/>
+    <!-- Grip & Pommel -->
+    <rect x="77.5" y="107" width="5" height="15" rx="1" fill="#451a03"/>
+    <circle cx="80" cy="125" r="4.5" fill="url(#goldPlate)"/>
+  </g>
+
+  <!-- Enchanted Quill: Top-Right to Bottom-Left -->
+  <g transform="rotate(45 80 80)">
+    <!-- Feather vanes -->
+    <path d="M80 18c-8 12-11 34-4 60l4-2c7-26 4-48-4-60z" fill="#38bdf8" opacity="0.75"/>
+    <path d="M80 18c8 12 11 34 4 60l-4-2c-7-26-4-48 4-60z" fill="#818cf8" opacity="0.75"/>
+    <!-- Quill Shaft & Golden Nib -->
+    <line x1="80" y1="16" x2="80" y2="108" stroke="url(#goldPlate)" stroke-width="1.8"/>
+    <path d="M78.5 108l1.5 15 1.5-15z" fill="url(#goldPlate)"/>
+  </g>
+
+  <!-- Open Grimoire Book Base -->
+  <!-- Left Page Stack -->
+  <path d="M38 72c14-6 28-3 42 5v42c-14-8-28-11-42-5z" fill="#b45309" opacity="0.7"/>
+  <!-- Right Page Stack -->
+  <path d="M122 72c-14-6-28-3-42 5v42c14-8 28-11 42-5z" fill="#b45309" opacity="0.7"/>
+
+  <!-- Left Main Page -->
+  <path d="M39 69c14-6 27-3 41 5v40c-14-8-27-11-41-5z" fill="#fef3c7" stroke="#78350f" stroke-width="1"/>
+  <!-- Right Main Page -->
+  <path d="M121 69c-14-6-27-3-41 5v40c14-8 27-11 41-5z" fill="#fef3c7" stroke="#78350f" stroke-width="1"/>
+
+  <!-- Book Spine Center Binding -->
+  <line x1="80" y1="73" x2="80" y2="114" stroke="url(#goldPlate)" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- Mystic Script on Left Page -->
+  <path d="M46 76h24 M46 82h26 M46 88h22 M46 94h25" stroke="#92400e" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="2 3" opacity="0.85"/>
+
+  <!-- Glowing Arcane Seal on Right Page -->
+  <circle cx="101" cy="87" r="11" fill="none" stroke="#6366f1" stroke-width="1.2" opacity="0.8"/>
+  <path d="M101 78l2.5 6.5 6.5 2.5-6.5 2.5-2.5 6.5-2.5-6.5-6.5-2.5 6.5-2.5z" fill="#38bdf8" filter="url(#softGlow)" opacity="0.95"/>
+  <circle cx="101" cy="87" r="2.5" fill="#fef08a"/>
+
+  <!-- Heraldic Crown / Arch over Book -->
+  <path d="M62 48l9 8 9-12 9 12 9-8v12H62z" fill="url(#goldPlate)" stroke="#713f12" stroke-width="1"/>
+  <circle cx="71" cy="56" r="1.8" fill="#38bdf8"/>
+  <circle cx="80" cy="44" r="2.2" fill="#ef4444"/>
+  <circle cx="89" cy="56" r="1.8" fill="#38bdf8"/>
+
+  <!-- Star Glints -->
+  <g filter="url(#softGlow)">
+    <path d="M80 18l1.2 3.8 3.8 1.2-3.8 1.2-1.2 3.8-1.2-3.8-3.8-1.2 3.8-1.2z" fill="#fef08a"/>
+    <path d="M32 40l1 3 3 1-3 1-1 3-1-3-3-1 3-1z" fill="#38bdf8"/>
+    <path d="M128 40l1 3 3 1-3 1-1 3-1-3-3-1 3-1z" fill="#38bdf8"/>
+  </g>
+</svg>

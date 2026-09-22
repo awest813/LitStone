@@ -29,11 +29,20 @@
 .hub-brand .hub-tagline { margin-bottom: 0; }
 
 .hub-emblem {
-  font-size: 72px;
   line-height: 1;
-  margin-bottom: 12px;
-  filter: drop-shadow(0 0 24px rgba(232, 160, 32, .45));
+  margin-bottom: 16px;
+  filter: drop-shadow(0 0 28px rgba(232, 160, 32, .5));
   animation: hubEmblemFloat 4s ease-in-out infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hub-emblem-img {
+  width: 128px;
+  height: 128px;
+  display: block;
+  filter: drop-shadow(0 0 24px rgba(56, 189, 248, .35)) drop-shadow(0 6px 20px rgba(0, 0, 0, .85));
 }
 
 @keyframes hubEmblemFloat {
@@ -508,9 +517,10 @@
   padding: 14px 16px;
   background: linear-gradient(135deg, var(--col-surface), var(--col-panel));
   border: 1px solid var(--col-border);
+  border-left: 3px solid var(--col-border-bright);
   border-radius: 12px;
   cursor: pointer;
-  transition: border-color .15s, transform .15s, box-shadow .15s;
+  transition: border-color .18s, transform .18s, box-shadow .18s;
   text-align: left;
 }
 
@@ -532,33 +542,90 @@
 }
 
 .campaign-node--done {
-  border-color: var(--col-green);
+  border-color: var(--col-green) !important;
+  border-left-color: var(--col-green) !important;
   box-shadow: inset 0 0 12px rgba(0, 184, 148, .12);
 }
 
+.campaign-node[data-class="Mage"]    { border-left-color: var(--mage-col); }
+.campaign-node[data-class="Warrior"] { border-left-color: var(--warrior-col); }
+.campaign-node[data-class="Priest"]  { border-left-color: var(--priest-col); }
+.campaign-node[data-class="Rogue"]   { border-left-color: var(--rogue-col); }
+.campaign-node[data-class="Paladin"] { border-left-color: var(--paladin-col); }
+.campaign-node[data-class="Shaman"]  { border-left-color: var(--shaman-col); }
+
+.campaign-node--boss {
+  border-color: var(--col-gold) !important;
+  border-left: 4px solid var(--col-gold) !important;
+  box-shadow: 0 4px 18px rgba(232, 160, 32, .25);
+  background: linear-gradient(135deg, rgba(28, 18, 10, .95), rgba(14, 24, 38, .98));
+}
+
+.campaign-node--elite {
+  border-color: var(--col-purple-bright);
+  border-left: 4px solid var(--col-purple-bright);
+  box-shadow: 0 4px 16px rgba(155, 89, 182, .22);
+}
+
 .campaign-node-index {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   font-family: 'Cinzel', serif;
   font-weight: 700;
   font-size: 14px;
-  background: rgba(20, 40, 64, .9);
+  background: radial-gradient(circle at 35% 35%, #183556, #091728);
   border: 2px solid var(--col-border-bright);
   flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .15);
+}
+
+.campaign-node-crest {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.campaign-node-crest .crest-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.campaign-node-num {
+  font-size: 9px;
+  line-height: 1;
+  color: #ffeaa7;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .85);
+}
+
+.campaign-boss-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
 }
 
 .campaign-node--boss .campaign-node-index {
   border-color: var(--col-gold);
   color: var(--col-gold);
+  overflow: hidden;
+  box-shadow: 0 0 14px rgba(232, 160, 32, .6);
 }
 
 .campaign-node--elite .campaign-node-index {
   border-color: var(--col-purple-bright);
   color: var(--col-purple-bright);
+  overflow: hidden;
+  box-shadow: 0 0 12px rgba(155, 89, 182, .55);
 }
 
 .campaign-node-body { flex: 1; min-width: 0; }
@@ -689,6 +756,14 @@
   border: 2px solid var(--col-border-bright);
   flex-shrink: 0;
   box-shadow: 0 0 12px rgba(0, 0, 0, .4);
+  background: rgba(16, 30, 46, .8);
+  overflow: hidden;
+}
+
+.deck-class-emblem .crest-svg {
+  width: 32px;
+  height: 32px;
+  display: block;
 }
 
 .deck-validation {

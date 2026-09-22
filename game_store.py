@@ -8,6 +8,9 @@ import time
 from typing import Any
 
 
+import contextlib
+
+
 class GameStore:
     """Persist active game state so sessions survive server restarts."""
 
@@ -15,10 +18,15 @@ class GameStore:
         self.db_path = db_path
         self._ensure_schema()
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextlib.contextmanager
+    def _connect(self):
         conn = sqlite3.connect(self.db_path)
         conn.execute("PRAGMA journal_mode=WAL")
-        return conn
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     def _ensure_schema(self) -> None:
         with self._connect() as conn:

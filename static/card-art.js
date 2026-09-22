@@ -146,21 +146,43 @@ function applyArtVars(el, card) {
   if (card?.classes?.[0]) el.dataset.cardClass = card.classes[0];
 }
 
+const BESPOKE_CARD_ASSETS = {
+  "The Coin": { type: "image", src: "/static/assets/cards/the_coin.svg" },
+  "Victor Frankenstein": { type: "image", src: "/static/assets/bosses/frankenstein.jpg", portrait: true },
+  "Van Helsing": { type: "image", src: "/static/assets/bosses/van_helsing.jpg", portrait: true },
+  "Professor Moriarty": { type: "image", src: "/static/assets/bosses/moriarty.jpg", portrait: true },
+};
+
 function renderArt(card, name, size) {
   const t = resolveTheme(card);
-  const glyph = emoji(card?.icon);
   const sizeCls = size ? ` card-art--${size}` : "";
   const legCls = card?.legendary ? " card-art--legendary" : "";
   const coinCls = isCoin(card, name) ? " card-art--coin" : "";
   const classAttr = card?.classes?.[0] ? ` data-card-class="${card.classes[0]}"` : "";
   const label = name ? `${name} card art` : "Card art";
+
+  let artContent = "";
+  const bespoke = BESPOKE_CARD_ASSETS[name] || (isCoin(card, name) ? BESPOKE_CARD_ASSETS["The Coin"] : null);
+
+  if (bespoke) {
+    const portraitCls = bespoke.portrait ? " card-art__custom-img--portrait" : "";
+    artContent = `<img class="card-art__custom-img${portraitCls}" src="${bespoke.src}" alt="${label}" loading="lazy" />`;
+  } else if (card?.icon && typeof ClassCrests !== "undefined" && ClassCrests.getTotemIcon(card.icon)) {
+    artContent = `<div class="card-art__custom-svg" role="img" aria-label="${label}">${ClassCrests.getTotemIcon(card.icon)}</div>`;
+  } else if (card?.icon && typeof CardGraphics !== "undefined" && CardGraphics.getGraphic(card.icon)) {
+    artContent = `<div class="card-art__graphic" role="img" aria-label="${label}">${CardGraphics.getGraphic(card.icon)}</div>`;
+  } else {
+    const glyph = emoji(card?.icon);
+    artContent = `<span class="card-art__glyph" role="img" aria-label="${label}">${glyph}</span>`;
+  }
+
   return `<div class="card-art${sizeCls}${legCls}${coinCls}" data-motif="${t.motif}" data-variant="${t.variant ?? 0}"${classAttr} style="${styleAttr(card)}">
     <div class="card-art__rim" aria-hidden="true"></div>
     <div class="card-art__bg" aria-hidden="true"></div>
     <div class="card-art__motif" aria-hidden="true"></div>
     <div class="card-art__vignette" aria-hidden="true"></div>
     <div class="card-art__shine" aria-hidden="true"></div>
-    <span class="card-art__glyph" role="img" aria-label="${label}">${glyph}</span>
+    ${artContent}
   </div>`;
 }
 

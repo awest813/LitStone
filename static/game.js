@@ -642,8 +642,20 @@ function renderCampaignMap() {
     const oppLabel = node.boss_id
       ? `Boss · ${oppClass || "?"} · ${oppHp} HP`
       : (oppClass ? `${oppClass} opponent · ${oppHp} HP` : "Duel");
+    const bossThumb = node.boss_id && typeof ClassCrests !== "undefined" && ClassCrests.getBossPortrait(node.boss_id)
+      ? `<img src="${ClassCrests.getBossPortrait(node.boss_id)}" alt="" class="campaign-boss-thumb" />`
+      : null;
+    let nodeVisual = "";
+    if (bossThumb) {
+      nodeVisual = bossThumb;
+    } else if (oppClass && typeof ClassCrests !== "undefined" && ClassCrests.getCrest(oppClass)) {
+      nodeVisual = `<span class="campaign-node-crest">${ClassCrests.getCrest(oppClass)}</span><span class="campaign-node-num">${i + 1}</span>`;
+    } else {
+      nodeVisual = `<span class="campaign-node-num">${i + 1}</span>`;
+    }
+    if (oppClass) div.dataset.class = oppClass;
     div.innerHTML = `
-      <span class="campaign-node-index">${i + 1}</span>
+      <span class="campaign-node-index">${nodeVisual}</span>
       <span class="campaign-node-body">
         <div class="campaign-node-name">${node.name}</div>
         <div class="campaign-node-sub">${node.subtitle || ""}</div>
@@ -1024,7 +1036,8 @@ function enterDeckBuilder(cls, initialDeck) {
   if (sub) sub.textContent = deckBuilderSubtitle(cls);
   const emblem = document.getElementById("deck-class-emblem");
   if (emblem) {
-    emblem.textContent = HERO_ICONS[cls] || "?";
+    const crestSvg = typeof ClassCrests !== "undefined" ? ClassCrests.getCrest(cls) : null;
+    emblem.innerHTML = crestSvg || HERO_ICONS[cls] || "?";
     emblem.style.borderColor = HERO_COLORS[cls] || "var(--col-border-bright)";
     emblem.style.boxShadow = `0 0 14px ${HERO_COLORS[cls] || "#333"}55`;
   }
@@ -1404,12 +1417,16 @@ function updateDeckSidebar() {
       const n    = draftDeck.filter(c => c === name).length;
       const cost = card.cost ?? "?";
       const typeIcon = CardArt.typeIcon(card.type);
+      const isLeg = !!card.legendary;
+      const countLabel = isLeg ? "★" : (n > 1 ? `2` : "");
+      const countCls = isLeg ? "deck-entry-count deck-entry-count--legendary" : "deck-entry-count";
       const li   = document.createElement("li");
-      li.className = `deck-entry deck-entry--${card.type || "minion"}`;
+      li.className = `deck-entry deck-entry--${card.type || "minion"}${isLeg ? " deck-entry--legendary" : ""}`;
+      const cardSvg = (card.icon && typeof CardGraphics !== "undefined" && CardGraphics.getGraphic(card.icon)) || "";
       li.innerHTML = `<span class="deck-entry-cost">${cost}</span>
-                      <span class="deck-entry-type" title="${card.type}">${typeIcon}</span>
+                      ${cardSvg ? `<span class="deck-entry-art" aria-hidden="true">${cardSvg}</span>` : `<span class="deck-entry-type" title="${card.type}">${typeIcon}</span>`}
                       <span class="deck-entry-name">${name}</span>
-                      <span class="deck-entry-count">×${n}</span>
+                      ${countLabel ? `<span class="${countCls}">${countLabel}</span>` : ""}
                       <button type="button" class="deck-entry-remove" title="Remove one" aria-label="Remove one ${name} from deck">✕</button>`;
       li.querySelector(".deck-entry-remove").addEventListener("click", e => {
         e.stopPropagation();
@@ -1801,7 +1818,8 @@ async function importDeckCodeFromText(raw, { reportError } = {}) {
     document.getElementById("deck-title").textContent = `Build Your ${heroClass} Deck`;
     const emblem = document.getElementById("deck-class-emblem");
     if (emblem) {
-      emblem.textContent = HERO_ICONS[heroClass] || "?";
+      const crestSvg = typeof ClassCrests !== "undefined" ? ClassCrests.getCrest(heroClass) : null;
+      emblem.innerHTML = crestSvg || HERO_ICONS[heroClass] || "?";
       emblem.style.borderColor = HERO_COLORS[heroClass] || "var(--col-border-bright)";
     }
   }
@@ -2308,7 +2326,10 @@ function setAiThinking(active) {
   const bar = document.getElementById("ai-thinking-bar");
   if (bar) bar.classList.toggle("active", active);
   const etBtn = document.getElementById("btn-end-turn");
-  if (etBtn) etBtn.textContent = active ? "AI thinking…" : "End Turn";
+  if (etBtn) {
+    etBtn.textContent = active ? "AI thinking…" : "End Turn";
+    if (active) etBtn.classList.remove("ready-to-end");
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2451,45 +2472,199 @@ function playSfx(kind) {
   try {
     const ctx = getAudioCtx();
     if (ctx.state === "suspended") ctx.resume();
+    const now = ctx.currentTime;
+
     switch (kind) {
-      case "play":
-        tone(392, 0.1);
-        setTimeout(() => tone(523, 0.12), 60);
+      case "play": {
+        // Crisp card flick / whoosh with wooden settle
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(260, now);
+        osc.frequency.exponentialRampToValueAtTime(540, now + 0.08);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.12);
         break;
-      case "attack":
-        tone(160, 0.14, "square", 0.05);
+      }
+      case "attack": {
+        // Visceral low-frequency punch with transient impact snap
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(42, now + 0.14);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.15);
+
+        // Noise transient
+        const bufferSize = Math.floor(ctx.sampleRate * 0.04);
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.25));
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type = "bandpass";
+        filter.frequency.value = 1200;
+        const nGain = ctx.createGain();
+        nGain.gain.setValueAtTime(0.06, now);
+        noise.connect(filter);
+        filter.connect(nGain);
+        nGain.connect(ctx.destination);
+        noise.start(now);
         break;
-      case "damage":
-        tone(110, 0.18, "sawtooth", 0.045);
+      }
+      case "damage": {
+        // Heavy crunchy sub drop with filter sweep
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const filter = ctx.createBiquadFilter();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(115, now);
+        osc.frequency.exponentialRampToValueAtTime(35, now + 0.22);
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(400, now);
+        filter.frequency.exponentialRampToValueAtTime(90, now + 0.22);
+        gain.gain.setValueAtTime(0.09, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.22);
         break;
-      case "heal":
-        tone(440, 0.14);
-        setTimeout(() => tone(554, 0.16), 80);
+      }
+      case "heal": {
+        // Shimmering harmonic chime arpeggio (C5, E5, G5, C6)
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, idx) => {
+          const t = now + idx * 0.045;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.065, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.18);
+        });
         break;
-      case "turn":
-        tone(330, 0.2);
-        setTimeout(() => tone(440, 0.15), 100);
+      }
+      case "turn": {
+        // Resonant heraldic golden chime
+        const freqs = [329.63, 493.88];
+        freqs.forEach(freq => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime(0.06, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.32);
+        });
         break;
-      case "turn_enemy":
-        tone(220, 0.2, "triangle", 0.05);
-        setTimeout(() => tone(165, 0.18, "triangle", 0.045), 110);
+      }
+      case "turn_enemy": {
+        // Deeper warning tone
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(146.83, now + 0.28);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.28);
         break;
-      case "power":
-        tone(392, 0.12, "sine", 0.05);
-        setTimeout(() => tone(587, 0.14, "sine", 0.045), 70);
+      }
+      case "power": {
+        // Resonant mystical surge with chorus detune
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const filter = ctx.createBiquadFilter();
+        osc1.type = "sine";
+        osc2.type = "triangle";
+        osc1.frequency.setValueAtTime(293.66, now);
+        osc2.frequency.setValueAtTime(297.0, now);
+        filter.type = "bandpass";
+        filter.frequency.setValueAtTime(450, now);
+        filter.frequency.exponentialRampToValueAtTime(1400, now + 0.2);
+        filter.Q.value = 3.0;
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+        osc1.connect(filter);
+        osc2.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 0.24);
+        osc2.stop(now + 0.24);
         break;
-      case "tap":
-        tone(520, 0.06, "sine", 0.035);
+      }
+      case "tap": {
+        tone(520, 0.05, "sine", 0.035);
         break;
-      case "victory":
-        tone(523, 0.18);
-        setTimeout(() => tone(659, 0.18), 140);
-        setTimeout(() => tone(784, 0.22), 280);
+      }
+      case "victory": {
+        // Triumphant fantasy fanfare
+        const chords = [
+          { time: 0, notes: [261.63, 329.63] },
+          { time: 0.12, notes: [329.63, 392.00] },
+          { time: 0.24, notes: [392.00, 523.25] },
+          { time: 0.38, notes: [523.25, 659.25, 783.99, 1046.50] },
+        ];
+        chords.forEach(({ time, notes }) => {
+          notes.forEach(f => {
+            const t = now + time;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(f, t);
+            gain.gain.setValueAtTime(0.055, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + (time >= 0.38 ? 0.6 : 0.22));
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(t);
+            osc.stop(t + (time >= 0.38 ? 0.6 : 0.22));
+          });
+        });
         break;
-      case "defeat":
-        tone(220, 0.25, "triangle", 0.06);
-        setTimeout(() => tone(165, 0.35, "triangle", 0.05), 200);
+      }
+      case "defeat": {
+        // Somber minor chord descent
+        const notes = [220, 185, 155.56, 110];
+        notes.forEach((f, idx) => {
+          const t = now + idx * 0.14;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(f, t);
+          gain.gain.setValueAtTime(0.06, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.38);
+        });
         break;
+      }
       default:
         break;
     }
@@ -2881,6 +3056,16 @@ function renderGame() {
   const etBtn = document.getElementById("btn-end-turn");
   etBtn.disabled = !is_player_turn || !!winner;
   etBtn.textContent = is_player_turn ? "End Turn" : "Waiting…";
+  if (is_player_turn && !winner) {
+    const effMana = clientEffectiveMana(p1);
+    const hasPlayableCard = p1.hand.some(name => (CARD_DB[name]?.cost ?? 99) <= effMana);
+    const hasAttacker = p1.board.some(m => m.can_attack);
+    const hpCanUse = p1.mana >= 2 && !p1.hero_power_used;
+    const readyToEnd = !hasPlayableCard && !hasAttacker && !hpCanUse;
+    etBtn.classList.toggle("ready-to-end", readyToEnd);
+  } else {
+    etBtn.classList.remove("ready-to-end");
+  }
 
   // Turn banner: fire only when turn ownership changes
   const displayTurn = gameState.turn_number || turnNumber;
@@ -2910,6 +3095,11 @@ function renderGame() {
         : "Defeat!";
     const crown = overlay.querySelector(".winner-crown");
     if (crown) crown.textContent = winner === "DRAW" ? "🤝" : isWin ? "👑" : "💔";
+    const winBox = overlay.querySelector(".winner-box");
+    if (winBox) {
+      winBox.classList.remove("win", "loss", "draw");
+      winBox.classList.add(winner === "DRAW" ? "draw" : isWin ? "win" : "loss");
+    }
     if (subtitle) {
       const vs = gameState.opponent_name || "the AI";
       const turns = gameState.turn_number || turnNumber;
@@ -2949,8 +3139,18 @@ function renderHero(elId, player, isOpp) {
 
   const maxHp = player.max_hp || 30;
   const hpPct = Math.max(0, Math.min(100, (player.hp / maxHp) * 100));
-  const icon  = HERO_ICONS[player.hero_class] || "?";
+  const defaultIcon  = HERO_ICONS[player.hero_class] || "?";
   const accentColor = HERO_COLORS[player.hero_class] || "#2e4a66";
+
+  let heroVisual = "";
+  const bossId = isOpp && activeCampaignNode?.boss_id;
+  if (bossId && typeof ClassCrests !== "undefined" && ClassCrests.getBossPortrait(bossId)) {
+    heroVisual = `<img src="${ClassCrests.getBossPortrait(bossId)}" class="hero-portrait-img" alt="${activeCampaignNode.name || player.hero_class}" />`;
+  } else if (typeof ClassCrests !== "undefined" && ClassCrests.getCrest(player.hero_class)) {
+    heroVisual = ClassCrests.getCrest(player.hero_class);
+  } else {
+    heroVisual = defaultIcon;
+  }
 
   let cls = "hero-panel";
   if (!isOpp) {
@@ -2981,10 +3181,12 @@ function renderHero(elId, player, isOpp) {
     el.style.borderColor = accentColor;
   }
 
+  const displayName = (isOpp && activeCampaignNode?.name) ? activeCampaignNode.name : player.hero_class;
+
   el.innerHTML = `
     ${armorBadge}${weaponBadge}${fatigueBadge}
-    <div class="hero-icon">${icon}</div>
-    <div class="hero-class-name">${player.hero_class}</div>
+    <div class="hero-icon">${heroVisual}</div>
+    <div class="hero-class-name">${displayName}</div>
     <div class="hero-hp-bar"><div class="hero-hp-fill" style="width:${hpPct}%"></div></div>
     <div class="hero-hp-text">${Math.max(0, player.hp)} HP</div>
   `;
@@ -2992,7 +3194,7 @@ function renderHero(elId, player, isOpp) {
   el.onclick = () => handleHeroClick(isOpp, player);
   el.setAttribute("tabindex", "0");
   el.setAttribute("role", "button");
-  el.setAttribute("aria-label", `${isOpp ? "Enemy" : "Your"} hero, ${player.hero_class}, ${Math.max(0, player.hp)} health`);
+  el.setAttribute("aria-label", `${isOpp ? "Enemy" : "Your"} hero, ${displayName}, ${Math.max(0, player.hp)} health`);
   el.onkeydown = e => {
     if (e.key !== "Enter" && e.key !== " ") return;
     e.preventDefault();
@@ -3029,7 +3231,8 @@ function renderHeroMana(trayId, player) {
 function renderHeroPower(elId, player, isOpp) {
   const el = document.getElementById(elId);
   const canUse = !player.hero_power_used && clientEffectiveMana(player) >= GAME_LIMITS.HERO_POWER_COST;
-  const icon   = HERO_POWER_ICONS[player.hero_class] || "⚡";
+  const powerSvg = typeof ClassCrests !== "undefined" ? ClassCrests.getPowerIcon(player.hero_class) : null;
+  const icon   = powerSvg || HERO_POWER_ICONS[player.hero_class] || "⚡";
 
   let cls = "hero-power-panel";
   if (!canUse) cls += " used";
@@ -3063,7 +3266,11 @@ function renderHeroPower(elId, player, isOpp) {
 /* ---- Deck panel ---- */
 function renderDeckPanel(elId, player) {
   const el = document.getElementById(elId);
-  el.innerHTML = `<div class="deck-n">${player.deck.length}</div><div>Deck</div>`;
+  if (!el) return;
+  const n = player.deck ? player.deck.length : 0;
+  el.classList.toggle("empty", n === 0);
+  el.setAttribute("aria-label", `Deck: ${n} cards remaining`);
+  el.innerHTML = `<div class="deck-badge"><div class="deck-n">${n}</div><div class="deck-label">Deck</div></div>`;
 }
 
 /* ---- Opp hand ---- */
@@ -3822,6 +4029,15 @@ function syncDeckSizeUi() {
   applyGameSpeedClass();
   initConfirmModal();
   initDeckCodeModal();
+  if (typeof ClassCrests !== "undefined") {
+    document.querySelectorAll(".hero-card[data-class]").forEach(cardEl => {
+      const cls = cardEl.dataset.class;
+      const emblemEl = cardEl.querySelector(".hero-emblem");
+      if (emblemEl && ClassCrests.getCrest(cls)) {
+        emblemEl.innerHTML = ClassCrests.getCrest(cls);
+      }
+    });
+  }
   await updateHubContinue();
   const meta = document.getElementById("hub-meta");
   if (meta) meta.textContent = `6 classes · ${cardCount} cards · career & practice`;
