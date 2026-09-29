@@ -242,6 +242,15 @@ const ClassCrests = (() => {
     </svg>`,
   };
 
+  const HERO_PORTRAITS = {
+    Mage:    "/static/assets/heroes/mage.jpg",
+    Warrior: "/static/assets/heroes/warrior.jpg",
+    Priest:  "/static/assets/heroes/priest.jpg",
+    Rogue:   "/static/assets/heroes/rogue.jpg",
+    Paladin: "/static/assets/heroes/paladin.jpg",
+    Shaman:  "/static/assets/heroes/shaman.jpg",
+  };
+
   const BOSS_PORTRAITS = {
     frankenstein: "/static/assets/bosses/frankenstein.jpg",
     van_helsing:  "/static/assets/bosses/van_helsing.jpg",
@@ -250,6 +259,10 @@ const ClassCrests = (() => {
 
   function getCrest(heroClass) {
     return HERO_CRESTS[heroClass] || null;
+  }
+
+  function getHeroPortrait(heroClass) {
+    return HERO_PORTRAITS[heroClass] || null;
   }
 
   function getPowerIcon(heroClass) {
@@ -266,10 +279,12 @@ const ClassCrests = (() => {
 
   return {
     HERO_CRESTS,
+    HERO_PORTRAITS,
     POWER_ICONS,
     TOTEM_ICONS,
     BOSS_PORTRAITS,
     getCrest,
+    getHeroPortrait,
     getPowerIcon,
     getTotemIcon,
     getBossPortrait,

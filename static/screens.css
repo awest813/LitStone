@@ -128,6 +128,42 @@
 
 .hub-mode--play .hub-mode-title { font-size: 20px; color: #e8f4ff; }
 
+.hub-mode--tutorial {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  background: linear-gradient(145deg, rgba(20, 36, 56, .85), rgba(10, 18, 30, .95));
+  border-color: rgba(74, 158, 221, .35);
+}
+
+.hub-mode--tutorial:hover:not(:disabled) {
+  border-color: var(--col-mana-bright);
+  background: linear-gradient(145deg, rgba(28, 50, 78, .92), rgba(14, 26, 44, .98));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .45), 0 0 16px rgba(74, 158, 221, .2);
+}
+
+.hub-mode--tutorial .hub-mode-icon {
+  font-size: 24px;
+}
+
+.hub-mode--tutorial .hub-mode-text {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hub-mode--tutorial .hub-mode-title {
+  font-size: 14px;
+}
+
+.hub-mode--tutorial .hub-mode-desc {
+  font-size: 12px;
+  color: var(--col-text-dim);
+}
+
 .hub-mode-icon {
   font-size: 28px;
   line-height: 1;
@@ -238,7 +274,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  width: min(320px, 100%);
+  width: min(380px, 100%);
   margin: 0 auto;
   padding: 20px;
   background: linear-gradient(135deg, var(--col-surface), var(--col-panel));
@@ -643,6 +679,27 @@
   line-height: 1.35;
 }
 
+.campaign-node-volume {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--col-gold-bright, #ffd56b);
+  margin-bottom: 2px;
+}
+
+.campaign-node-epigraph {
+  margin: 6px 0 2px;
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.35;
+  color: rgba(247, 231, 206, .85);
+  border-left: 2px solid rgba(232, 160, 32, .45);
+  padding-left: 6px;
+}
+
 .campaign-node-meta {
   font-size: 9px;
   color: var(--col-mana-bright);
@@ -666,22 +723,39 @@
 /* Deck builder match options */
 .match-options {
   display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 6px;
+  background: rgba(8, 15, 26, 0.65);
+  border: 1px solid var(--col-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.match-option-row {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  margin-bottom: 4px;
 }
 
 .match-option-label {
   font-size: 11px;
   color: var(--col-text-dim);
   font-family: 'Cinzel', serif;
+  white-space: nowrap;
+  letter-spacing: .04em;
 }
 
-.match-difficulty-select {
+.match-difficulty-select,
+.match-personality-select {
   flex: 1;
   min-width: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 6px;
 }
 
 .match-options.hidden { display: none; }
@@ -763,6 +837,14 @@
 .deck-class-emblem .crest-svg {
   width: 32px;
   height: 32px;
+  display: block;
+}
+
+.deck-class-emblem .hero-portrait-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
   display: block;
 }
 
@@ -863,6 +945,271 @@
 }
 
 .modal-actions .btn { width: 100%; }
+
+/* Card Inspect / Literary Lore Modal */
+.card-inspect-panel {
+  position: relative;
+  width: min(720px, 94vw);
+  max-height: min(92vh, 760px);
+  padding: 28px 24px 20px;
+  background: radial-gradient(circle at 50% 10%, #152238, #0a111e 85%);
+  border: 2px solid var(--col-gold, #e8a020);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .95), 0 0 50px rgba(232, 160, 32, .2);
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.btn-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 50%;
+  color: var(--col-text-dim, #a0aec0);
+  font-size: 15px;
+  cursor: pointer;
+  transition: all .15s ease;
+  z-index: 10;
+}
+.btn-modal-close:hover {
+  background: rgba(232, 160, 32, .25);
+  border-color: var(--col-gold, #e8a020);
+  color: #fff;
+  transform: scale(1.08);
+}
+
+.card-inspect-body {
+  overflow-y: auto;
+  padding-right: 4px;
+  flex: 1;
+}
+
+.inspect-card-view {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 600px) {
+  .inspect-card-view {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+.inspect-art-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.inspect-art-frame {
+  width: 100%;
+  border-radius: 16px;
+  padding: 8px;
+  background: linear-gradient(145deg, #1b2838, #0e1624);
+  border: 2px solid var(--frame-edge, rgba(255, 255, 255, .15));
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .8), inset 0 0 16px rgba(0, 0, 0, .6);
+}
+
+.inspect-legendary-frame {
+  border-color: var(--col-gold-bright, #ffd56b);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, .9), 0 0 24px rgba(232, 160, 32, .35);
+}
+
+.inspect-badges-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  width: 100%;
+}
+
+.inspect-cost-badge {
+  background: radial-gradient(circle at 35% 35%, var(--col-mana-bright, #3498db), var(--col-mana, #2980b9));
+  color: #fff;
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .4);
+}
+
+.inspect-legendary-badge {
+  background: linear-gradient(135deg, #d4af37, #996515);
+  color: #fff;
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 12px;
+  letter-spacing: .08em;
+  box-shadow: 0 0 10px rgba(212, 175, 55, .4);
+}
+
+.inspect-class-badge,
+.inspect-neutral-badge {
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .14);
+  color: var(--col-text-dim, #cbd5e1);
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 12px;
+}
+
+.inspect-details-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inspect-header .inspect-title {
+  font-family: 'Cinzel', serif;
+  font-size: 24px;
+  color: var(--col-gold-bright, #ffd56b);
+  margin: 0 0 4px;
+  text-align: left;
+  text-shadow: 0 0 16px rgba(232, 160, 32, .4);
+}
+
+.inspect-header .inspect-subhead {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  letter-spacing: .12em;
+  color: var(--col-text-dim, #94a3b8);
+  text-transform: uppercase;
+}
+
+.inspect-stats-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.inspect-stat {
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, .45);
+  border: 1px solid rgba(255, 255, 255, .12);
+}
+
+.inspect-stat.stat-atk { color: #ff7675; border-color: rgba(255, 118, 117, .3); }
+.inspect-stat.stat-hp  { color: #55efc4; border-color: rgba(85, 239, 196, .3); }
+.inspect-stat.stat-spell { color: #a29bfe; border-color: rgba(162, 155, 254, .3); }
+
+.inspect-keywords-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.inspect-section-label {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--col-gold, #e8a020);
+  margin-bottom: 6px;
+}
+
+.inspect-rules-box {
+  background: rgba(0, 0, 0, .35);
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.inspect-rule {
+  margin: 0;
+  font-size: 12.5px;
+  color: #e2e8f0;
+  line-height: 1.45;
+}
+.inspect-rule + .inspect-rule { margin-top: 4px; }
+
+.inspect-lore-section {
+  background: radial-gradient(circle at 50% 0%, rgba(232, 160, 32, .08), rgba(0, 0, 0, .4) 80%);
+  border: 1px solid rgba(232, 160, 32, .25);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-top: 4px;
+  position: relative;
+}
+
+.inspect-quote {
+  margin: 0 0 10px;
+  font-family: 'Cinzel', Georgia, serif;
+  font-style: italic;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #f7e7ce;
+  text-shadow: 0 0 10px rgba(0, 0, 0, .8);
+}
+
+.inspect-quote-mark {
+  color: var(--col-gold, #e8a020);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.inspect-citation {
+  text-align: right;
+  font-size: 11px;
+  color: var(--col-text-dim, #cbd5e1);
+}
+
+.inspect-author {
+  font-weight: 700;
+  color: var(--col-gold-bright, #ffd56b);
+}
+
+.inspect-work {
+  font-style: italic;
+  color: #f7e7ce;
+}
+
+.inspect-year {
+  color: var(--col-text-dim, #94a3b8);
+}
+
+.inspect-battlecry-quote {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(232, 160, 32, .2);
+  font-family: 'Cinzel', Georgia, serif;
+  font-style: italic;
+  font-size: 12px;
+  color: #ffd56b;
+}
+
+.inspect-quote-tag {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--col-gold, #e8a020);
+  margin-right: 4px;
+}
+
+.card-inspect-actions {
+  margin-top: 16px;
+}
 
 .settings-group {
   margin-bottom: 18px;

@@ -237,14 +237,15 @@ body::after {
 .hero-card {
   position: relative;
   width: 220px;
-  background: linear-gradient(175deg, var(--col-surface), var(--col-panel));
+  background: linear-gradient(175deg, #131c2a, #0b111c);
   border: 2px solid var(--col-border);
   border-radius: 20px;
-  padding: 30px 22px 24px;
+  padding: 24px 18px 22px;
   text-align: center;
   cursor: pointer;
   transition: transform .25s cubic-bezier(.175,.885,.32,1.275), box-shadow .25s ease, border-color .25s ease;
   overflow: hidden;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65);
 }
 
 .hero-card::before {
@@ -259,7 +260,7 @@ body::after {
 .hero-card:hover::before { opacity: 1; }
 
 .hero-card:hover {
-  transform: translateY(-16px) scale(1.04);
+  transform: translateY(-12px) scale(1.03);
   box-shadow: var(--shadow-hover);
 }
 .hero-card[data-class="Mage"]    { --hero-accent: var(--mage-col); }
@@ -267,6 +268,7 @@ body::after {
 .hero-card[data-class="Priest"]  { --hero-accent: var(--priest-col); }
 .hero-card[data-class="Rogue"]   { --hero-accent: var(--rogue-col); }
 .hero-card[data-class="Paladin"] { --hero-accent: var(--paladin-col); }
+.hero-card[data-class="Shaman"]  { --hero-accent: var(--shaman-col); }
 .hero-card:hover {
   border-color: var(--hero-accent, var(--col-border));
   box-shadow: 0 20px 60px rgba(0,0,0,.85), 0 0 30px color-mix(in srgb, var(--hero-accent, transparent) 35%, transparent);
@@ -283,6 +285,102 @@ body::after {
 .rogue-glow   { background: radial-gradient(circle, var(--rogue-col), transparent); }
 .paladin-glow { background: radial-gradient(circle, var(--paladin-col), transparent); }
 .shaman-glow  { background: radial-gradient(circle, var(--shaman-col), transparent); }
+
+/* ---- Premium Hero Portrait Showcase ---- */
+.hero-portrait-frame {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  border: 3px solid #d4af37;
+  box-shadow:
+    0 0 0 2px #3c2a08,
+    0 8px 24px rgba(0, 0, 0, 0.8),
+    inset 0 0 16px rgba(0, 0, 0, 0.6);
+  background: #080f1a;
+}
+
+.hero-portrait-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.hero-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 50%;
+  display: block;
+  transition: transform .35s cubic-bezier(.175,.885,.32,1.275), filter .35s ease;
+  filter: brightness(0.96) contrast(1.04);
+}
+
+.hero-card:hover .hero-card-img {
+  transform: scale(1.08);
+  filter: brightness(1.06) contrast(1.08);
+}
+
+.hero-portrait-frame:hover {
+  border-color: #fde047;
+  box-shadow:
+    0 0 0 2px #78350f,
+    0 0 20px rgba(253, 224, 71, 0.4),
+    0 8px 24px rgba(0, 0, 0, 0.8),
+    inset 0 0 16px rgba(0, 0, 0, 0.6);
+}
+
+/* Ornamental Crest Seal Badge */
+.hero-crest-badge {
+  position: absolute;
+  bottom: -6px;
+  right: -2px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #1e293b, #090d16);
+  border: 2px solid #d4af37;
+  box-shadow:
+    0 0 0 1px #3c2a08,
+    0 4px 10px rgba(0, 0, 0, 0.85),
+    0 0 10px rgba(212, 175, 55, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
+}
+
+.hero-card:hover .hero-crest-badge {
+  transform: scale(1.12);
+  border-color: #fde047;
+  box-shadow:
+    0 0 0 1px #78350f,
+    0 4px 12px rgba(0, 0, 0, 0.95),
+    0 0 16px rgba(253, 224, 71, 0.65);
+}
+
+.hero-crest-badge .hero-emblem {
+  font-size: 20px;
+  margin-bottom: 0;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.hero-crest-badge .hero-emblem .crest-svg {
+  width: 28px;
+  height: 28px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8));
+}
 
 .hero-emblem {
   font-size: 58px;
@@ -312,6 +410,18 @@ body::after {
   color: var(--col-text);
   margin-bottom: 16px;
   text-shadow: 0 2px 4px rgba(0,0,0,.5);
+}
+
+.hero-class-epithet {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--col-gold-bright, #ffd56b);
+  margin-top: -10px;
+  margin-bottom: 12px;
+  text-shadow: 0 0 8px rgba(232, 160, 32, .45);
 }
 
 .hero-power-badge {
@@ -588,6 +698,33 @@ body::after {
 .pool-remove-btn:hover {
   background: rgba(90, 16, 16, .95);
   border-color: #e07070;
+}
+
+.pool-inspect-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(232, 160, 32, .4);
+  background: rgba(14, 24, 38, .88);
+  color: #ffd56b;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all .15s ease;
+}
+
+.pool-inspect-btn:hover {
+  background: rgba(232, 160, 32, .25);
+  border-color: var(--col-gold-bright, #ffd56b);
+  transform: scale(1.12);
 }
 
 .deck-controls-meta {
@@ -1340,6 +1477,7 @@ body::after {
 .log-draw { color: #f8e090; border-left-color: var(--col-gold); }
 .log-block{ color: #f0c090; border-left-color: #e67e22; }
 .log-system{ color: var(--col-text-dim); font-style: italic; border-left-color: transparent; }
+.log-lore  { color: #f7e7ce !important; font-style: italic; background: rgba(232, 160, 32, .08); border-left: 2px solid var(--col-gold, #e8a020) !important; font-family: 'Cinzel', Georgia, serif; }
 
 /* ---- Hero panel ---- */
 .hero-panel {
@@ -1499,6 +1637,13 @@ body::after {
   white-space: nowrap;
   box-shadow: 0 2px 6px rgba(0,0,0,.5);
   z-index: 5;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.weapon-badge:hover {
+  transform: scale(1.18);
+  box-shadow: 0 0 10px rgba(255, 208, 128, 0.65);
+  border-color: #ffe090;
 }
 
 /* Mana bar */
@@ -2035,7 +2180,7 @@ body::after {
 .card-tooltip {
   position: fixed;
   z-index: 1000;
-  width: 190px;
+  width: min(230px, 88vw);
   background: linear-gradient(175deg, #0c1826, #101e2e);
   border: 2px solid var(--col-gold);
   border-radius: 14px;
@@ -2059,6 +2204,34 @@ body::after {
   letter-spacing: .12em;
   margin-bottom: 6px;
   text-shadow: 0 0 8px rgba(232,160,32,.5);
+}
+.tooltip-lore {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(232, 160, 32, .3);
+  font-style: italic;
+  line-height: 1.45;
+}
+.tooltip-lore-quote {
+  color: #f7e7ce;
+  font-size: 10.5px;
+  margin-bottom: 3px;
+  font-family: 'Cinzel', Georgia, serif;
+}
+.tooltip-lore-source {
+  color: var(--col-gold, #e8a020);
+  font-size: 9.5px;
+  font-weight: 600;
+  text-align: right;
+  letter-spacing: .02em;
+}
+.tooltip-inspect-hint {
+  margin-top: 6px;
+  font-size: 9px;
+  color: var(--col-text-dim, #8899aa);
+  text-align: center;
+  letter-spacing: .03em;
+  opacity: .75;
 }
 
 /* ---- Legendary card styling ---- */
@@ -2309,6 +2482,21 @@ body::after {
   line-height: 1.4;
 }
 
+.winner-epilogue {
+  margin: 10px auto 18px;
+  padding: 10px 16px;
+  font-family: 'Cinzel', Georgia, serif;
+  font-style: italic;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #f7e7ce;
+  background: rgba(0, 0, 0, .45);
+  border-radius: 8px;
+  border: 1px dashed rgba(232, 160, 32, .35);
+  max-width: 440px;
+  text-shadow: 0 0 10px rgba(0, 0, 0, .8);
+}
+
 #btn-hub-resume {
   background: linear-gradient(160deg, #0e2848, #1a4880);
   border-color: var(--col-mana-bright);
@@ -2452,6 +2640,26 @@ body::after {
   max-width: min(92vw, 560px);
   text-align: center;
   line-height: 1.25;
+}
+
+.turn-banner-chapter {
+  display: block;
+  font-family: 'Cinzel', serif;
+  font-size: clamp(12px, 1.8vw, 18px);
+  font-weight: 600;
+  letter-spacing: .32em;
+  opacity: .92;
+  margin-bottom: 4px;
+  color: #ffe080;
+  text-shadow: 0 0 12px rgba(255, 224, 128, .55);
+}
+
+.turn-banner-label {
+  display: block;
+  font-family: 'Cinzel', serif;
+  font-size: clamp(20px, 3.2vw, 36px);
+  font-weight: 900;
+  letter-spacing: .16em;
 }
 
 .turn-banner.active {
@@ -2909,4 +3117,442 @@ body::after {
   justify-content: center;
   gap: 16px;
 }
+
+/* ============================================================
+   PREMIUM TCG: COMBAT TARGETING ARROW
+   ============================================================ */
+.targeting-layer {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 600;
+  overflow: visible;
+}
+
+.targeting-arrow-glow {
+  fill: none;
+  stroke: rgba(239, 68, 68, 0.4);
+  stroke-width: 16px;
+  stroke-linecap: round;
+  filter: url(#arrowGlow);
+}
+
+.targeting-arrow-main {
+  fill: none;
+  stroke: url(#arrowGradOffense);
+  stroke-width: 6px;
+  stroke-linecap: round;
+  stroke-dasharray: 12 6;
+  animation: arrowDashFlow 0.8s linear infinite;
+}
+
+.targeting-layer.support .targeting-arrow-glow {
+  stroke: rgba(16, 185, 129, 0.4);
+}
+
+.targeting-layer.support .targeting-arrow-main {
+  stroke: url(#arrowGradSupport);
+}
+
+@keyframes arrowDashFlow {
+  from { stroke-dashoffset: 36; }
+  to   { stroke-dashoffset: 0; }
+}
+
+.targeting-arrow-head {
+  fill: #fde047;
+  stroke: #b45309;
+  stroke-width: 2px;
+  filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.9));
+  transform-origin: center;
+  transition: transform 0.05s ease;
+}
+
+.targeting-layer.support .targeting-arrow-head {
+  fill: #67e8f9;
+  stroke: #0369a1;
+  filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.9));
+}
+
+/* Targeting Reticle Bullseye */
+.targeting-reticle {
+  pointer-events: none;
+  transition: transform 0.1s ease-out;
+}
+
+.reticle-outer {
+  fill: none;
+  stroke: #ef4444;
+  stroke-width: 2.5px;
+  stroke-dasharray: 8 4;
+  animation: reticleSpin 4s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.8));
+}
+
+.reticle-inner {
+  fill: rgba(239, 68, 68, 0.15);
+  stroke: #f59e0b;
+  stroke-width: 1.5px;
+  animation: reticlePulse 1.2s ease-in-out infinite alternate;
+}
+
+.reticle-line {
+  stroke: #fde047;
+  stroke-width: 2px;
+  stroke-linecap: round;
+}
+
+.targeting-layer.support .reticle-outer {
+  stroke: #10b981;
+  filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.8));
+}
+.targeting-layer.support .reticle-inner {
+  fill: rgba(16, 185, 129, 0.15);
+  stroke: #38bdf8;
+}
+.targeting-layer.support .reticle-line {
+  stroke: #bae6fd;
+}
+
+@keyframes reticleSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes reticlePulse {
+  from { r: 18px; opacity: 0.6; }
+  to   { r: 24px; opacity: 1; }
+}
+
+/* ============================================================
+   PREMIUM TCG: SCREEN SHAKE & COMBAT IMPACT
+   ============================================================ */
+#screen-game.shake-light {
+  animation: screenShakeLight 0.22s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+#screen-game.shake-medium {
+  animation: screenShakeMedium 0.32s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+#screen-game.shake-heavy {
+  animation: screenShakeHeavy 0.45s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes screenShakeLight {
+  10%, 90% { transform: translate3d(-1px, 1px, 0); }
+  20%, 80% { transform: translate3d(2px, -1px, 0); }
+  30%, 50%, 70% { transform: translate3d(-2px, 2px, 0); }
+  40%, 60% { transform: translate3d(2px, -1px, 0); }
+}
+
+@keyframes screenShakeMedium {
+  10%, 90% { transform: translate3d(-3px, 2px, 0) rotate(-0.3deg); }
+  20%, 80% { transform: translate3d(4px, -3px, 0) rotate(0.4deg); }
+  30%, 50%, 70% { transform: translate3d(-5px, 4px, 0) rotate(-0.5deg); }
+  40%, 60% { transform: translate3d(4px, -3px, 0) rotate(0.3deg); }
+}
+
+@keyframes screenShakeHeavy {
+  0% { transform: scale(1.02); }
+  10%, 90% { transform: translate3d(-6px, 4px, 0) rotate(-0.8deg); }
+  20%, 80% { transform: translate3d(7px, -6px, 0) rotate(0.9deg); }
+  30%, 50%, 70% { transform: translate3d(-8px, 6px, 0) rotate(-1deg); }
+  40%, 60% { transform: translate3d(8px, -5px, 0) rotate(0.8deg); }
+  100% { transform: scale(1); }
+}
+
+/* Combat slash mark overlay */
+.combat-slash-fx {
+  position: absolute;
+  width: 90px;
+  height: 90px;
+  pointer-events: none;
+  z-index: 550;
+  transform: translate(-50%, -50%);
+}
+
+.combat-slash-fx::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, #ffffff 40%, #ff4d4d 60%, transparent);
+  box-shadow: 0 0 12px #ff4d4d, 0 0 20px #ffaa00;
+  transform: translateY(-50%) rotate(var(--slash-angle, -35deg)) scaleX(0);
+  animation: slashStrike 0.35s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+}
+
+@keyframes slashStrike {
+  0%   { transform: translateY(-50%) rotate(var(--slash-angle, -35deg)) scaleX(0.1); opacity: 1; }
+  50%  { transform: translateY(-50%) rotate(var(--slash-angle, -35deg)) scaleX(1.3); opacity: 1; }
+  100% { transform: translateY(-50%) rotate(var(--slash-angle, -35deg)) scaleX(1.5); opacity: 0; }
+}
+
+/* ============================================================
+   PREMIUM TCG: HERO EMOTES & SPEECH BUBBLES
+   ============================================================ */
+.hero-emote-toggle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1.5px solid var(--col-gold);
+  color: var(--col-gold);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  transition: transform 0.15s ease, background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.hero-emote-toggle:hover {
+  transform: scale(1.18);
+  background: var(--col-panel);
+  border-color: #fde047;
+  box-shadow: 0 0 12px rgba(253, 224, 71, 0.5);
+}
+
+.emote-menu {
+  position: absolute;
+  bottom: 120px;
+  left: 20px;
+  z-index: 650;
+  background: linear-gradient(165deg, rgba(20, 29, 44, 0.96), rgba(10, 16, 26, 0.98));
+  border: 1.5px solid var(--col-gold);
+  border-radius: 14px;
+  padding: 8px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85), 0 0 18px rgba(212, 175, 55, 0.35);
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 150px;
+  animation: emoteMenuPop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes emoteMenuPop {
+  from { opacity: 0; transform: scale(0.85) translateY(10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.emote-opt {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-family: 'Cinzel', serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--col-text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.emote-opt:hover {
+  background: rgba(212, 175, 55, 0.15);
+  border-color: rgba(212, 175, 55, 0.4);
+  color: #fff;
+  transform: translateX(4px);
+}
+
+/* Speech bubbles */
+.hero-speech-bubble {
+  position: absolute;
+  z-index: 620;
+  max-width: 270px;
+  background: #fdfaf3;
+  color: #1a1610;
+  border: 2px solid #b89758;
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-family: 'Crimson Pro', serif;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75), 0 0 14px rgba(212, 175, 55, 0.3);
+  pointer-events: none;
+  animation: bubblePop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes bubblePop {
+  0%   { opacity: 0; transform: scale(0.7) translateY(8px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.hero-speech-bubble::before {
+  content: '';
+  position: absolute;
+  width: 0; height: 0;
+  border: 10px solid transparent;
+}
+
+.hero-speech-bubble--player {
+  bottom: 115px;
+  left: 105px;
+}
+.hero-speech-bubble--player::before {
+  bottom: -18px;
+  left: 20px;
+  border-top-color: #b89758;
+}
+
+.hero-speech-bubble--opp {
+  top: 95px;
+  left: 105px;
+}
+.hero-speech-bubble--opp::before {
+  top: -18px;
+  left: 20px;
+  border-bottom-color: #b89758;
+}
+
+/* ============================================================
+   PREMIUM TCG: HOLOGRAPHIC FOIL & READY MINION PULSE
+   ============================================================ */
+.hand-card.legendary {
+  border-color: #ffd700;
+  box-shadow: 0 4px 14px rgba(255, 215, 0, 0.35);
+}
+
+.hand-card.legendary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    130deg,
+    transparent 20%,
+    rgba(255, 0, 128, 0.15) 35%,
+    rgba(0, 255, 255, 0.2) 50%,
+    rgba(255, 255, 0, 0.15) 65%,
+    transparent 80%
+  );
+  background-size: 200% 200%;
+  pointer-events: none;
+  mix-blend-mode: color-dodge;
+  animation: holofoilSweep 4s ease-in-out infinite alternate;
+}
+
+@keyframes holofoilSweep {
+  0%   { background-position: 0% 0%; opacity: 0.4; }
+  50%  { opacity: 0.85; }
+  100% { background-position: 100% 100%; opacity: 0.4; }
+}
+
+.pool-card--legendary {
+  position: relative;
+}
+
+.pool-card--legendary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    130deg,
+    transparent 20%,
+    rgba(255, 0, 128, 0.12) 35%,
+    rgba(0, 255, 255, 0.16) 50%,
+    rgba(255, 255, 0, 0.12) 65%,
+    transparent 80%
+  );
+  background-size: 200% 200%;
+  pointer-events: none;
+  mix-blend-mode: color-dodge;
+  animation: holofoilSweep 4s ease-in-out infinite alternate;
+  z-index: 4;
+}
+
+.pool-card--legendary:hover:not(.pool-card--full)::after {
+  opacity: 1;
+}
+
+.minion-card.legendary {
+  border-color: #ffd700;
+  box-shadow: 0 0 14px rgba(255, 215, 0, 0.4);
+}
+
+.minion-card.legendary::before {
+  content: '★';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #ffd700;
+  font-size: 14px;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.9), 0 0 10px #ffd700;
+  z-index: 5;
+}
+
+/* Ready-to-attack living pulse */
+.minion-card.can-attack {
+  border-color: #00b894;
+  box-shadow: 0 0 12px rgba(0, 184, 148, 0.55);
+  animation: readyPulse 2s ease-in-out infinite;
+}
+
+@keyframes readyPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(0, 184, 148, 0.5); }
+  50%      { box-shadow: 0 0 20px rgba(0, 184, 148, 0.85), inset 0 0 8px rgba(0, 184, 148, 0.3); }
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 600px) {
+  .hero-card {
+    width: 156px;
+    padding: 16px 12px 14px;
+  }
+  .hero-portrait-frame {
+    width: 110px;
+    height: 110px;
+    margin-bottom: 12px;
+  }
+  .hero-crest-badge {
+    width: 36px;
+    height: 36px;
+  }
+  .hero-crest-badge .hero-emblem .crest-svg {
+    width: 22px;
+    height: 22px;
+  }
+  .hero-card h2 {
+    font-size: 18px;
+    margin-bottom: 8px;
+  }
+  .hero-power-badge {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+  .badge-cost {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+  .hero-speech-bubble {
+    max-width: 200px;
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+  .hero-speech-bubble--player {
+    bottom: 85px;
+    left: 75px;
+  }
+  .hero-speech-bubble--opp {
+    top: 75px;
+    left: 75px;
+  }
+  .emote-menu {
+    left: 8px;
+    bottom: 90px;
+    min-width: 130px;
+  }
+}
+
 

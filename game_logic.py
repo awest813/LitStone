@@ -5,6 +5,7 @@ so log entries render safely in any environment.
 """
 
 import random
+from card_lore import get_card_lore
 
 # ---------------------------------------------------------------------------
 # 1. CARD DATABASE & CONFIGURATION
@@ -59,7 +60,7 @@ CARD_DB = {
     "Frankenstein's Monster": {"type": "minion", "cost": 6, "atk": 6, "hp": 6, "taunt": True,
                                "deathrattle": {"effect": "dmg_hero", "val": 3},
                                "legendary": True, "icon": "FM"},
-    "Alice": {"type": "minion", "cost": 3, "atk": 3, "hp": 4,
+    "Alice": {"type": "minion", "cost": 3, "atk": 3, "hp": 3,
               "battlecry": {"effect": "draw_cards", "val": 1},
               "legendary": True, "icon": "AL"},
     "The Mad Hatter": {"type": "minion", "cost": 6, "atk": 4, "hp": 5,
@@ -97,7 +98,7 @@ CARD_DB = {
     "Merlin": {"type": "minion", "cost": 6, "atk": 4, "hp": 7,
                "battlecry": {"effect": "heal_hero", "val": 6},
                "legendary": True, "icon": "ME"},
-    "Lancelot": {"type": "minion", "cost": 5, "atk": 5, "hp": 3, "charge": True,
+    "Lancelot": {"type": "minion", "cost": 5, "atk": 4, "hp": 3, "charge": True,
                  "legendary": True, "icon": "LT"},
     "Guinevere": {"type": "minion", "cost": 4, "atk": 3, "hp": 6, "divine_shield": True,
                   "legendary": True, "icon": "GV"},
@@ -160,7 +161,7 @@ CARD_DB = {
     # ---------- Warrior class cards ----------
     "Bulwark Bearer":      {"type": "minion", "cost": 2, "atk": 1, "hp": 4, "taunt": True,
                             "classes": ["Warrior"], "icon": "BK"},
-    "Shieldwall Sergeant": {"type": "minion", "cost": 3, "atk": 2, "hp": 4, "taunt": True,
+    "Shieldwall Sergeant": {"type": "minion", "cost": 3, "atk": 2, "hp": 3, "taunt": True,
                             "divine_shield": True, "classes": ["Warrior"], "icon": "WG"},
     "Rampart Raider":      {"type": "minion", "cost": 3, "atk": 4, "hp": 3, "classes": ["Warrior"], "icon": "RR"},
     "Berserker's Ballad":  {"type": "minion", "cost": 4, "atk": 5, "hp": 4, "charge": True,
@@ -168,7 +169,7 @@ CARD_DB = {
     "Ironclad Anvil":      {"type": "weapon", "cost": 3, "atk": 3, "durability": 2, "classes": ["Warrior"], "icon": "IA"},
     "War Drums":           {"type": "spell", "cost": 3, "effect": "buff_all", "val": [1, 1],
                             "classes": ["Warrior"], "icon": "WD"},
-    "Cleave Chronicle":    {"type": "spell", "cost": 3, "effect": "damage_all", "val": 1, "classes": ["Warrior"], "icon": "CV"},
+    "Cleave Chronicle":    {"type": "spell", "cost": 3, "effect": "damage_all", "val": 2, "classes": ["Warrior"], "icon": "CV"},
     "Fortify":             {"type": "spell", "cost": 2, "effect": "heal", "val": 5, "classes": ["Warrior"], "icon": "FY"},
 
     # ---------- Priest class cards ----------
@@ -190,10 +191,10 @@ CARD_DB = {
     "Shadowstep Scout":   {"type": "minion", "cost": 2, "atk": 3, "hp": 2, "classes": ["Rogue"], "icon": "SC"},
     "Venomous Valet":     {"type": "minion", "cost": 4, "atk": 3, "hp": 3, "poisonous": True,
                           "classes": ["Rogue"], "icon": "VV"},
-    "Thief's Shiv":       {"type": "weapon", "cost": 1, "atk": 1, "durability": 2, "classes": ["Rogue"], "icon": "TV"},
+    "Thief's Shiv":       {"type": "weapon", "cost": 1, "atk": 1, "durability": 3, "classes": ["Rogue"], "icon": "TV"},
     "Assassin's Rapier":  {"type": "weapon", "cost": 5, "atk": 3, "durability": 4, "classes": ["Rogue"], "icon": "AR"},
     "Cheap Shot":         {"type": "spell", "cost": 2, "effect": "damage", "val": 2, "classes": ["Rogue"], "icon": "KT"},
-    "Shiv Storm":         {"type": "spell", "cost": 2, "effect": "damage_all", "val": 1, "classes": ["Rogue"], "icon": "SV"},
+    "Shiv Storm":         {"type": "spell", "cost": 1, "effect": "damage_all", "val": 1, "classes": ["Rogue"], "icon": "SV"},
     "Heist Ledger":       {"type": "spell", "cost": 4, "effect": "draw", "val": 3, "classes": ["Rogue"], "icon": "HL"},
 
     # ---------- Paladin class cards ----------
@@ -217,12 +218,24 @@ CARD_DB = {
     "Stormhammer Saga":   {"type": "weapon", "cost": 2, "atk": 2, "durability": 3, "classes": ["Shaman"], "icon": "HM"},
     "Lightning Limerick": {"type": "spell", "cost": 1, "effect": "damage", "val": 3, "classes": ["Shaman"], "icon": "LL"},
     "Maelstrom Verse":    {"type": "spell", "cost": 3, "effect": "damage_all", "val": 2, "classes": ["Shaman"], "icon": "MV"},
-    "Hex of Baba":        {"type": "spell", "cost": 3, "effect": "silence", "val": 0, "classes": ["Shaman"], "icon": "HX"},
+    "Hex of Baba":        {"type": "spell", "cost": 2, "effect": "silence", "val": 0, "classes": ["Shaman"], "icon": "HX"},
     "Ancestral Memory":   {"type": "spell", "cost": 2, "effect": "draw", "val": 2, "classes": ["Shaman"], "icon": "AN"},
 
-    # ---------- Uncollectible ----------
-    COIN_CARD: {"type": "spell", "cost": 0, "effect": "coin", "val": 1,
-                "icon": "CN", "uncollectible": True},
+    # ---------- Uncollectible / Hero Power Tokens ----------
+    COIN_CARD:             {"type": "spell", "cost": 0, "effect": "coin", "val": 1,
+                            "icon": "CN", "uncollectible": True},
+    "Silver Hand Recruit": {"type": "minion", "cost": 0, "atk": 1, "hp": 1,
+                            "classes": ["Paladin"], "icon": "SR", "uncollectible": True},
+    "Wicked Dagger":       {"type": "weapon", "cost": 1, "atk": 1, "durability": 2,
+                            "classes": ["Rogue"], "icon": "DG", "uncollectible": True},
+    "Searing Totem":       {"type": "minion", "cost": 0, "atk": 1, "hp": 1,
+                            "classes": ["Shaman"], "icon": "ST", "uncollectible": True},
+    "Healing Totem":       {"type": "minion", "cost": 0, "atk": 0, "hp": 2,
+                            "classes": ["Shaman"], "icon": "HE", "uncollectible": True},
+    "Stonefang Totem":     {"type": "minion", "cost": 0, "atk": 0, "hp": 2, "taunt": True,
+                            "classes": ["Shaman"], "icon": "SF", "uncollectible": True},
+    "Wrath of Air Totem":  {"type": "minion", "cost": 0, "atk": 0, "hp": 2,
+                            "classes": ["Shaman"], "icon": "WA", "uncollectible": True},
 }
 
 HERO_CLASSES = ["Mage", "Warrior", "Priest", "Rogue", "Paladin", "Shaman"]
@@ -256,6 +269,13 @@ def cards_for_class(hero_class: str) -> list[str]:
 
 
 AI_DIFFICULTIES = ("easy", "normal", "hard")
+AI_PERSONALITIES = ("balanced", "aggro", "control", "midrange", "ramp", "gambler", "value")
+
+
+def normalize_personality(personality: str | None) -> str:
+    p = (personality or "balanced").lower()
+    return p if p in AI_PERSONALITIES else "balanced"
+
 
 # Target copies per mana bucket for AI deck curves (sums to DECK_SIZE).
 CURVE_TARGETS = {1: 4, 2: 8, 3: 8, 4: 6, 5: 3, 6: 1}
@@ -264,44 +284,68 @@ CAMPAIGN_NODES = [
     {
         "id": "n1",
         "name": "Street Urchin",
+        "volume": "Volume I",
+        "chapter_title": "Shadows of Whitechapel",
         "subtitle": "A quick-fingered Rogue tests your opener.",
+        "epigraph": "“Every street corner holds a tale of ambition and survival.”",
         "difficulty": "easy",
         "ai_class": "Rogue",
+        "ai_personality": "aggro",
     },
     {
         "id": "n2",
         "name": "Town Guard",
+        "volume": "Volume II",
+        "chapter_title": "The Citadel Gate",
         "subtitle": "Taunts and shields slow your assault.",
+        "epigraph": "“None shall breach the iron portcullis without the warden's seal.”",
         "difficulty": "normal",
         "ai_class": "Warrior",
+        "ai_personality": "control",
     },
     {
         "id": "n3",
         "name": "Guild Librarian",
+        "volume": "Volume III",
+        "chapter_title": "The Grand Scriptorium",
         "subtitle": "Arcane tricks and burn spells.",
+        "epigraph": "“Between leather-bound tomes, arcane knowledge awaits the worthy.”",
         "difficulty": "normal",
         "ai_class": "Mage",
+        "ai_personality": "midrange",
     },
     {
         "id": "n4",
         "name": "Victor Frankenstein",
+        "volume": "Volume IV",
+        "chapter_title": "The Modern Prometheus",
         "subtitle": "Mad science — monsters, heals, and stubborn taunts.",
+        "epigraph": "“Life and death appeared to me ideal bounds, which I should first break through.” — Mary Shelley",
         "difficulty": "hard",
         "boss_id": "frankenstein",
+        "ai_personality": "control",
     },
     {
         "id": "n5",
         "name": "Van Helsing",
+        "volume": "Volume V",
+        "chapter_title": "The Castle in the Carpathians",
         "subtitle": "Elite hunter — charges and armor.",
+        "epigraph": "“There are darknesses in life and there are lights, and you are one of the lights.” — Bram Stoker",
         "difficulty": "hard",
         "boss_id": "van_helsing",
+        "ai_personality": "midrange",
     },
     {
         "id": "n6",
         "name": "Professor Moriarty",
+        "volume": "Volume VI",
+        "chapter_title": "The Final Problem",
         "subtitle": "Final boss — poison, daggers, and schemes.",
+        "epigraph": "“He is the Napoleon of crime, Watson. The organizer of half that is evil.” — Arthur Conan Doyle",
         "difficulty": "hard",
         "boss_id": "moriarty",
+        "ai_personality": "control",
     },
 ]
 
@@ -327,7 +371,7 @@ BOSS_PRESETS = {
     "van_helsing": {
         "display_name": "Van Helsing",
         "hero_class": "Warrior",
-        "hp": 35,
+        "hp": 32,
         "core": [
             "Van Helsing", "Gawain", "Gawain", "Lancelot", "Lancelot",
             "Errant Knight", "Errant Knight", "Castle Guard", "Castle Guard",
@@ -335,19 +379,19 @@ BOSS_PRESETS = {
             "Shieldwall Sergeant", "Shieldwall Sergeant", "Rampart Raider", "Rampart Raider",
             "Cleave Chronicle", "Cleave Chronicle", "Fortify", "Fortify",
             "War Drums", "Ironclad Anvil", "Bulwark Bearer", "Rampart Raider",
-            "Castle Guard", "Errant Knight", "Gawain", "Lancelot", "Fortify", "Cleave Chronicle",
+            "Castle Guard", "Errant Knight", "Berserker's Ballad", "Shieldwall Sergeant", "Fortify", "Cleave Chronicle",
         ],
     },
     "moriarty": {
         "display_name": "Professor Moriarty",
         "hero_class": "Rogue",
-        "hp": 32,
+        "hp": 34,
         "core": [
             "Professor Moriarty", "Back Alley Burglar", "Back Alley Burglar",
             "Shadowstep Scout", "Shadowstep Scout", "Venomous Valet", "Venomous Valet",
             "Sherlock Holmes", "Cheap Shot", "Cheap Shot", "Shiv Storm", "Shiv Storm",
             "Thief's Shiv", "Thief's Shiv", "Assassin's Rapier", "Heist Ledger", "Heist Ledger",
-            "Cave Spider", "Cave Spider", "Rebel's Ambush", "Quill Bolt", "Quill Bolt",
+            "Cave Spider", "Cave Spider", "Nevermore", "Nevermore", "Quill Bolt",
             "Back Alley Burglar", "Shadowstep Scout", "Cheap Shot", "Shiv Storm",
             "Venomous Valet", "Heist Ledger", "Thief's Shiv", "Rebel's Ambush",
         ],
@@ -380,9 +424,14 @@ def complete_deck_from_core(hero_class: str, core: list[str]) -> list[str]:
     return deck[:DECK_SIZE]
 
 
-def build_curved_ai_deck(hero_class: str) -> list[str]:
-    """Build a 30-card deck with a playable mana curve for the AI."""
-    pool = [n for n in cards_for_class(hero_class) if not CARD_DB[n].get("legendary")]
+def build_curved_ai_deck(hero_class: str, max_legendaries: int = 2) -> list[str]:
+    """Build a 30-card deck with a playable mana curve for the AI, with optional legendaries."""
+    all_class_cards = cards_for_class(hero_class)
+    non_legendaries = [n for n in all_class_cards if not CARD_DB[n].get("legendary")]
+    legendaries = [n for n in all_class_cards if CARD_DB[n].get("legendary")]
+    random.shuffle(legendaries)
+    selected_legendaries = legendaries[:max_legendaries]
+    pool = non_legendaries + selected_legendaries
     by_cost: dict[int, list[str]] = {}
     for name in pool:
         cost = max(1, min(CARD_DB[name]["cost"], 6))
@@ -465,12 +514,14 @@ def select_ai_move(
     p2: dict,
     p1: dict,
     difficulty: str = "normal",
+    personality: str = "balanced",
 ) -> tuple | None:
-    """Pick a move for the AI based on difficulty tier."""
+    """Pick a move for the AI based on difficulty tier and playstyle personality."""
     if not legal:
         return None
 
-    scored = [(evaluate_ai_move(p2, p1, mv), mv) for mv in legal]
+    personality = normalize_personality(personality)
+    scored = [(evaluate_ai_move(p2, p1, mv, personality=personality), mv) for mv in legal]
     scored.sort(key=lambda pair: -pair[0])
 
     if difficulty == "easy":
@@ -485,7 +536,7 @@ def select_ai_move(
 
     if difficulty == "hard":
         contenders = [mv for score, mv in scored if score >= best_score - 1.5]
-        return max(contenders, key=lambda mv: evaluate_ai_move(p2, p1, mv))
+        return max(contenders, key=lambda mv: evaluate_ai_move(p2, p1, mv, personality=personality))
 
     # normal — slight variety among near-best lines
     contenders = [mv for score, mv in scored if score >= best_score - 0.75]
@@ -537,9 +588,10 @@ def get_deathrattle_desc(deathrattle: dict | None) -> str:
     return ""
 
 
-def enrich_card(card: dict) -> dict:
-    """Attach display text for API / client consumption."""
+def enrich_card(card: dict, name: str | None = None) -> dict:
+    """Attach display text and literary lore for API / client consumption."""
     enriched = dict(card)
+    card_name = name or card.get("name")
     if card.get("type") == "spell":
         enriched["desc_short"] = get_spell_desc(card, short=True)
         enriched["desc_long"] = get_spell_desc(card, short=False)
@@ -549,14 +601,26 @@ def enrich_card(card: dict) -> dict:
     dr = card.get("deathrattle")
     if dr:
         enriched["deathrattle_text"] = get_deathrattle_desc(dr)
+    if card_name:
+        lore = get_card_lore(card_name)
+        if lore:
+            enriched.update(lore)
     return enriched
 
 
 def collectible_card_db() -> dict[str, dict]:
     return {
-        name: enrich_card(card)
+        name: enrich_card(card, name)
         for name, card in CARD_DB.items()
         if not card.get("uncollectible")
+    }
+
+
+def full_card_db() -> dict[str, dict]:
+    """Return all cards and tokens enriched with text and lore."""
+    return {
+        name: enrich_card(card, name)
+        for name, card in CARD_DB.items()
     }
 
 
@@ -843,7 +907,14 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             minion["max_hp"]     = card["hp"]
             minion["can_attack"] = card.get("charge", False)
             minion["turns_on_board"] = 0
+            lore = get_card_lore(card_name)
+            if lore:
+                minion.update(lore)
             player["board"].append(minion)
+            if card.get("legendary") and lore.get("battlecry_quote"):
+                log_action(f'   “{lore["battlecry_quote"]}”')
+            elif card.get("legendary") and lore.get("lore_quote"):
+                log_action(f'   “{lore["lore_quote"]}”')
             if "battlecry" in card:
                 bc = card["battlecry"]
                 if bc["effect"] == "heal_hero":
@@ -1076,7 +1147,11 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
 
         elif cls == "Rogue":
             # Dagger Mastery: equip (or refresh) a 1/2 Wicked Dagger
-            player["weapon"] = {"name": "Wicked Dagger", "atk": 1, "durability": 2}
+            dagger = {"name": "Wicked Dagger", "atk": 1, "durability": 2}
+            lore = get_card_lore("Wicked Dagger")
+            if lore:
+                dagger.update(lore)
+            player["weapon"] = dagger
             if not player.get("hero_attacked_this_turn"):
                 player["hero_can_attack"] = True
             log_action(f">> {player['name']} uses Dagger Mastery! Equipped a 1/2 Wicked Dagger.")
@@ -1084,18 +1159,18 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
 
         elif cls == "Paladin":
             # Reinforce: summon a 1/1 Silver Hand Recruit
-            recruit = {
+            recruit = enrich_card({
                 "name": "Silver Hand Recruit", "type": "minion", "cost": 0,
                 "atk": 1, "hp": 1, "max_hp": 1, "can_attack": False,
-                "turns_on_board": 0, "icon": "SR",
-            }
+                "turns_on_board": 0, "icon": "SR", "classes": ["Paladin"],
+            }, "Silver Hand Recruit")
             player["board"].append(recruit)
             log_action(f">> {player['name']} uses Reinforce! Summons a 1/1 Silver Hand Recruit.")
             notify("armor", player, "hero", 0)
 
         elif cls == "Shaman":
             totem_tpl = random.choice(SHAMAN_TOTEMS)
-            totem = dict(totem_tpl)
+            totem = enrich_card(dict(totem_tpl), totem_tpl["name"])
             totem["max_hp"] = totem["hp"]
             totem["can_attack"] = False
             totem["turns_on_board"] = 0
@@ -1147,6 +1222,40 @@ def _hero_missing_hp(player: dict) -> int:
     return max(0, cap - player["hp"])
 
 
+def check_immediate_lethal(p_active: dict, p_opp: dict) -> tuple[bool, int]:
+    """Calculate maximum guaranteed face damage achievable this turn.
+    Returns (has_lethal, total_face_dmg)."""
+    opp_eff_hp = p_opp.get("hp", 0) + p_opp.get("armor", 0)
+    has_taunt = any(m.get("taunt") for m in p_opp.get("board", []))
+
+    total_dmg = 0
+    if not has_taunt:
+        for m in p_active.get("board", []):
+            if m.get("can_attack"):
+                total_dmg += m.get("atk", 0)
+        if p_active.get("hero_can_attack") and p_active.get("weapon"):
+            total_dmg += p_active["weapon"].get("atk", 0)
+
+    current_mana = p_active.get("mana", 0)
+    hand_spells = []
+    for name in p_active.get("hand", []):
+        c = CARD_DB.get(name, {})
+        if c.get("type") == "spell" and c.get("effect") == "damage":
+            hand_spells.append((c.get("cost", 0), c.get("val", 0)))
+
+    hand_spells.sort(key=lambda s: s[1] / max(1, s[0]), reverse=True)
+    mana_left = current_mana
+    for cost, dmg in hand_spells:
+        if cost <= mana_left:
+            mana_left -= cost
+            total_dmg += dmg
+
+    if not p_active.get("hero_power_used") and mana_left >= 2 and p_active.get("hero_class") == "Mage":
+        total_dmg += 1
+
+    return (total_dmg >= opp_eff_hp, total_dmg)
+
+
 def _ai_should_pass_turn(legal: list, move: tuple, score: float, p2: dict, p1: dict) -> bool:
     """Stop the AI turn when the chosen move is a wasteful hero power."""
     del legal, p2, p1  # signature kept for future lookahead
@@ -1155,12 +1264,27 @@ def _ai_should_pass_turn(legal: list, move: tuple, score: float, p2: dict, p1: d
     return False
 
 
-def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
+def evaluate_ai_move(p2: dict, p1: dict, move: tuple, personality: str = "balanced") -> float:
     action, idx, target = move
     score = 0.0
 
     p1_eff_hp = p1["hp"] + p1.get("armor", 0)
     p2_eff_hp = p2["hp"] + p2.get("armor", 0)
+    personality = normalize_personality(personality)
+
+    # Combined Lethal Solver: prioritize lethal attacks to end the game immediately
+    has_lethal, _ = check_immediate_lethal(p2, p1)
+    if has_lethal:
+        if action == "attack" and target == "hero":
+            return 1000.0 + p2["board"][idx]["atk"]
+        if action == "hero_attack" and target == "hero":
+            return 1000.0 + (p2["weapon"]["atk"] if p2.get("weapon") else 1)
+        if action == "play":
+            card = CARD_DB[p2["hand"][idx]]
+            if card.get("type") == "spell" and card.get("effect") == "damage" and target == "hero":
+                return 1000.0 + card["val"]
+        if action == "hero_power" and p2.get("hero_class") == "Mage" and target == "hero":
+            return 1000.0
 
     if action == "play":
         card_name = p2["hand"][idx]
@@ -1170,14 +1294,23 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
         if card["type"] == "minion":
             score += 3
             if card.get("poisonous"): score += 2
-            if card.get("charge"):    score += 2
+            if card.get("charge"):
+                score += (5 if personality == "aggro" else 2)
+            if card.get("taunt"):
+                score += (4 if personality in ("control", "ramp") else 0)
+            if card.get("cost", 0) >= 5 and personality == "ramp":
+                score += 6
+            if personality == "aggro":
+                score += card.get("atk", 0)
             if "battlecry" in card:
                 bc = card["battlecry"]
                 if bc["effect"] == "heal_hero" and p2["hp"] < 25:
+                    score += (6 if personality == "control" else 3)
+                elif bc["effect"] == "draw_cards" and personality == "value":
                     score += 3
 
         elif card["type"] == "weapon":
-            score += card["atk"] * 2 if not p2["weapon"] else -4
+            score += card["atk"] * (3 if personality == "aggro" else 2) if not p2["weapon"] else -4
 
         elif card["type"] == "spell":
             if card["effect"] == "damage":
@@ -1188,15 +1321,21 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
                     else:                         score += 2
                 else:
                     if p1_eff_hp <= card["val"]: score += 1000
-                    score += 1
+                    score += (card["val"] * 2 + 5 if personality == "aggro" else 1)
 
             elif card["effect"] == "heal":
                 hp_missing = _hero_missing_hp(p2)
                 effective_heal = min(card["val"], hp_missing)
-                score += effective_heal if effective_heal > 0 else -3
+                if personality == "control":
+                    score += effective_heal * 2 if hp_missing >= 4 else -2
+                else:
+                    score += effective_heal if effective_heal > 0 else -3
 
             elif card["effect"] == "draw":
-                score += card["val"] * 4 if len(p2["hand"]) < 9 else -10
+                if len(p2["hand"]) >= 8:
+                    score -= 15  # Overdraw prevention
+                else:
+                    score += card["val"] * (5 if personality == "value" else 4)
 
             elif card["effect"] == "coin":
                 unspent = p2["mana"]
@@ -1208,7 +1347,7 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
 
             elif card["effect"] == "damage_all":
                 hits = sum(5 if m["hp"] <= card["val"] else 1 for m in p1["board"])
-                score += hits * 2 if hits else -10
+                score += hits * (3 if personality == "control" else 2) if hits else -10
 
             elif card["effect"] == "buff":
                 score += sum(card["val"]) * 2
@@ -1238,14 +1377,21 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
                     kw_count = sum(1 for kw in ("taunt", "divine_shield", "poisonous", "deathrattle")
                                    if tm.get(kw))
                     score += kw_count * 6
-                    if tm.get("taunt"):    score += 4   # removing taunt opens up better targets
+                    if tm.get("taunt"):    score += 4
                     if tm.get("divine_shield"): score += 4
 
     elif action == "attack":
         attacker = p2["board"][idx]
         if target == "hero":
             if p1_eff_hp <= attacker["atk"]: score += 1000
-            score += attacker["atk"]
+            if personality == "aggro":
+                score += attacker["atk"] * 2 + 6
+            elif personality == "control" and p1["board"]:
+                score -= 4
+            elif personality == "midrange" and (not p1["board"] or p1_eff_hp <= 15):
+                score += attacker["atk"] * 1.5 + 2
+            else:
+                score += attacker["atk"]
         else:
             defender = p1["board"][target]
             atk_dmg = 0 if defender.get("divine_shield") else attacker["atk"]
@@ -1258,22 +1404,28 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
             ) > attacker["atk"]:
                 score += 4
 
-            if def_dmg < attacker["hp"] and atk_dmg >= defender["hp"]: score += 15
-            elif atk_dmg >= defender["hp"]:                              score += 5
-            else:                                                         score -= 5
+            if def_dmg < attacker["hp"] and atk_dmg >= defender["hp"]:
+                score += (18 if personality in ("control", "midrange") else 15)
+            elif atk_dmg >= defender["hp"]:
+                score += 5
+            else:
+                score -= 5
 
     elif action == "hero_attack":
         w_atk = p2["weapon"]["atk"]
         if target == "hero":
             if p1_eff_hp <= w_atk: score += 1000
-            score += w_atk
+            score += w_atk * (2 if personality == "aggro" else 1)
         else:
             defender = p1["board"][target]
             atk_dmg = 0 if defender.get("divine_shield") else w_atk
             def_dmg = defender["atk"]
-            if def_dmg >= p2_eff_hp:   score -= 1000
+            if def_dmg >= p2_eff_hp:
+                score -= 1000
+            elif p2_eff_hp <= 14 and def_dmg >= 3:
+                score -= def_dmg * 2  # Weapon self-damage preservation
             elif atk_dmg >= defender["hp"]:
-                score += 6
+                score += (8 if personality in ("control", "midrange") else 6)
                 score -= def_dmg
             else:
                 score -= 5
@@ -1287,7 +1439,7 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
             elif missing == 0:
                 score -= 3
             else:
-                score += min(4, missing)
+                score += min(4, missing) + (3 if personality == "control" else 0)
         elif cls == "Mage":
             if target != "hero":
                 tm = p1["board"][target]
@@ -1296,7 +1448,7 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
                 else:                       score += 1
             else:
                 if p1_eff_hp <= 1: score += 1000
-                score += 1
+                score += (4 if personality == "aggro" else 1)
         elif cls == "Priest":
             if target == "hero":
                 healable = clamp_heal(p2, 2)
@@ -1307,13 +1459,14 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple) -> float:
                 missing = max(0, max_hp - tm["hp"])
                 score += min(4, missing) if missing > 0 else -5
         elif cls == "Rogue":
-            # Dagger Mastery: equip 1/2 weapon — worth it if no weapon already
             score += 4 if not p2.get("weapon") else -2
         elif cls == "Paladin":
-            # Reinforce: always decent if board isn't full
             score += 3 if len(p2["board"]) < 7 else -10
         elif cls == "Shaman":
             score += 3 if len(p2["board"]) < 7 else -10
+
+    if personality == "gambler":
+        score += random.uniform(-4.0, 4.0)
 
     return score
 
@@ -1325,9 +1478,11 @@ def run_ai_turn(
     *,
     draw: bool = True,
     difficulty: str = "normal",
+    personality: str = "balanced",
 ) -> list[tuple]:
     """Execute AI turn synchronously. Returns the list of moves made."""
     difficulty = normalize_difficulty(difficulty)
+    personality = normalize_personality(personality)
     start_turn(p2, draw=draw)
     if check_win(p1, p2):
         return []
@@ -1338,10 +1493,10 @@ def run_ai_turn(
         legal = get_legal_moves(p2, p1)
         if not legal:
             break
-        best = select_ai_move(legal, p2, p1, difficulty)
+        best = select_ai_move(legal, p2, p1, difficulty, personality=personality)
         if best is None:
             break
-        best_score = evaluate_ai_move(p2, p1, best)
+        best_score = evaluate_ai_move(p2, p1, best, personality=personality)
         if _ai_should_pass_turn(legal, best, best_score, p2, p1):
             break
         execute_move(p2, p1, best)

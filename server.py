@@ -12,6 +12,7 @@ from flask import Flask, jsonify, render_template, request
 from whitenoise import WhiteNoise
 
 from game_logic import (
+    AI_PERSONALITIES,
     BOSS_PRESETS,
     CAMPAIGN_NODES,
     CARD_DB,
@@ -31,6 +32,7 @@ from game_logic import (
     check_win,
     clamp_practice_hp,
     collectible_card_db,
+    full_card_db,
     create_ai_opponent,
     create_player,
     do_mulligan,
@@ -41,6 +43,7 @@ from game_logic import (
     give_coin,
     log_action,
     normalize_difficulty,
+    normalize_personality,
     run_ai_turn,
     set_active_log,
     start_turn,
@@ -126,8 +129,9 @@ def _state_response(gs: dict, *, include_card_db: bool = False) -> dict:
         "mulligan_phase":   mulligan,
     }
     if include_card_db:
-        resp["card_db"] = collectible_card_db()
+        resp["card_db"] = full_card_db()
     resp["ai_difficulty"] = gs.get("ai_difficulty", "normal")
+    resp["ai_personality"] = gs.get("ai_personality", "balanced")
     resp["opponent_name"] = gs["p2"].get("name", "AI")
     resp["campaign_node"] = gs.get("campaign_node")
     resp["boss_id"] = gs.get("boss_id")
@@ -199,7 +203,13 @@ def _finish_mulligan(gs: dict) -> None:
     gs["is_player_turn"] = False
     gs["turn_number"] = 1
     log_action("--- Enemy goes first ---")
-    run_ai_turn(gs["p2"], gs["p1"], draw=False, difficulty=gs.get("ai_difficulty", "normal"))
+    run_ai_turn(
+        gs["p2"],
+        gs["p1"],
+        draw=False,
+        difficulty=gs.get("ai_difficulty", "normal"),
+        personality=gs.get("ai_personality", "balanced"),
+    )
     if _log_winner_if_any(gs["p1"], gs["p2"]):
         return
     gs["is_player_turn"] = True
@@ -234,7 +244,7 @@ def health():
 def cards():
     """Return the card database and hero class list — available before any game starts."""
     return jsonify({
-        "card_db": collectible_card_db(),
+        "card_db": full_card_db(),
         "hero_classes": HERO_CLASSES,
         "deck_size": DECK_SIZE,
     })
@@ -276,6 +286,10 @@ def _resolve_match_setup(data: dict) -> dict:
         campaign_node=campaign_node if node and not boss_id else None,
     )
 
+    personality = normalize_personality(data.get("personality") or data.get("ai_personality"))
+    if node and node.get("ai_personality"):
+        personality = normalize_personality(node.get("ai_personality"))
+
     if practice:
         mode = "practice"
     elif tutorial:
@@ -288,6 +302,7 @@ def _resolve_match_setup(data: dict) -> dict:
     return {
         "p2": p2,
         "difficulty": difficulty,
+        "personality": personality,
         "campaign_node": campaign_node,
         "boss_id": boss_id,
         "tutorial": tutorial,
@@ -376,6 +391,7 @@ def new_game():
         "mulligan_phase":    True,
         "player_goes_first": player_goes_first,
         "ai_difficulty":     match["difficulty"],
+        "ai_personality":    match["personality"],
         "campaign_node":     match["campaign_node"],
         "boss_id":           match["boss_id"],
         "tutorial":          match["tutorial"],
@@ -383,7 +399,9 @@ def new_game():
         "log":               [],
     }
     if match["practice"]:
-        opts = match["practice"]
+        opts = dict(match["practice"])
+        opts["difficulty"] = match["difficulty"]
+        opts["personality"] = match["personality"]
         gs["practice"] = opts
         apply_practice_options(gs["p1"], hp=opts["p1_hp"], infinite_mana=opts["infinite_mana"])
         apply_practice_options(gs["p2"], hp=opts["p2_hp"], infinite_mana=opts["infinite_mana"])
@@ -405,7 +423,8 @@ def new_game():
             log_action(
                 f"--- Practice Sandbox — You {opts['p1_hp']} HP · AI {opts['p2_hp']} HP{mana_note} ---"
             )
-        log_action(f"Opponent: {gs['p2']['name']} ({gs['p2']['hero_class']}) · {gs['ai_difficulty'].title()} AI")
+        personality_label = f" ({gs['ai_personality'].title()})" if gs["ai_personality"] != "balanced" else ""
+        log_action(f"Opponent: {gs['p2']['name']} ({gs['p2']['hero_class']}) · {gs['ai_difficulty'].title()} AI{personality_label}")
         order = "You go first." if player_goes_first else "Enemy goes first — you'll receive The Coin."
         log_action(order)
         _deal_opening_hands(gs)
@@ -473,7 +492,12 @@ def do_action():
         if action == "end_turn":
             gs["is_player_turn"] = False
             log_action("--- Enemy Turn ---")
-            run_ai_turn(p2, p1, difficulty=gs.get("ai_difficulty", "normal"))
+            run_ai_turn(
+                p2,
+                p1,
+                difficulty=gs.get("ai_difficulty", "normal"),
+                personality=gs.get("ai_personality", "balanced"),
+            )
             if not _log_winner_if_any(p1, p2):
                 gs["turn_number"] += 1
                 gs["is_player_turn"] = True

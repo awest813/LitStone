@@ -102,6 +102,18 @@
         <option value="hard">Hard — ruthless</option>
       </select>
     </label>
+    <label class="practice-field" for="practice-personality">
+      <span>AI personality</span>
+      <select id="practice-personality" class="setting-select">
+        <option value="balanced" selected>Balanced — adaptable generalist</option>
+        <option value="aggro">Aggro — aggressive face attacks</option>
+        <option value="control">Control — board clears &amp; defense</option>
+        <option value="midrange">Midrange — high-tempo minion trades</option>
+        <option value="ramp">Ramp — prioritizes heavy late-game minions</option>
+        <option value="value">Value — prioritizes card draw &amp; resources</option>
+        <option value="gambler">Gambler — wild unpredictable variance</option>
+      </select>
+    </label>
     <button type="button" class="btn btn-primary" onclick="startPracticeFromSetup()">Choose Class &amp; Deck</button>
   </div>
 </div>
@@ -146,68 +158,92 @@
 
     <div class="hero-card" data-class="Mage" role="button" tabindex="0" aria-label="Choose Mage class" onclick="selectClass('Mage')">
       <div class="hero-glow mage-glow"></div>
-      <div class="hero-emblem">🔮</div>
+      <div class="hero-portrait-frame">
+        <img class="hero-card-img" src="/static/assets/heroes/mage.jpg" alt="Mage Hero Art" loading="lazy" />
+        <div class="hero-crest-badge" aria-hidden="true"><div class="hero-emblem">🔮</div></div>
+      </div>
       <h2>Mage</h2>
+      <div class="hero-class-epithet">The Arcane Scholar</div>
       <div class="hero-power-badge">
         <span class="badge-cost">2</span>
         <span class="badge-text">Fireblast<br><em>Deal 1 dmg to any target</em></span>
       </div>
-      <div class="hero-flavour">Masters of arcane fire, capable of precise strikes against any foe.</div>
+      <div class="hero-flavour">Masters of illuminated manuscripts and pyromantic verse, striking foes with pinpoint arcane fire.</div>
     </div>
 
     <div class="hero-card" data-class="Warrior" role="button" tabindex="0" aria-label="Choose Warrior class" onclick="selectClass('Warrior')">
       <div class="hero-glow warrior-glow"></div>
-      <div class="hero-emblem">⚔️</div>
+      <div class="hero-portrait-frame">
+        <img class="hero-card-img" src="/static/assets/heroes/warrior.jpg" alt="Warrior Hero Art" loading="lazy" />
+        <div class="hero-crest-badge" aria-hidden="true"><div class="hero-emblem">⚔️</div></div>
+      </div>
       <h2>Warrior</h2>
+      <div class="hero-class-epithet">The Epic Champion</div>
       <div class="hero-power-badge">
         <span class="badge-cost">2</span>
         <span class="badge-text">Armor Up!<br><em>Gain 2 Armor</em></span>
       </div>
-      <div class="hero-flavour">Hardened veterans who forge impenetrable defences under fire.</div>
+      <div class="hero-flavour">Hardened champions forged in the verses of the Iliad, building impenetrable defenses under fire.</div>
     </div>
 
     <div class="hero-card" data-class="Priest" role="button" tabindex="0" aria-label="Choose Priest class" onclick="selectClass('Priest')">
       <div class="hero-glow priest-glow"></div>
-      <div class="hero-emblem">✨</div>
+      <div class="hero-portrait-frame">
+        <img class="hero-card-img" src="/static/assets/heroes/priest.jpg" alt="Priest Hero Art" loading="lazy" />
+        <div class="hero-crest-badge" aria-hidden="true"><div class="hero-emblem">✨</div></div>
+      </div>
       <h2>Priest</h2>
+      <div class="hero-class-epithet">The Holy Cleric</div>
       <div class="hero-power-badge">
         <span class="badge-cost">2</span>
         <span class="badge-text">Lesser Heal<br><em>Restore 2 HP to a friendly</em></span>
       </div>
-      <div class="hero-flavour">Wielders of holy light, sustaining allies through any ordeal.</div>
+      <div class="hero-flavour">Guardians of sacred scripture and restorative psalms, sustaining allies through every ordeal.</div>
     </div>
 
     <div class="hero-card" data-class="Rogue" role="button" tabindex="0" aria-label="Choose Rogue class" onclick="selectClass('Rogue')">
       <div class="hero-glow rogue-glow"></div>
-      <div class="hero-emblem">🗡️</div>
+      <div class="hero-portrait-frame">
+        <img class="hero-card-img" src="/static/assets/heroes/rogue.jpg" alt="Rogue Hero Art" loading="lazy" />
+        <div class="hero-crest-badge" aria-hidden="true"><div class="hero-emblem">🗡️</div></div>
+      </div>
       <h2>Rogue</h2>
+      <div class="hero-class-epithet">The Prowling Cutpurse</div>
       <div class="hero-power-badge">
         <span class="badge-cost">2</span>
         <span class="badge-text">Dagger Mastery<br><em>Equip a 1/2 Wicked Dagger</em></span>
       </div>
-      <div class="hero-flavour">Shadowy assassins who stay armed with a fresh blade every turn.</div>
+      <div class="hero-flavour">Shadowy figures straight from Victorian penny dreadfuls, armed with poisoned daggers and cunning tricks.</div>
     </div>
 
     <div class="hero-card" data-class="Paladin" role="button" tabindex="0" aria-label="Choose Paladin class" onclick="selectClass('Paladin')">
       <div class="hero-glow paladin-glow"></div>
-      <div class="hero-emblem">🛡️</div>
+      <div class="hero-portrait-frame">
+        <img class="hero-card-img" src="/static/assets/heroes/paladin.jpg" alt="Paladin Hero Art" loading="lazy" />
+        <div class="hero-crest-badge" aria-hidden="true"><div class="hero-emblem">🛡️</div></div>
+      </div>
       <h2>Paladin</h2>
+      <div class="hero-class-epithet">The Knight of Chivalry</div>
       <div class="hero-power-badge">
         <span class="badge-cost">2</span>
         <span class="badge-text">Reinforce<br><em>Summon a 1/1 Silver Hand Recruit</em></span>
       </div>
-      <div class="hero-flavour">Noble crusaders who rally the faithful with endless reinforcements.</div>
+      <div class="hero-flavour">Noble crusaders of Arthurian romance, rallying the faithful with holy vows and divine shields.</div>
     </div>
 
     <div class="hero-card" data-class="Shaman" role="button" tabindex="0" aria-label="Choose Shaman class" onclick="selectClass('Shaman')">
       <div class="hero-glow shaman-glow"></div>
-      <div class="hero-emblem">⚡</div>
+      <div class="hero-portrait-frame">
+        <img class="hero-card-img" src="/static/assets/heroes/shaman.jpg" alt="Shaman Hero Art" loading="lazy" />
+        <div class="hero-crest-badge" aria-hidden="true"><div class="hero-emblem">⚡</div></div>
+      </div>
       <h2>Shaman</h2>
+      <div class="hero-class-epithet">The Elder Skald</div>
       <div class="hero-power-badge">
         <span class="badge-cost">2</span>
         <span class="badge-text">Totemic Call<br><em>Summon a random Totem</em></span>
       </div>
-      <div class="hero-flavour">Spirit callers who command lightning and ancestral totems.</div>
+      <div class="hero-flavour">Mystic chanters who command elemental sagas, summoning lightning and ancestral totems.</div>
     </div>
 
   </div>
@@ -318,13 +354,28 @@
       </div>
 
       <div class="match-options">
-        <label class="match-option-label" for="match-difficulty" title="How aggressively the AI values trades and lethal">AI difficulty</label>
-        <select id="match-difficulty" class="setting-select match-difficulty-select" aria-label="AI difficulty"
-                title="Easy: random &amp; forgiving · Normal: solid trades · Hard: punishes mistakes">
-          <option value="easy" title="40% random plays; picks from the top half of scored moves">Easy — learning</option>
-          <option value="normal" selected title="Picks strong trades and near-lethal lines">Normal — standard</option>
-          <option value="hard" title="Consistently picks the best heuristic line">Hard — ruthless</option>
-        </select>
+        <div class="match-option-row">
+          <label class="match-option-label" for="match-difficulty" title="How aggressively the AI values trades and lethal">AI difficulty</label>
+          <select id="match-difficulty" class="setting-select match-difficulty-select" aria-label="AI difficulty"
+                  title="Easy: random &amp; forgiving · Normal: solid trades · Hard: punishes mistakes">
+            <option value="easy" title="40% random plays; picks from the top half of scored moves">Easy — learning</option>
+            <option value="normal" selected title="Picks strong trades and near-lethal lines">Normal — standard</option>
+            <option value="hard" title="Consistently picks the best heuristic line">Hard — ruthless</option>
+          </select>
+        </div>
+        <div class="match-option-row">
+          <label class="match-option-label" for="match-personality" title="Strategic playstyle archetype of the AI opponent">AI archetype</label>
+          <select id="match-personality" class="setting-select match-personality-select" aria-label="AI personality archetype"
+                  title="Balanced, Aggro, Control, Midrange, Ramp, Value, or Gambler">
+            <option value="balanced" selected title="Adaptable generalist playstyle">Balanced</option>
+            <option value="aggro" title="Prioritizes face damage and fast charges">Aggro</option>
+            <option value="control" title="Prioritizes board wipes, taunts, and healing">Control</option>
+            <option value="midrange" title="High-tempo favorable minion trades">Midrange</option>
+            <option value="ramp" title="Prioritizes heavy high-cost win conditions">Ramp</option>
+            <option value="value" title="Prioritizes card advantage and hand replenishment">Value</option>
+            <option value="gambler" title="Wild, unpredictable plays">Gambler</option>
+          </select>
+        </div>
       </div>
       <div class="deck-start-wrap">
         <button type="button" class="btn btn-primary btn-start-match" id="btn-start-ai" disabled onclick="startGame()">
@@ -378,6 +429,7 @@
   <!-- Player tray -->
   <div class="tray tray-player" id="tray-player">
     <div class="hero-panel" id="hero-player"></div>
+    <button type="button" class="hero-emote-toggle" id="btn-hero-emote" onclick="toggleEmoteMenu(event)" title="Hero Emotes" aria-label="Hero emotes">💬</button>
     <div class="hero-power-panel" id="hp-player"></div>
     <div class="deck-panel" id="deck-player"></div>
     <div class="end-turn-area">
@@ -400,6 +452,54 @@
   <!-- Floating effects container -->
   <div id="fx-layer" class="fx-layer"></div>
 
+  <!-- Interactive Targeting Arrow Layer -->
+  <svg id="targeting-layer" class="targeting-layer hidden" aria-hidden="true">
+    <defs>
+      <linearGradient id="arrowGradOffense" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#ef4444" stop-opacity="0.85"/>
+        <stop offset="50%" stop-color="#f59e0b" stop-opacity="0.95"/>
+        <stop offset="100%" stop-color="#fde047" stop-opacity="1"/>
+      </linearGradient>
+      <linearGradient id="arrowGradSupport" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#10b981" stop-opacity="0.85"/>
+        <stop offset="50%" stop-color="#38bdf8" stop-opacity="0.95"/>
+        <stop offset="100%" stop-color="#fef08a" stop-opacity="1"/>
+      </linearGradient>
+      <filter id="arrowGlow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="4" result="blur"/>
+        <feMerge>
+          <feMergeNode in="blur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+    </defs>
+    <path id="targeting-arrow-glow" class="targeting-arrow-glow" d="" />
+    <path id="targeting-arrow-main" class="targeting-arrow-main" d="" />
+    <polygon id="targeting-arrow-head" class="targeting-arrow-head" points="" />
+    <g id="targeting-reticle" class="targeting-reticle hidden">
+      <circle cx="0" cy="0" r="32" class="reticle-outer" />
+      <circle cx="0" cy="0" r="22" class="reticle-inner" />
+      <line x1="-36" y1="0" x2="-24" y2="0" class="reticle-line" />
+      <line x1="24" y1="0" x2="36" y2="0" class="reticle-line" />
+      <line x1="0" y1="-36" x2="0" y2="-24" class="reticle-line" />
+      <line x1="0" y1="24" x2="0" y2="36" class="reticle-line" />
+    </g>
+  </svg>
+
+  <!-- Hero Emote Menu -->
+  <div id="emote-menu" class="emote-menu hidden" role="menu" aria-label="Hero emotes">
+    <button type="button" class="emote-opt" onclick="triggerHeroEmote('greetings')" role="menuitem">👋 Greetings</button>
+    <button type="button" class="emote-opt" onclick="triggerHeroEmote('well_played')" role="menuitem">🏆 Well Played</button>
+    <button type="button" class="emote-opt" onclick="triggerHeroEmote('thanks')" role="menuitem">🙏 Thanks</button>
+    <button type="button" class="emote-opt" onclick="triggerHeroEmote('wow')" role="menuitem">⚡ Wow</button>
+    <button type="button" class="emote-opt" onclick="triggerHeroEmote('oops')" role="menuitem">🤦 Oops</button>
+    <button type="button" class="emote-opt" onclick="triggerHeroEmote('threaten')" role="menuitem">⚔️ Threaten</button>
+  </div>
+
+  <!-- Hero Speech Bubbles -->
+  <div id="speech-bubble-player" class="hero-speech-bubble hero-speech-bubble--player hidden" role="status" aria-live="polite"></div>
+  <div id="speech-bubble-opp" class="hero-speech-bubble hero-speech-bubble--opp hidden" role="status" aria-live="polite"></div>
+
   <!-- Selection indicator -->
   <div id="selection-info" class="selection-info hidden" role="status"></div>
 
@@ -409,6 +509,7 @@
       <div class="winner-crown" aria-hidden="true">👑</div>
       <h2 id="winner-text" aria-live="polite">Victory!</h2>
       <p class="winner-subtitle" id="winner-subtitle"></p>
+      <div class="winner-epilogue" id="winner-epilogue"></div>
       <div class="winner-actions">
         <button type="button" class="btn btn-play-again hidden" id="btn-winner-next" onclick="startNextCareerChapter()">Next Chapter →</button>
         <button type="button" class="btn btn-play-again" id="btn-winner-again" onclick="playAgain()">Play Again</button>
@@ -529,6 +630,17 @@
       <button type="button" class="btn btn-back" onclick="quitToHubFromPause()">Quit to Menu</button>
     </div>
     <p class="pause-hint">Press Esc to resume</p>
+  </div>
+</div>
+
+<!-- Card Inspect / Literary Lore Modal -->
+<div id="card-inspect-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="card-inspect-title">
+  <div class="modal-panel card-inspect-panel">
+    <button type="button" class="btn-modal-close" onclick="closeCardInspectModal()" aria-label="Close lore inspection">✕</button>
+    <div id="card-inspect-body" class="card-inspect-body"></div>
+    <div class="modal-actions card-inspect-actions">
+      <button type="button" class="btn btn-primary" onclick="closeCardInspectModal()">Done Reading</button>
+    </div>
   </div>
 </div>
 

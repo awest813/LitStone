@@ -26,7 +26,7 @@ The current state of the project establishes the core gameplay loop.
 - [x] Mulligan phase (player)
 - [x] Deck filter/sort, mana curve, save/load decks (localStorage)
 - [x] Legendary minions (37 literary legends)
-- [x] Unit tests — 193 tests covering game logic, AI, career API, and browser E2E (`test_game_logic.py`, `test_career_playthrough.py`, `test_career_browser.py`)
+- [x] Unit tests — 201 tests covering game logic, AI, career API, and browser E2E (`test_game_logic.py`, `test_career_playthrough.py`, `test_career_browser.py`)
 
 ---
 
@@ -38,9 +38,18 @@ Goals: make the game feel complete and production-ready for single-player use.
 - [x] **Per-session game IDs** — UUID-keyed game sessions (`GAMES` dict)
 - [x] **AI mulligan** — heuristic opening-hand swaps for the AI opponent
 - [x] **Improved AI** — difficulty tiers (Easy/Normal/Hard), curved AI decks, boss opponents
+- [x] **AI Personalities & Combined Lethal Solver** — 7 playstyles (Midrange, Ramp, Control, Aggro, Gambler, Value, Balanced), multi-action lethal calculation, overdraw prevention, weapon self-preservation
+- [x] **AI Personalities UI Exposure** — Practice Sandbox and Deck Builder match options allow players to select opponent playstyle archetype directly
+- [x] **Title Hub & Screen Polish** — balanced responsive mode grid with tutorial banner, widened practice panel, and deck builder match controls
+- [x] **Card Balance Optimization** — 100-run simulation benchmark audit resulting in nerfs to overtuned cards (`Shieldwall Sergeant`, `Lancelot`, `Alice`) and buffs to trap cards (`Shiv Storm`, `Cleave Chronicle`, `Thief's Shiv`, `Hex of Baba`)
+- [x] **Campaign Boss Tuning** — rebalanced `Van Helsing` and `Professor Moriarty`, with thematic AI personalities per chapter
 - [x] **Partial card animations** — summon flash, damage float, buff glow, turn banner, hero flash
 - [x] **Full card animations** — play-from-hand arc, attack lunge, death burst, weapon swing, spell flash
-- [x] **Sound effects** — Web Audio SFX for play, attack, damage, heal, turn, victory/defeat (mute toggle)
+- [x] **Arched Combat Targeting Arrow** — dynamic quadratic bezier vector arc with energy dash flow, arrowhead tracking, target snapping, and rotating target reticle
+- [x] **Tactile Screen Rumble & Combat FX** — screen/board camera shake scaling with impact severity (light, medium, heavy), slash marks, and deep sub-bass crunch
+- [x] **Hero Emotes & Speech Bubbles** — 6-way emote wheel (Greetings, Well Played, Thanks, Wow, Oops, Threaten) with class-specific literary dialogue, parchment bubbles, and AI retorts
+- [x] **3D Card Hover Depth & Holographic Sheen** — dynamic 3D cursor-tracking perspective tilt on hand cards and animated prismatic holofoil reflection on hand cards and collection pool cards
+- [x] **Sound effects** — Web Audio SFX for play, attack, damage, heal, turn, victory/defeat, coin flip, heavy hits, emotes (mute toggle)
 - [x] **Partial responsive layout** — breakpoints at 900px / 1100px; mobile scroll fixes
 - [x] **Partial mobile polish** — sticky hand/tray, collapsible log, touch targets, board scroll
 - [x] **Partial mobile polish (≤375px)** — deck-builder and in-game controls meet 44px tap targets
@@ -62,6 +71,12 @@ Goals: deepen the card pool and hero variety.
 - [x] **The Coin** — second-player gains +1 mana crystal (once)
 - [x] **First-player randomization** — coin flip for who goes first
 - [x] **Literary Career mode** — 6-chapter career with 3 boss encounters (Frankenstein, Van Helsing, Moriarty) and progress tracking
+- [x] **Premium Hero Graphics** — High-resolution fantasy digital art portraits for all 6 hero classes (Mage, Warrior, Priest, Rogue, Paladin, Shaman) integrated into Class Select cards, in-game hero trays, and deck builder emblem with sculpted golden bezels and class aura effects
+- [x] **Literary Anthology & Lore System** — 100% lore coverage for all 110 cards plus hero power tokens (Silver Hand Recruit, Wicked Dagger, Searing/Healing/Stonefang/Wrath Totems) with authentic citations, authors, works, and publication dates
+- [x] **Illuminated Card Inspect Modal** — two-column literary grimoire inspection modal with large card art, stats, rules text, battlecry quotes, and anthology citations (accessible via right-click or [I] key across pool, deck, hand, board, and hero trays)
+- [x] **Chapter & Roman Turn Banners** — turn notifications rendered as dramatic book chapters (Prologue, Chapter I through X, The Climax)
+- [x] **Dynamic Legendary Battlecry Speeches** — atmospheric speech bubbles quoting classic literature when legendary cards are summoned by player or AI
+- [x] **Match Epilogues & Campaign Epigraphs** — thematic classical quotes concluding matches and introducing campaign chapters
 
 ---
 

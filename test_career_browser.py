@@ -6,12 +6,12 @@ Requires: pip install playwright && playwright install chromium
 
 import json
 
-import pytest
-
-from career_test_support import CHAPTER_NAMES, setup_lethal_turn
-from server import GAMES
-
-pytestmark = pytest.mark.browser
+try:
+    import pytest
+    pytestmark = pytest.mark.browser
+except ImportError:
+    import unittest
+    raise unittest.SkipTest("pytest is not installed; skipping browser E2E tests")
 
 _MULLIGAN_BTN_READY = "() => !document.getElementById('btn-mulligan-confirm')?.disabled"
 _ACTIVE_GAME_READY = """() => {

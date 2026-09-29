@@ -1733,6 +1733,34 @@ class TestServerApi(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.get_json()["ai_difficulty"], "hard")
 
+    def test_practice_mode_respects_personality(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        res = client.post("/api/new_game", json={
+            "hero_class": "Mage",
+            "deck": deck,
+            "practice": True,
+            "personality": "aggro",
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertEqual(data["ai_personality"], "aggro")
+        self.assertEqual(data.get("practice", {}).get("personality"), "aggro")
+
+    def test_standard_match_respects_personality(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        res = client.post("/api/new_game", json={
+            "hero_class": "Mage",
+            "deck": deck,
+            "personality": "control",
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.get_json()["ai_personality"], "control")
+
+
     def test_resume_state_endpoint(self):
         from server import app
         client = app.test_client()
@@ -1790,6 +1818,17 @@ class TestServerApi(unittest.TestCase):
         res = client.get("/api/cards")
         holmes = res.get_json()["card_db"]["Sherlock Holmes"]
         self.assertIn("Battlecry: Draw 2 cards", holmes["battlecry_text"])
+
+    def test_cards_api_includes_literary_lore(self):
+        from server import app
+        client = app.test_client()
+        res = client.get("/api/cards")
+        holmes = res.get_json()["card_db"]["Sherlock Holmes"]
+        self.assertIn("The game is afoot", holmes["lore_quote"])
+        self.assertEqual(holmes["lore_author"], "Arthur Conan Doyle")
+        frankenstein = res.get_json()["card_db"]["Frankenstein's Monster"]
+        self.assertEqual(frankenstein["lore_author"], "Mary Shelley")
+
 
     def test_legal_moves_endpoint(self):
         from server import app
@@ -1883,6 +1922,144 @@ class TestCardText(unittest.TestCase):
         db = collectible_card_db()
         self.assertNotIn(COIN_CARD, db)
         self.assertIn("Quill Bolt", db)
+
+
+class TestPersonalitiesAndLethalSolver(unittest.TestCase):
+    """Tests for combined lethal detection and AI personality move scoring."""
+
+    def test_check_immediate_lethal_board_minions(self):
+        from game_logic import check_immediate_lethal, create_player
+        p1 = create_player("P1", "Mage")
+        p2 = create_player("P2", "Warrior")
+        p2["hp"] = 6
+        p1["board"] = [
+            {"name": "M1", "atk": 3, "hp": 3, "can_attack": True},
+            {"name": "M2", "atk": 3, "hp": 3, "can_attack": True},
+        ]
+        has_lethal, dmg = check_immediate_lethal(p1, p2)
+        self.assertTrue(has_lethal)
+        self.assertEqual(dmg, 6)
+
+    def test_check_immediate_lethal_blocked_by_taunt(self):
+        from game_logic import check_immediate_lethal, create_player
+        p1 = create_player("P1", "Mage")
+        p2 = create_player("P2", "Warrior")
+        p2["hp"] = 4
+        p1["board"] = [{"name": "M1", "atk": 5, "hp": 5, "can_attack": True}]
+        p2["board"] = [{"name": "Guard", "atk": 1, "hp": 2, "taunt": True}]
+        has_lethal, dmg = check_immediate_lethal(p1, p2)
+        self.assertFalse(has_lethal)
+
+    def test_combined_lethal_gives_high_score_to_all_face_attacks(self):
+        from game_logic import evaluate_ai_move, create_player
+        p1 = create_player("P1", "Mage")
+        p2 = create_player("AI", "Warrior")
+        p1["hp"] = 6
+        p2["board"] = [
+            {"name": "M1", "atk": 3, "hp": 3, "can_attack": True},
+            {"name": "M2", "atk": 3, "hp": 3, "can_attack": True},
+        ]
+        # Even though neither minion alone kills P1, combined lethal gives >= 1000 score
+        score = evaluate_ai_move(p2, p1, ("attack", 0, "hero"))
+        self.assertGreaterEqual(score, 1000)
+
+    def test_personality_normalization(self):
+        from game_logic import normalize_personality, AI_PERSONALITIES
+        self.assertEqual(normalize_personality("Aggro"), "aggro")
+        self.assertEqual(normalize_personality("control"), "control")
+        self.assertEqual(normalize_personality("invalid_xyz"), "balanced")
+        self.assertIn("midrange", AI_PERSONALITIES)
+
+    def test_aggro_personality_scores_face_higher(self):
+        from game_logic import evaluate_ai_move, create_player
+        p1 = create_player("P1", "Mage")
+        p2 = create_player("AI", "Warrior")
+        p1["hp"] = 30
+        p2["board"] = [{"name": "M1", "atk": 4, "hp": 4, "can_attack": True}]
+        move = ("attack", 0, "hero")
+        score_balanced = evaluate_ai_move(p2, p1, move, personality="balanced")
+        score_aggro = evaluate_ai_move(p2, p1, move, personality="aggro")
+        self.assertGreater(score_aggro, score_balanced)
+
+    def test_overdraw_penalty_when_hand_is_full(self):
+        from game_logic import evaluate_ai_move, create_player
+        p1 = create_player("P1", "Mage")
+        p2 = create_player("AI", "Mage")
+        p2["hand"] = ["Arcane Lexicon"] + ["Town Crier"] * 8  # 9 cards in hand
+        p2["mana"] = 10
+        score = evaluate_ai_move(p2, p1, ("play", 0, None))
+        self.assertLess(score, 0)
+
+    def test_weapon_self_preservation_when_low_hp(self):
+        from game_logic import evaluate_ai_move, create_player
+        p1 = create_player("P1", "Mage")
+        p2 = create_player("AI", "Rogue")
+        p2["hp"] = 8  # Low health
+        p2["weapon"] = {"name": "Heroic Blade", "atk": 3, "durability": 2}
+        p2["hero_can_attack"] = True
+        p1["board"] = [{"name": "Giant", "atk": 6, "hp": 3}]
+        # Attacking 6-atk minion with hero would take 6 damage leaving hero at 2 HP
+        score = evaluate_ai_move(p2, p1, ("hero_attack", None, 0))
+        # Self-damage penalty should significantly reduce the score
+        self.assertLess(score, 0)
+
+    def test_build_curved_ai_deck_with_legendaries(self):
+        from game_logic import build_curved_ai_deck, CARD_DB, DECK_SIZE
+        deck = build_curved_ai_deck("Warrior", max_legendaries=2)
+        self.assertEqual(len(deck), DECK_SIZE)
+        legendaries = [c for c in deck if CARD_DB[c].get("legendary")]
+        self.assertLessEqual(len(legendaries), 2)
+        # Verify no duplicate legendaries
+        for leg in legendaries:
+            self.assertEqual(deck.count(leg), 1)
+
+
+class TestCardRebalanceAudit(unittest.TestCase):
+    """Verify that audited card balance adjustments are correctly reflected in CARD_DB."""
+
+    def test_rebalanced_card_values(self):
+        # Alice nerfed from 4 HP to 3 HP
+        self.assertEqual(CARD_DB["Alice"]["hp"], 3)
+        self.assertEqual(CARD_DB["Alice"]["atk"], 3)
+
+        # Lancelot nerfed from 5 ATK to 4 ATK
+        self.assertEqual(CARD_DB["Lancelot"]["atk"], 4)
+        self.assertTrue(CARD_DB["Lancelot"]["charge"])
+
+        # Shieldwall Sergeant nerfed from 4 HP to 3 HP
+        self.assertEqual(CARD_DB["Shieldwall Sergeant"]["hp"], 3)
+        self.assertTrue(CARD_DB["Shieldwall Sergeant"]["taunt"])
+        self.assertTrue(CARD_DB["Shieldwall Sergeant"]["divine_shield"])
+
+        # Shiv Storm buffed from 2 mana to 1 mana
+        self.assertEqual(CARD_DB["Shiv Storm"]["cost"], 1)
+
+        # Cleave Chronicle buffed from 1 damage to 2 damage
+        self.assertEqual(CARD_DB["Cleave Chronicle"]["val"], 2)
+
+        # Thief's Shiv buffed from 2 durability to 3 durability
+        self.assertEqual(CARD_DB["Thief's Shiv"]["durability"], 3)
+
+        # Hex of Baba buffed from 3 mana to 2 mana
+        self.assertEqual(CARD_DB["Hex of Baba"]["cost"], 2)
+
+    def test_token_cards_and_full_card_db(self):
+        from game_logic import full_card_db, collectible_card_db
+        full = full_card_db()
+        collectible = collectible_card_db()
+        # Collectible omits uncollectibles
+        self.assertNotIn("Silver Hand Recruit", collectible)
+        self.assertNotIn("Wicked Dagger", collectible)
+        self.assertNotIn("The Coin", collectible)
+        # Full DB contains uncollectibles and enriched lore
+        self.assertIn("Silver Hand Recruit", full)
+        self.assertIn("Wicked Dagger", full)
+        self.assertIn("Searing Totem", full)
+        self.assertIn("The Coin", full)
+        self.assertTrue(full["Silver Hand Recruit"]["uncollectible"])
+        self.assertIn("Le Morte d'Arthur", full["Silver Hand Recruit"]["lore_work"])
+        self.assertIn("Macbeth", full["Wicked Dagger"]["lore_work"])
+        self.assertIn("Völuspá", full["Searing Totem"]["lore_work"])
 
 
 if __name__ == "__main__":
