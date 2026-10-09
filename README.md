@@ -7,13 +7,15 @@ A lightweight, browser-based card game inspired by Hearthstone. Play against an 
 ## Features
 
 - **6 Hero Classes** — Mage, Warrior, Priest, Rogue, Paladin, and Shaman, each with a unique hero power
-- **109-card library** — Neutral literary cards plus 8 class-exclusive cards per hero (48 class cards), including 37 Legendary minions
-- **Rich card mechanics** — Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle, Silence
+- **117-card library** — 69 neutral literary cards plus 8 class-exclusive cards per hero (48 class cards), including 37 Legendary minions
+- **Rich card mechanics** — Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle, Silence, Windfury, Lifesteal, Discover, and Secrets
 - **Mulligan phase** — Select any opening-hand cards to redraw before each game starts
 - **Literary Legends** — Legendary minions inspired by Sherlock Holmes, Dr. John Watson, Professor Moriarty, Van Helsing, Victor Frankenstein, Frankenstein's Monster, Alice, The Mad Hatter, The White Rabbit, The Queen of Hearts, The Cheshire Cat, Snow White, Rapunzel, Sleeping Beauty, Little Red Riding Hood, Rumpelstiltskin, The Big Bad Wolf, Pied Piper, Baba Yaga, Bluebeard, King Arthur, Merlin, Lancelot, Guinevere, Morgan le Fay, Mordred, Gawain, Robin Hood, Maid Marian, Friar Tuck, Little John, Will Scarlet, Ebenezer Scrooge, Oliver Twist, Ivanhoe, Quasimodo, and Don Quixote (max 1 copy per deck)
 - **Deck Builder** — Build a custom 30-card deck (max 2 copies per card; max 1 copy of Legendary cards) before each game
 - **AI opponent** — Heuristic-driven AI with Easy / Normal / Hard difficulty and curved decks
 - **Career & tutorial** — 6-chapter Literary Career (3 boss duels: Frankenstein, Van Helsing, Moriarty), guided tutorial, and practice sandbox
+- **Arena draft** — pick 1 of 3 cards thirty times to build a deck, then duel the AI
+- **Accessibility** — high-contrast theme, strong focus rings, and reduced-motion support
 - **Session persistence** — active games saved to SQLite and restored after server restart
 - **Combat log** — Real-time log of every action taken during the game
 - **Fatigue system** — Players take increasing damage when their deck runs out
@@ -75,13 +77,13 @@ playwright install chromium   # once, for browser E2E
 ruff check .
 ```
 
-The suite has **193** tests (game logic, career API, and Playwright browser E2E).
+The suite has **236** tests (game logic, career API, and Playwright browser E2E).
 
 Third-party licenses: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 ## How to Play
 
-1. From the **title hub**, pick **Play**, **Career**, **Practice**, or **Tutorial**.
+1. From the **title hub**, pick **Play**, **Career**, **Practice**, **Tutorial**, or **Arena**.
 2. **Choose a hero class**, then **build a 30-card deck** (up to 2 copies each; legendaries max 1).
 3. **Mulligan** any opening-hand cards you want to replace, then confirm.
 4. On your turn, play cards, attack with minions or your hero, and use your hero power.
@@ -165,11 +167,18 @@ These legendary minions are based on classic literature and folklore and have a 
 | Enchanted Shield | 1 | Give a friendly minion Divine Shield |
 | Inkwell Blast | 2 | Deal 1 damage to all enemy minions |
 | Tome of Silence | 3 | Remove all text from an enemy minion |
+| Fabled Discovery | 1 | Discover a card: choose 1 of 3 to add to your hand |
+| Explosive Runes | 2 | Secret: when your opponent plays a minion, deal 3 damage to it |
+| Warding Sigil | 2 | Secret: when your opponent casts a spell, gain 4 Armor |
+| Riposte | 2 | Secret: when your opponent attacks, deal 3 damage to their hero |
 
 ### Core Set Minions & Spells
 
 - Minions: Town Crier, Castle Guard, Highwayman, Errant Knight, Templar Captain, Storybook Dragon, Cave Spider, Cathedral Cleric, Tinker Alchemist.
+- Windfury minions: Zephyr Duelist, Stormwing Gryphon.
+- Lifesteal minions: Chalice Acolyte, Crimson Reveler.
 - Spells & weapon: Quill Bolt, Inferno Verse, Restorative Hymn, Deductive Clue, Rebel's Ambush, Fairy Blessing, Heroic Blade.
+- Discover & Secret spells: Fabled Discovery, Explosive Runes, Warding Sigil, Riposte.
 
 ### Keyword Reference
 
@@ -181,7 +190,16 @@ These legendary minions are based on classic literature and folklore and have a 
 | Poisonous     | Destroys any minion it damages |
 | Battlecry     | Triggers an effect when played from hand |
 | Deathrattle   | Triggers an effect when the minion dies |
+| Windfury      | Can attack twice each turn |
+| Lifesteal     | Damage dealt also restores that much HP to your hero |
 | Silence       | Removes all keywords and text from a minion |
+
+### Special Mechanics
+
+| Mechanic | Effect |
+|----------|--------|
+| Discover | Choose one of three offered cards to add to your hand |
+| Secrets  | A hidden trap that triggers on your opponent's turn (minion played, spell cast, or attack) |
 
 ## Project Structure
 
@@ -227,7 +245,10 @@ LitStone/
 | GET    | `/api/state`       | Returns the current game state   |
 | POST   | `/api/action`      | Executes a player action         |
 | POST   | `/api/resign`      | Abandon the current game         |
-| GET    | `/api/legal_moves` | Returns all legal moves for P1   |
+| GET    | `/api/legal_moves` | Returns all legal moves for P1 |
+| GET    | `/api/decks`       | List saved decks for a browser token (`?token=…`) |
+| POST   | `/api/decks`       | Save/overwrite a deck for a browser token |
+| POST   | `/api/decks/delete`| Delete a saved deck for a browser token |
 
 ## License
 

@@ -434,6 +434,42 @@ CARD_LORE = {
     },
 
     # =========================================================================
+    # WINDFURY / LIFESTEAL MINIONS
+    # =========================================================================
+    "Zephyr Duelist": {
+        "lore_quote": "Blow, winds, and crack your cheeks! Rage! Blow! You cataracts and hurricanoes, spout till you have drenched our steeples.",
+        "lore_source": "William Shakespeare, King Lear (1608)",
+        "lore_author": "William Shakespeare",
+        "lore_work": "King Lear",
+        "lore_year": "1608",
+        "battlecry_quote": "Swift as the gale — once, and once again!",
+    },
+    "Stormwing Gryphon": {
+        "lore_quote": "The North Wind and the Sun contended for mastery; the harder the wind blew, the closer the traveller drew his cloak.",
+        "lore_source": "Aesop, Fables (c. 600 BCE)",
+        "lore_author": "Aesop",
+        "lore_work": "The North Wind and the Sun",
+        "lore_year": "c. 600 BCE",
+        "battlecry_quote": "Two strikes from the tempest's wing!",
+    },
+    "Chalice Acolyte": {
+        "lore_quote": "Drink of the holy grail and the wound of the world is knit anew; the cup giveth life to the faint.",
+        "lore_source": "Sir Thomas Malory, Le Morte d'Arthur (1485)",
+        "lore_author": "Sir Thomas Malory",
+        "lore_work": "Le Morte d'Arthur",
+        "lore_year": "1485",
+        "battlecry_quote": "From the chalice, strength renewed!",
+    },
+    "Crimson Reveler": {
+        "lore_quote": "The blood is the life! With each fell draught the ancient hunger swells, and the crimson feast restores the reveller.",
+        "lore_source": "Bram Stoker, Dracula (1897)",
+        "lore_author": "Bram Stoker",
+        "lore_work": "Dracula",
+        "lore_year": "1897",
+        "battlecry_quote": "Your wounds shall feed my vigour!",
+    },
+
+    # =========================================================================
     # NEUTRAL ANTHOLOGY CARDS
     # =========================================================================
     "Library Whisper": {
@@ -491,6 +527,34 @@ CARD_LORE = {
         "lore_author": "Jorge Luis Borges",
         "lore_work": "Ficciones",
         "lore_year": "1941",
+    },
+    "Fabled Discovery": {
+        "lore_quote": "The library is unlimited and cyclical; from its endless hexagons, one volume is chosen, and in choosing, a fate is written.",
+        "lore_source": "Jorge Luis Borges, The Library of Babel (1941)",
+        "lore_author": "Jorge Luis Borges",
+        "lore_work": "Ficciones",
+        "lore_year": "1941",
+    },
+    "Explosive Runes": {
+        "lore_quote": "The letters glowed, and the watcher knew too late the meaning of the cursed inscription.",
+        "lore_source": "J.R.R. Tolkien, The Lord of the Rings (1954)",
+        "lore_author": "J.R.R. Tolkien",
+        "lore_work": "The Fellowship of the Ring",
+        "lore_year": "1954",
+    },
+    "Warding Sigil": {
+        "lore_quote": "Here I set my seal, that no wandering spell nor ill intent might pass this threshold unbidden.",
+        "lore_source": "Christopher Marlowe, Doctor Faustus (c. 1592)",
+        "lore_author": "Christopher Marlowe",
+        "lore_work": "Doctor Faustus",
+        "lore_year": "c. 1592",
+    },
+    "Riposte": {
+        "lore_quote": "He parried, and with the same motion answered — for the truest defence is the counterstroke.",
+        "lore_source": "Alexandre Dumas, The Three Musketeers (1844)",
+        "lore_author": "Alexandre Dumas",
+        "lore_work": "The Three Musketeers",
+        "lore_year": "1844",
     },
 
     # =========================================================================

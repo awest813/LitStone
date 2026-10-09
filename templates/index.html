@@ -57,6 +57,13 @@
           <span class="hub-mode-desc">Learn the basics</span>
         </span>
       </button>
+      <button type="button" class="hub-mode hub-mode--arena" id="btn-hub-arena" onclick="goToArena()">
+        <span class="hub-mode-icon" aria-hidden="true">🏟️</span>
+        <span class="hub-mode-text">
+          <span class="hub-mode-title">Arena</span>
+          <span class="hub-mode-desc">Draft 30 cards, then duel</span>
+        </span>
+      </button>
     </div>
 
     <div class="hub-footer">
@@ -94,6 +101,10 @@
       <input type="checkbox" id="practice-infinite-mana" />
       <span>Infinite mana (both players)</span>
     </label>
+    <label class="practice-toggle">
+      <input type="checkbox" id="practice-solo" />
+      <span>No AI opponent (solo sandbox)</span>
+    </label>
     <label class="practice-field" for="practice-difficulty">
       <span>AI difficulty</span>
       <select id="practice-difficulty" class="setting-select">
@@ -115,6 +126,34 @@
       </select>
     </label>
     <button type="button" class="btn btn-primary" onclick="startPracticeFromSetup()">Choose Class &amp; Deck</button>
+    <div class="practice-presets">
+      <span class="practice-presets-label">Quick start with a preset starter deck:</span>
+      <div class="practice-preset-row">
+        <button type="button" class="practice-preset" data-class="Mage" onclick="startPracticePreset('Mage')">🔮 Mage</button>
+        <button type="button" class="practice-preset" data-class="Warrior" onclick="startPracticePreset('Warrior')">⚔️ Warrior</button>
+        <button type="button" class="practice-preset" data-class="Priest" onclick="startPracticePreset('Priest')">✨ Priest</button>
+        <button type="button" class="practice-preset" data-class="Rogue" onclick="startPracticePreset('Rogue')">🗡️ Rogue</button>
+        <button type="button" class="practice-preset" data-class="Paladin" onclick="startPracticePreset('Paladin')">🛡️ Paladin</button>
+        <button type="button" class="practice-preset" data-class="Shaman" onclick="startPracticePreset('Shaman')">⚡ Shaman</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =====================  SCREEN: ARENA DRAFT  ======================= -->
+<div id="screen-arena" class="screen">
+  <div class="menu-bg-overlay"></div>
+  <header class="menu-header">
+    <button type="button" class="btn btn-back btn-icon" onclick="goToHub()" title="Back" aria-label="Back to title">←</button>
+    <span class="menu-header-spacer"></span>
+  </header>
+  <h2 class="arena-title">Arena Draft</h2>
+  <p class="arena-subtitle" id="arena-subtitle">Choose a class to begin — then pick 1 of 3 cards, 30 times.</p>
+  <div class="arena-class-picker" id="arena-class-picker" role="group" aria-label="Choose a class"></div>
+  <div class="arena-draft hidden" id="arena-draft">
+    <div class="arena-progress" id="arena-progress" aria-live="polite"></div>
+    <div class="arena-choices" id="arena-choices"></div>
+    <div class="arena-actions" id="arena-actions"></div>
   </div>
 </div>
 
@@ -524,6 +563,15 @@
 
 <div id="status-toast" class="status-toast hidden" role="status" aria-live="polite"></div>
 
+<!-- Discover modal (choose 1 of 3) -->
+<div id="discover-overlay" class="discover-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="discover-title">
+  <div class="discover-panel">
+    <h2 id="discover-title">Discover</h2>
+    <p class="discover-subtitle">Choose one card to add to your hand.</p>
+    <div class="discover-cards" id="discover-cards"></div>
+  </div>
+</div>
+
 <!-- Confirm modal (global, replaces native confirm()) -->
 <div id="confirm-modal" class="modal-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
   <div class="modal-panel confirm-panel">
@@ -589,6 +637,16 @@
           <option value="instant">Instant</option>
         </select>
       </div>
+      <label class="setting-row">
+        <span>
+          <span class="setting-label">High contrast</span>
+          <div class="setting-hint">Stronger borders and brighter text for readability</div>
+        </span>
+        <span class="toggle-switch">
+          <input type="checkbox" id="setting-contrast" onchange="applySettingContrast(this.checked)" />
+          <span class="toggle-slider"></span>
+        </span>
+      </label>
     </div>
     <div class="settings-group">
       <div class="settings-group-title">Gameplay</div>

@@ -10,7 +10,7 @@ For the strategic plan to reach **Hearthstone Lite** quality, see [HEARTHSTONE_L
 
 The current state of the project establishes the core gameplay loop.
 
-- [x] Literary-themed card library (109 collectable cards + The Coin)
+- [x] Literary-themed card library (117 collectable cards + The Coin)
 - [x] 6 hero classes with unique hero powers (Mage, Warrior, Priest, Rogue, Paladin, Shaman)
 - [x] Full keyword system: Taunt, Divine Shield, Charge, Poisonous, Battlecry, Deathrattle, Silence
 - [x] Deck builder (30 cards, max 2 copies; legendaries max 1)
@@ -26,7 +26,7 @@ The current state of the project establishes the core gameplay loop.
 - [x] Mulligan phase (player)
 - [x] Deck filter/sort, mana curve, save/load decks (localStorage)
 - [x] Legendary minions (37 literary legends)
-- [x] Unit tests — 201 tests covering game logic, AI, career API, and browser E2E (`test_game_logic.py`, `test_career_playthrough.py`, `test_career_browser.py`)
+- [x] Unit tests — 236 tests covering game logic, AI, career API, and browser E2E (`test_game_logic.py`, `test_career_playthrough.py`, `test_career_browser.py`)
 
 ---
 
@@ -63,7 +63,7 @@ Goals: make the game feel complete and production-ready for single-player use.
 
 Goals: deepen the card pool and hero variety.
 
-- [x] **More cards** — 109-card library (61 neutral + 48 class-exclusive)
+- [x] **More cards** — 117-card library (69 neutral + 48 class-exclusive)
 - [x] **Additional hero classes** — Rogue, Paladin, and Shaman (Totemic Call)
 - [x] **Class-specific cards** — 8 cards per class; neutrals usable by all heroes
 - [x] **Legendary minions** — 37 high-impact unique cards (one copy per deck)
@@ -77,6 +77,12 @@ Goals: deepen the card pool and hero variety.
 - [x] **Chapter & Roman Turn Banners** — turn notifications rendered as dramatic book chapters (Prologue, Chapter I through X, The Climax)
 - [x] **Dynamic Legendary Battlecry Speeches** — atmospheric speech bubbles quoting classic literature when legendary cards are summoned by player or AI
 - [x] **Match Epilogues & Campaign Epigraphs** — thematic classical quotes concluding matches and introducing campaign chapters
+- [x] **Windfury & Lifesteal** — minions may attack twice per turn or heal their hero from damage dealt
+- [x] **Discover** — choose one of three offered cards to add to your hand (spell + UI modal + AI auto-pick)
+- [x] **Secrets** — hidden reactive traps that trigger on an opponent's minion play, spell cast, or attack
+- [x] **Mobile board readability** — larger minion slots and tap-to-preview cards on touch in duels
+- [x] **Server-side deck storage** — account-less saved decks keyed by a browser token (`/api/decks`)
+- [x] **Practice quick-start presets** — one-tap sandbox entry with a curved starter deck for any class, plus a no-AI solo toggle
 
 ---
 
@@ -111,7 +117,7 @@ Ideas that may be incorporated into any version:
 - [x] Tutorial match with in-game step hints
 - [x] Practice sandbox mode (custom HP / infinite mana)
 - Replay system — save and replay past games
-- Draft / Arena mode — pick cards one at a time from random sets
-- New keywords: Windfury, Lifesteal, Discover, Secrets
-- Accessibility improvements (screen reader support, high-contrast theme)
+- [x] Draft / Arena mode — pick 1 of 3 cards thirty times to build a deck, then duel
+- [x] New keywords: Windfury, Lifesteal, Discover, Secrets
+- [x] Accessibility improvements — high-contrast theme toggle, strong focus rings, ARIA labels/roles
 - Localization (i18n framework for non-English languages)

@@ -24,6 +24,9 @@ from game_logic import (
     card_allowed_for_class, cards_for_class,
     clamp_practice_hp, apply_practice_options, effective_mana,
     clamp_heal, _ai_should_pass_turn, _hero_missing_hp, CURVE_TARGETS,
+    max_attacks, check_immediate_lethal,
+    DISCOVER_OPTIONS, open_discover, resolve_discover, ai_choose_discover,
+    MAX_SECRETS,
 )
 
 
@@ -1465,6 +1468,17 @@ class TestPracticeSandbox(unittest.TestCase):
         execute_move(p1, p2, ("play", 0, None))
         self.assertEqual(p1["mana"], 10)
 
+    def test_solo_mode_ai_takes_no_actions(self):
+        p2 = create_player("AI", "Mage", shuffle=False)
+        p1 = create_player("P", "Warrior", shuffle=False)
+        p2["hand"] = ["Quill Bolt", "Town Crier"]
+        p2["mana"] = 10
+        p2["max_mana"] = 10
+        moves = run_ai_turn(p2, p1, draw=True, solo=True)
+        self.assertEqual(moves, [])
+        self.assertEqual(p1["board"], [])
+        self.assertEqual(p1["hp"], 30)
+
 
 class TestGameplayPolish(unittest.TestCase):
     def test_hero_one_attack_per_turn_after_weapon(self):
@@ -1510,6 +1524,245 @@ class TestGameplayPolish(unittest.TestCase):
         self.assertIsNotNone(move)
         self.assertIn(move, legal)
 
+    def test_ai_prefers_least_bad_when_all_scores_negative(self):
+        """When every move hurts, the AI must take the highest-scored option."""
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        # A lethal taunt wall: swinging the weapon in would kill the hero, while
+        # trading the 1-attack minion is merely bad — not fatal.
+        p1["board"] = [_make_minion("Wall", 6, 8, taunt=True)]
+        p2["board"] = [_make_minion("Scout", 1, 1)]
+        p2["weapon"] = {"name": "Heroic Blade", "atk": 3, "durability": 5}
+        p2["hero_can_attack"] = True
+        p2["hp"] = 5
+        p2["mana"] = 0
+        p2["hand"] = []
+        legal = get_legal_moves(p2, p1)
+        self.assertIn(("hero_attack", None, 0), legal)
+        self.assertIn(("attack", 0, 0), legal)
+        chosen = select_ai_move(legal, p2, p1, "normal")
+        best = max(evaluate_ai_move(p2, p1, mv) for mv in legal)
+        self.assertAlmostEqual(evaluate_ai_move(p2, p1, chosen), best)
+        # The suicidal weapon swing must not be selected.
+        self.assertNotEqual(chosen, ("hero_attack", None, 0))
+
+    def test_zero_attack_minion_cannot_attack(self):
+        p1 = create_player("P", "Shaman", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p1["board"] = [_make_minion("Wrath of Air Totem", 0, 2)]
+        moves = get_legal_moves(p1, p2)
+        self.assertFalse(any(m[0] == "attack" for m in moves))
+
+    def test_ai_deck_builder_does_not_overfill_buckets(self):
+        # With abundant candidates at every cost, each bucket must fill to
+        # exactly its target. The old `try_add(name) and added < need` ordering
+        # added one extra per bucket (5,9,9,7,...), which also skewed real
+        # class decks. Patch in a controlled pool to make this deterministic.
+        from unittest import mock
+
+        import game_logic
+
+        fake_db: dict[str, dict] = {}
+        pool: list[str] = []
+        for cost in range(1, 7):
+            for i in range(6):
+                name = f"Pool {cost}-{i}"
+                fake_db[name] = {"type": "minion", "cost": cost, "atk": 1, "hp": 1}
+                pool.append(name)
+
+        with mock.patch.object(game_logic, "CARD_DB", fake_db), \
+                mock.patch.object(game_logic, "cards_for_class", lambda cls: list(pool)):
+            deck = build_curved_ai_deck("Mage")
+
+        self.assertEqual(len(deck), DECK_SIZE)
+        counts: dict[int, int] = {}
+        for name in deck:
+            bucket = int(name.split()[1].split("-")[0])
+            counts[bucket] = counts.get(bucket, 0) + 1
+        for cost, target in CURVE_TARGETS.items():
+            self.assertEqual(counts.get(cost, 0), target, f"cost {cost}")
+
+
+class TestWindfuryLifesteal(unittest.TestCase):
+    def test_windfury_cards_are_neutral(self):
+        for name in ("Zephyr Duelist", "Stormwing Gryphon", "Chalice Acolyte", "Crimson Reveler"):
+            with self.subTest(card=name):
+                self.assertIn(name, CARD_DB)
+                self.assertNotIn("classes", CARD_DB[name])
+                self.assertTrue(card_allowed_for_class(name, "Warrior"))
+
+    def test_windfury_minion_attacks_twice(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p1["board"] = [_make_minion("Zephyr Duelist", 2, 3, windfury=True)]
+        p1["mana"] = 10
+        self.assertEqual(max_attacks(p1["board"][0]), 2)
+
+        execute_move(p1, p2, ("attack", 0, "hero"))
+        self.assertTrue(p1["board"][0]["can_attack"])
+        self.assertIn(("attack", 0, "hero"), get_legal_moves(p1, p2))
+
+        execute_move(p1, p2, ("attack", 0, "hero"))
+        self.assertFalse(p1["board"][0]["can_attack"])
+        self.assertNotIn(("attack", 0, "hero"), get_legal_moves(p1, p2))
+        self.assertEqual(p2["hp"], 26)
+
+    def test_standard_minion_attacks_once(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p1["board"] = [_make_minion("Highwayman", 3, 3)]
+        p1["mana"] = 10
+        execute_move(p1, p2, ("attack", 0, "hero"))
+        self.assertFalse(p1["board"][0]["can_attack"])
+        self.assertNotIn(("attack", 0, "hero"), get_legal_moves(p1, p2))
+
+    def test_lifesteal_heals_hero_on_face_damage(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p1["hp"] = 20
+        p1["board"] = [_make_minion("Crimson Reveler", 3, 4, lifesteal=True)]
+        p1["mana"] = 10
+        execute_move(p1, p2, ("attack", 0, "hero"))
+        self.assertEqual(p2["hp"], 27)
+        self.assertEqual(p1["hp"], 23)
+
+    def test_lifesteal_heals_hero_on_minion_damage(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p1["hp"] = 20
+        p2["board"] = [_make_minion("Wall", 1, 5)]
+        p1["board"] = [_make_minion("Crimson Reveler", 3, 4, lifesteal=True)]
+        p1["mana"] = 10
+        execute_move(p1, p2, ("attack", 0, 0))
+        self.assertEqual(p1["hp"], 23)
+        self.assertEqual(p2["board"][0]["hp"], 2)
+
+    def test_silence_removes_windfury_and_extra_attack(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p2["board"] = [_make_minion("Zephyr Duelist", 2, 3, windfury=True)]
+        p2["board"][0]["attacks_this_turn"] = 1
+        p2["board"][0]["can_attack"] = True
+        p1["hand"] = ["Tome of Silence"]
+        p1["mana"] = 10
+        execute_move(p1, p2, ("play", 0, 0))
+        self.assertFalse(p2["board"][0].get("windfury"))
+        self.assertFalse(p2["board"][0]["can_attack"])
+
+    def test_lethal_solver_counts_windfury(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p1["board"] = [_make_minion("Zephyr Duelist", 8, 3, windfury=True)]
+        p1["mana"] = 0
+        p1["hand"] = []
+        p2["hp"] = 15
+        has_lethal, dmg = check_immediate_lethal(p1, p2)
+        self.assertTrue(has_lethal)
+        self.assertGreaterEqual(dmg, 16)
+
+
+class TestDiscover(unittest.TestCase):
+    def _play_discover(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p1["hand"] = ["Fabled Discovery"]
+        p1["mana"] = 10
+        execute_move(p1, p2, ("play", 0, None))
+        return p1, p2
+
+    def test_discover_opens_choice_and_locks_turn(self):
+        p1, p2 = self._play_discover()
+        pending = p1.get("pending_discover")
+        self.assertIsNotNone(pending)
+        self.assertEqual(len(pending["options"]), DISCOVER_OPTIONS)
+        self.assertEqual(get_legal_moves(p1, p2),
+                         [("discover", i, None) for i in range(DISCOVER_OPTIONS)])
+
+    def test_discover_choice_adds_card_to_hand(self):
+        p1, p2 = self._play_discover()
+        chosen = p1["pending_discover"]["options"][1]
+        execute_move(p1, p2, ("discover", 1, None))
+        self.assertNotIn("pending_discover", p1)
+        self.assertIn(chosen, p1["hand"])
+
+    def test_discover_options_are_legal_for_class(self):
+        p1 = create_player("P", "Priest", shuffle=False)
+        for name in open_discover(p1):
+            self.assertTrue(card_allowed_for_class(name, "Priest"))
+
+    def test_discover_hand_full_burns_choice(self):
+        p1, p2 = self._play_discover()
+        p1["hand"] = ["Town Crier"] * 10  # full hand
+        execute_move(p1, p2, ("discover", 0, None))
+        self.assertNotIn("pending_discover", p1)
+        self.assertEqual(len(p1["hand"]), 10)  # choice is lost, hand unchanged
+
+    def test_ai_resolves_its_own_discover(self):
+        p2 = create_player("AI", "Mage", shuffle=False)
+        p1 = create_player("P", "Warrior", shuffle=False)
+        p2["hand"] = ["Fabled Discovery"]
+        p2["deck"] = ["Town Crier"] * 5
+        run_ai_turn(p2, p1, difficulty="normal")
+        self.assertNotIn("pending_discover", p2)
+
+    def test_ai_choose_discover_prefers_biggest_card(self):
+        p2 = create_player("AI", "Mage", shuffle=False)
+        p2["pending_discover"] = {"options": ["Town Crier", "King Arthur", "Highwayman"]}
+        self.assertEqual(ai_choose_discover(p2), 1)
+
+
+class TestSecrets(unittest.TestCase):
+    def _play(self, card, caster_class="Mage"):
+        p1 = create_player("P", caster_class, shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p1["hand"] = [card]
+        p1["mana"] = 10
+        execute_move(p1, p2, ("play", 0, None))
+        return p1, p2
+
+    def test_secret_is_stored_and_not_opponent_visible(self):
+        from server import _serialize_opponent
+        p1, p2 = self._play("Explosive Runes")
+        self.assertEqual(len(p1["secrets"]), 1)
+        self.assertEqual(p1["secrets"][0]["name"], "Explosive Runes")
+        masked = _serialize_opponent(p1)
+        self.assertNotIn("secrets", masked)
+        self.assertEqual(masked["secret_count"], 1)
+
+    def test_explosive_runes_damages_played_minion(self):
+        p1, p2 = self._play("Explosive Runes")
+        p2["hand"] = ["Highwayman"]
+        p2["mana"] = 10
+        execute_move(p2, p1, ("play", 0, None))
+        self.assertEqual(p2["board"], [])  # 3/3 takes 3 damage and dies
+        self.assertEqual(p1["secrets"], [])  # secret consumed
+
+    def test_warding_sigil_grants_armor_on_opponent_spell(self):
+        p1, p2 = self._play("Warding Sigil")
+        p2["hand"] = ["Quill Bolt"]
+        p2["mana"] = 10
+        execute_move(p2, p1, ("play", 0, "hero"))
+        self.assertEqual(p1["armor"], 4)
+        self.assertEqual(p1["secrets"], [])
+
+    def test_riposte_punishes_attacking_hero(self):
+        p1, p2 = self._play("Riposte")
+        p2["board"] = [_make_minion("Highwayman", 3, 3)]
+        p2["mana"] = 10
+        execute_move(p2, p1, ("attack", 0, "hero"))
+        self.assertEqual(p2["hp"], 27)
+        self.assertEqual(p1["secrets"], [])
+
+    def test_secrets_are_capped(self):
+        p1 = create_player("P", "Mage", shuffle=False)
+        p2 = create_player("AI", "Warrior", shuffle=False)
+        p1["hand"] = ["Explosive Runes"] * 5
+        p1["mana"] = 20
+        for _ in range(5):
+            if ("play", 0, None) in get_legal_moves(p1, p2):
+                execute_move(p1, p2, ("play", 0, None))
+        self.assertEqual(len(p1["secrets"]), MAX_SECRETS)
+
 
 class TestGameStore(unittest.TestCase):
     def test_save_load_delete(self):
@@ -1527,6 +1780,23 @@ class TestGameStore(unittest.TestCase):
             self.assertEqual(loaded["g1"]["turn_number"], 1)
             store.delete("g1")
             self.assertEqual(store.load_all(), {})
+
+    def test_deck_storage_round_trip(self):
+        import os
+        import tempfile
+        from game_store import GameStore
+
+        with tempfile.TemporaryDirectory() as td:
+            store = GameStore(os.path.join(td, "decks.db"))
+            store.save_deck("token12345678", "Aggro", "Warrior", ["Town Crier", "Town Crier"])
+            decks = store.list_decks("token12345678")
+            self.assertEqual(len(decks), 1)
+            self.assertEqual(decks[0]["name"], "Aggro")
+            self.assertEqual(decks[0]["heroClass"], "Warrior")
+            self.assertEqual(decks[0]["cards"], ["Town Crier", "Town Crier"])
+            self.assertEqual(store.list_decks("other-token"), [])
+            store.delete_deck("token12345678", "Aggro")
+            self.assertEqual(store.list_decks("token12345678"), [])
 
 
 try:
@@ -1555,6 +1825,68 @@ class TestServerApi(unittest.TestCase):
         res = client.post("/api/new_game", json={"hero_class": "Mage", "deck": bad})
         self.assertEqual(res.status_code, 400)
         self.assertIn("error", res.get_json())
+
+    def test_deck_api_round_trip(self):
+        import uuid as _uuid
+        from server import app
+        client = app.test_client()
+        token = _uuid.uuid4().hex
+        res = client.post("/api/decks", json={
+            "token": token, "name": "Test Deck", "heroClass": "Mage",
+            "cards": ["Town Crier", "Quill Bolt"],
+        })
+        self.assertEqual(res.status_code, 200)
+        data = client.get(f"/api/decks?token={token}").get_json()
+        self.assertEqual(len(data["decks"]), 1)
+        self.assertEqual(data["decks"][0]["name"], "Test Deck")
+        client.post("/api/decks/delete", json={"token": token, "name": "Test Deck"})
+        self.assertEqual(client.get(f"/api/decks?token={token}").get_json()["decks"], [])
+
+    def test_deck_api_rejects_bad_token(self):
+        from server import app
+        client = app.test_client()
+        self.assertEqual(client.get("/api/decks?token=short").status_code, 400)
+
+    def test_deck_api_rejects_illegal_cards(self):
+        import uuid as _uuid
+        from server import app
+        client = app.test_client()
+        res = client.post("/api/decks", json={
+            "token": _uuid.uuid4().hex, "name": "X", "heroClass": "Mage",
+            "cards": ["Lightning Limerick"],
+        })
+        self.assertEqual(res.status_code, 400)
+
+    def test_deck_with_non_string_cards_rejected(self):
+        from server import app
+        client = app.test_client()
+        # Unhashable deck entries must be a 400, never a 500 TypeError.
+        res = client.post("/api/new_game", json={"hero_class": "Mage", "deck": [[] for _ in range(DECK_SIZE)]})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("error", res.get_json())
+
+    def test_player_deck_is_masked(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        data = client.post("/api/new_game", json={"hero_class": "Mage", "deck": deck}).get_json()
+        # Player's future draws must stay hidden; only the count is exposed.
+        self.assertTrue(all(c == "?" for c in data["p1"]["deck"]))
+        self.assertGreater(len(data["p2"]["hand"]), 0)
+        self.assertNotEqual(data["p1"]["deck"], deck[: len(data["p1"]["deck"])])
+
+    def test_campaign_nonboss_opponent_named(self):
+        from server import app
+        client = app.test_client()
+        deck = create_player("P", "Mage", shuffle=False)["deck"]
+        res = client.post("/api/new_game", json={
+            "hero_class": "Mage",
+            "deck": deck,
+            "campaign_node": "n1",
+        })
+        data = res.get_json()
+        self.assertEqual(data["opponent_name"], "Street Urchin")
+        self.assertEqual(data["p2"]["name"], "Street Urchin")
 
     def test_invalid_hero_class_rejected(self):
         from server import app

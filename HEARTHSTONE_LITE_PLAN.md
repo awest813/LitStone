@@ -6,7 +6,7 @@ This document defines what **Hearthstone Lite** means for LitStone and lays out 
 
 ## Audit Summary (June 2026 — updated)
 
-LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collectable cards, career/tutorial/practice modes, SQLite session persistence, animations, SFX, responsive UI polish, and **193 tests** (`test_game_logic.py`, `test_career_playthrough.py`, `test_career_browser.py`).
+LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 117 collectable cards, full keyword coverage (incl. Windfury, Lifesteal, Discover, Secrets), career/tutorial/practice modes, SQLite session persistence, animations, SFX, responsive UI polish, and **236 tests** (`test_game_logic.py`, `test_career_playthrough.py`, `test_career_browser.py`).
 
 ### What already feels good
 
@@ -21,18 +21,17 @@ LitStone is a **playable Hearthstone-style prototype** with 6 heroes, 109 collec
 | In-match UX (mana HUD, help bar, collapsible log, mobile hand/tray) | ✅ Partial |
 | Animations + Web Audio SFX (mute toggle) | ✅ Complete |
 | Procedural card art — class-themed frames, motifs, tooltip previews | ✅ Complete |
-| Rules tests | ✅ 193 tests in `test_game_logic.py` + `test_career_playthrough.py` + `test_career_browser.py` |
+| Rules tests | ✅ 236 tests in `test_game_logic.py` + `test_career_playthrough.py` + `test_career_browser.py` |
 
 ### Remaining gaps vs. Shippable Lite
 
 | Gap | Impact |
 |-----|--------|
 | Procedural card frames (no bespoke illustrated art per card) | Good readability; less immersion than full art |
-| Reduced random noise at Hard difficulty | Flat replay at Easy |
-| Practice sandbox polish (deck presets, no-AI solo) | Nice-to-have |
-| No discover / secrets / windfury / lifesteal | Missing HS texture |
-| In-match card tooltips are hover-only (deck pool has tap preview) | Harder card preview on touch in duels |
+| Practice no-AI solo mode (deck presets ✅ shipped as quick-start buttons) | Nice-to-have |
 | Illustrated card art (beyond procedural frames) | Less immersion |
+
+**Closed since the last audit:** Windfury, Lifesteal, Discover, and Secrets are implemented end-to-end; in-match board minions now support tap-to-preview on touch; mobile board minions are larger and easier to tap; account-less server-side deck storage exists (`/api/decks`); Hard difficulty commits to the best line deterministically (no random tie-breaks outside the Gambler personality).
 
 ---
 
@@ -94,12 +93,12 @@ flowchart TB
 | Resign / cleanup | ✅ `POST /api/resign` clears server state | Resign → new game works without refresh |
 | Card text from server | ✅ `collectible_card_db()` enriches spells/battlecries/deathrattles via API | Client reads `desc_short` / `desc_long` with local fallback |
 
-**Engine keywords to add (priority order):**
+**Engine keywords to add (priority order):** ✅ all shipped
 
-1. **Windfury** — attack twice per turn
-2. **Lifesteal** — damage heals hero
-3. **Discover** — pick 1 of 3 random cards (lite: from subset of pool)
-4. **Secrets** — 1 hidden reactive spell slot (start with 2–3 secrets total)
+1. ✅ **Windfury** — can attack twice per turn (`max_attacks`, per-minion attack counter)
+2. ✅ **Lifesteal** — damage dealt restores hero HP (`damage_hero` returns actual HP lost)
+3. ✅ **Discover** — choose 1 of 3 offered cards (`open_discover` / `resolve_discover`, UI modal, AI auto-pick)
+4. ✅ **Secrets** — hidden reactive traps triggered on enemy minion play, spell cast, or attack (`_trigger_secrets`)
 
 ---
 
@@ -114,7 +113,7 @@ flowchart TB
 | Death animation — shard burst at last board position | ✅ |
 | Hero weapon swing | ✅ |
 | Sound design — Web Audio + mute toggle | ✅ |
-| Board readability — larger minion slots on mobile | ⬜ |
+| Board readability — larger minion slots on mobile | ✅ (larger slots + tap-to-preview in duels) |
 | Loading states | ✅ (partial) |
 
 **Art direction (lite):** Commission or generate **consistent card frames + silhouettes** per literary character. Emoji is fine for dev; Lite needs illustrated or styled SVG portraits at minimum.
@@ -161,7 +160,7 @@ flowchart TB
 | Task | Details |
 |------|---------|
 | SQLite game store | Persist active games; survive server restart | ✅ |
-| Deck storage (server) | Optional account-less deck list via browser token | ⬜ |
+| Deck storage (server) | Optional account-less deck list via browser token | ✅ (`/api/decks`) |
 | Environment config | `FLASK_DEBUG`, `PORT`, `SECRET_KEY` via env | ✅ |
 | Docker image | `python:3.12-slim` + gunicorn | ✅ |
 | CI pipeline | `unittest` + optional `ruff` on push | ✅ |
@@ -249,6 +248,11 @@ Add new mechanics in Python with tests **before** wiring UI.
 6. ~~**Sound effects**~~ — ✅ Web Audio API with mute toggle (`localStorage`).
 7. ~~**Class card schema**~~ — ✅ `"classes": ["Mage"]` on 48 class-exclusive cards; deck builder filters by hero.
 8. ~~**Boss encounters**~~ — ✅ 3 scripted AI bosses with unique decks (Frankenstein, Van Helsing, Moriarty).
+9. ~~**Windfury + Lifesteal**~~ — ✅ engine, cards, AI scoring, UI badges, tests.
+10. ~~**Discover**~~ — ✅ spell + pick-1-of-3 modal, AI auto-pick, turn-lock until chosen.
+11. ~~**Secrets**~~ — ✅ hidden traps (minion played / spell cast / attack) with opponent masking.
+12. ~~**Mobile board readability + touch previews**~~ — ✅ larger minion slots and tap-to-preview in duels.
+13. ~~**Server-side deck storage**~~ — ✅ account-less `GET/POST /api/decks` keyed by a browser token.
 
 ---
 
@@ -259,7 +263,7 @@ Add new mechanics in Python with tests **before** wiring UI.
 | Average game length | 8–15 turns |
 | New player completes tutorial | > 80% |
 | Mobile deck build (375px width) | No horizontal scroll |
-| Unit test count | 193 (200+ stretch) |
+| Unit test count | 236 (200+ stretch) |
 | AI win rate vs default deck (Normal) | 45–55% |
 | Lighthouse performance (desktop) | > 80 |
 

@@ -5,6 +5,7 @@ Serves the browser-based UI and exposes a JSON REST API for all game actions.
 
 import os
 import random
+import re
 import uuid
 from contextlib import contextmanager
 
@@ -12,7 +13,6 @@ from flask import Flask, jsonify, render_template, request
 from whitenoise import WhiteNoise
 
 from game_logic import (
-    AI_PERSONALITIES,
     BOSS_PRESETS,
     CAMPAIGN_NODES,
     CARD_DB,
@@ -31,13 +31,12 @@ from game_logic import (
     cards_for_class,
     check_win,
     clamp_practice_hp,
-    collectible_card_db,
-    full_card_db,
     create_ai_opponent,
     create_player,
     do_mulligan,
     draw_card,
     execute_move,
+    full_card_db,
     get_campaign_node,
     get_legal_moves,
     give_coin,
@@ -91,16 +90,22 @@ def _validate_deck(deck: list, hero_class: str) -> bool:
     return (
         isinstance(deck, list) and
         len(deck) == DECK_SIZE and
-        all(c in pool for c in deck) and
+        all(isinstance(c, str) and c in pool for c in deck) and
         all(card_allowed_for_class(c, hero_class) for c in deck) and
         all(deck.count(c) <= card_max_copies(c) for c in deck)
     )
 
 
 def _serialize(player: dict) -> dict:
-    """Return a JSON-safe copy of a player dict."""
+    """Return a JSON-safe copy of a player dict.
+
+    The remaining deck is masked so a client cannot read its own future draws.
+    Only the count is exposed (the UI shows a deck badge).
+    """
     p = dict(player)
     p["board"] = [dict(m) for m in player["board"]]
+    p["hand"] = list(player["hand"])
+    p["deck"] = ["?"] * len(player["deck"])
     return p
 
 
@@ -109,6 +114,10 @@ def _serialize_opponent(player: dict) -> dict:
     p = _serialize(player)
     p["hand"] = ["?"] * len(player["hand"])
     p["deck"] = ["?"] * len(player["deck"])
+    # Hidden interactive state must never leak to the opponent — only counts.
+    p.pop("pending_discover", None)
+    p["secret_count"] = len(player.get("secrets", []))
+    p.pop("secrets", None)
     return p
 
 
@@ -167,7 +176,9 @@ def _normalize_target(raw) -> int | str | None:
 
 def _log_winner_if_any(p1: dict, p2: dict) -> str | None:
     winner = check_win(p1, p2)
-    if winner:
+    if winner == "DRAW":
+        log_action("=== The duel ends in a draw! ===")
+    elif winner:
         log_action(f"=== {winner} wins! ===")
     return winner
 
@@ -209,6 +220,7 @@ def _finish_mulligan(gs: dict) -> None:
         draw=False,
         difficulty=gs.get("ai_difficulty", "normal"),
         personality=gs.get("ai_personality", "balanced"),
+        solo=gs.get("solo", False),
     )
     if _log_winner_if_any(gs["p1"], gs["p2"]):
         return
@@ -257,6 +269,7 @@ def _parse_practice_options(data: dict) -> dict | None:
         "p1_hp": clamp_practice_hp(data.get("p1_hp")),
         "p2_hp": clamp_practice_hp(data.get("p2_hp")),
         "infinite_mana": bool(data.get("infinite_mana")),
+        "solo": bool(data.get("solo")),
     }
 
 
@@ -325,6 +338,7 @@ def _enrich_campaign_nodes() -> list[dict]:
         elif enriched.get("ai_class"):
             enriched["opponent_class"] = enriched["ai_class"]
             enriched["opponent_hp"] = DEFAULT_HERO_HP
+            enriched["opponent_name"] = enriched.get("name", "AI")
         nodes.append(enriched)
     return nodes
 
@@ -351,6 +365,55 @@ def starter_deck():
         "deck_size": DECK_SIZE,
         "curve_targets": CURVE_TARGETS,
     })
+
+
+DECK_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
+DECK_NAME_MAX = 60
+
+
+def _valid_deck_token(token: str) -> bool:
+    return bool(token) and DECK_TOKEN_RE.match(token) is not None
+
+
+@app.route("/api/decks", methods=["GET"])
+def list_decks():
+    """Return the account-less deck list stored for a browser token."""
+    token = (request.args.get("token") or "").strip()
+    if not _valid_deck_token(token):
+        return jsonify({"error": "Invalid deck token"}), 400
+    return jsonify({"decks": STORE.list_decks(token)})
+
+
+@app.route("/api/decks", methods=["POST"])
+def save_deck():
+    data = request.get_json() or {}
+    token = (data.get("token") or "").strip()
+    name = (data.get("name") or "").strip()
+    hero_class = data.get("heroClass") or data.get("hero_class")
+    cards = data.get("cards")
+    if not _valid_deck_token(token):
+        return jsonify({"error": "Invalid deck token"}), 400
+    if not name or len(name) > DECK_NAME_MAX:
+        return jsonify({"error": "Deck name must be 1–60 characters"}), 400
+    if hero_class not in HERO_CLASSES:
+        return jsonify({"error": f"Unknown hero class: {hero_class}"}), 400
+    if not isinstance(cards, list) or not all(isinstance(c, str) for c in cards):
+        return jsonify({"error": "Invalid deck"}), 400
+    if len(cards) > DECK_SIZE or any(not card_allowed_for_class(c, hero_class) for c in cards):
+        return jsonify({"error": "Deck contains illegal cards"}), 400
+    STORE.save_deck(token, name, hero_class, cards)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/decks/delete", methods=["POST"])
+def delete_deck():
+    data = request.get_json() or {}
+    token = (data.get("token") or "").strip()
+    name = (data.get("name") or "").strip()
+    if not _valid_deck_token(token) or not name:
+        return jsonify({"error": "Invalid request"}), 400
+    STORE.delete_deck(token, name)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/new_game", methods=["POST"])
@@ -396,6 +459,7 @@ def new_game():
         "boss_id":           match["boss_id"],
         "tutorial":          match["tutorial"],
         "mode":              match["mode"],
+        "solo":              bool(match["practice"] and match["practice"].get("solo")),
         "log":               [],
     }
     if match["practice"]:
@@ -407,7 +471,6 @@ def new_game():
         apply_practice_options(gs["p2"], hp=opts["p2_hp"], infinite_mana=opts["infinite_mana"])
 
     GAMES[game_id] = gs
-    _persist_game(gs)
 
     with _with_game_log(gs):
         log_action("--- NEW GAME STARTED ---")
@@ -420,8 +483,9 @@ def new_game():
         if gs.get("practice"):
             opts = gs["practice"]
             mana_note = " · infinite mana" if opts["infinite_mana"] else ""
+            solo_note = " · solo (no AI)" if opts.get("solo") else ""
             log_action(
-                f"--- Practice Sandbox — You {opts['p1_hp']} HP · AI {opts['p2_hp']} HP{mana_note} ---"
+                f"--- Practice Sandbox — You {opts['p1_hp']} HP · AI {opts['p2_hp']} HP{mana_note}{solo_note} ---"
             )
         personality_label = f" ({gs['ai_personality'].title()})" if gs["ai_personality"] != "balanced" else ""
         log_action(f"Opponent: {gs['p2']['name']} ({gs['p2']['hero_class']}) · {gs['ai_difficulty'].title()} AI{personality_label}")
@@ -429,6 +493,10 @@ def new_game():
         log_action(order)
         _deal_opening_hands(gs)
         log_action("--- Mulligan Phase: choose cards to replace ---")
+
+    # Persist only after the opening hands are dealt so a server restart during
+    # the mulligan restores a complete, playable session.
+    _persist_game(gs)
 
     return jsonify(_state_response(gs, include_card_db=True))
 
@@ -497,6 +565,7 @@ def do_action():
                 p1,
                 difficulty=gs.get("ai_difficulty", "normal"),
                 personality=gs.get("ai_personality", "balanced"),
+                solo=gs.get("solo", False),
             )
             if not _log_winner_if_any(p1, p2):
                 gs["turn_number"] += 1

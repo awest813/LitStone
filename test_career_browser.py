@@ -8,6 +8,10 @@ import json
 
 try:
     import pytest
+
+    from career_test_support import CHAPTER_NAMES, setup_lethal_turn
+    from server import GAMES
+
     pytestmark = pytest.mark.browser
 except ImportError:
     import unittest
@@ -132,6 +136,33 @@ def _advance_via_winner_next(page) -> None:
     if page.locator("#screen-mulligan.active").count():
         _confirm_mulligan(page, track_response=True)
     _wait_for_match_ready(page)
+
+
+@pytest.mark.browser
+def test_arena_draft_reaches_match(browser_page):
+    page, base = browser_page
+    page.goto(base)
+    page.wait_for_selector("#screen-hub.active")
+    page.evaluate("""() => localStorage.removeItem("litstoneActiveGame")""")
+
+    page.click("#btn-hub-arena")
+    page.wait_for_selector("#screen-arena.active")
+    page.click('.arena-class-btn[data-class="Mage"]')
+    page.wait_for_selector("#arena-choices .discover-card")
+
+    for _ in range(30):
+        page.locator("#arena-choices .discover-card").first.click()
+
+    page.wait_for_selector("#arena-actions .btn-primary")
+    with page.expect_response(
+        lambda r: "/api/new_game" in r.url and r.request.method == "POST" and r.status == 200
+    ):
+        page.click("#arena-actions .btn-primary")
+    _wait_loading_done(page)
+    page.wait_for_selector("#screen-mulligan.active, #screen-game.active")
+    if page.locator("#screen-mulligan.active").count():
+        _confirm_mulligan(page)
+    assert _active_game_id(page)
 
 
 @pytest.mark.browser

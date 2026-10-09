@@ -976,6 +976,35 @@ body::after {
   transform: translateX(2px);
 }
 
+.secret-zone {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 3px;
+  z-index: 5;
+}
+.secret-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1;
+  background: linear-gradient(160deg, #3a2a6a, #241846);
+  border: 1px solid #8a6fe0;
+  box-shadow: 0 0 8px rgba(138, 111, 224, .6);
+  cursor: help;
+}
+.secret-chip--hidden {
+  color: #cdbcf5;
+  font-weight: 700;
+  background: linear-gradient(160deg, #241846, #120a28);
+}
+
 .deck-entry--minion { border-left-color: #6c7a89; }
 .deck-entry--spell  { border-left-color: var(--col-mana-bright); }
 .deck-entry--weapon { border-left-color: #e67e22; }
@@ -3556,3 +3585,47 @@ body::after {
 }
 
 
+
+
+/* ============================================================
+   MOBILE BOARD READABILITY — larger, easier-to-tap minions
+   ============================================================ */
+@media (max-width: 600px) {
+  .board { min-height: 152px; gap: 12px; padding: 10px 12px; }
+  .minion-card {
+    width: 94px;
+    padding: 5px 5px 15px;
+  }
+  .card-art--board { height: 56px; }
+  .card-art--board .card-art__glyph { font-size: 32px; }
+  .minion-name { font-size: 10px; }
+  .stat-badge { width: 27px; height: 27px; font-size: 13px; }
+  .kw-badge { font-size: 8px; padding: 0 4px; }
+}
+
+
+/* ============================================================
+   HIGH CONTRAST THEME (accessibility)
+   ============================================================ */
+body.high-contrast {
+  --col-bg:            #000000;
+  --col-surface:       #0a121f;
+  --col-panel:         #121c2e;
+  --col-border:        #5a7ea8;
+  --col-border-bright: #8ac0f0;
+  --col-text:          #ffffff;
+  --col-text-dim:      #c8d8ea;
+  --col-gold-bright:   #ffe680;
+  --col-green-bright:  #00ffcc;
+  --col-mana-bright:   #6ab8ff;
+  --col-purple-bright: #c77dff;
+}
+body.high-contrast .minion-card.exhausted { filter: none; opacity: .82; }
+body.high-contrast .minion-card.invalid-target { filter: none; opacity: 1; outline: 3px dashed #ff5555; }
+body.high-contrast .btn,
+body.high-contrast button,
+body.high-contrast .pool-card,
+body.high-contrast .hand-card,
+body.high-contrast .hero-card { border-width: 2px; }
+body.high-contrast :focus-visible { outline: 3px solid #ffe680 !important; outline-offset: 2px; }
+body.high-contrast .kw-badge { color: #fff !important; text-shadow: 0 1px 1px rgba(0,0,0,.9); }

@@ -5,6 +5,8 @@ so log entries render safely in any environment.
 """
 
 import random
+import threading
+
 from card_lore import get_card_lore
 
 # ---------------------------------------------------------------------------
@@ -18,8 +20,11 @@ MAX_BOARD_SIZE = 7
 MAX_HAND_SIZE = 10
 OPENING_HAND_FIRST = 3
 OPENING_HAND_SECOND = 4
+DISCOVER_OPTIONS = 3
+MAX_SECRETS = 3
 COIN_CARD = "The Coin"
-MINION_TRAITS = ("taunt", "divine_shield", "charge", "poisonous", "battlecry", "deathrattle")
+MINION_TRAITS = ("taunt", "divine_shield", "charge", "poisonous", "battlecry", "deathrattle",
+                 "windfury", "lifesteal")
 
 CARD_DB = {
     # ---------- Standard cards ----------
@@ -135,7 +140,16 @@ CARD_DB = {
     "Circle of Mending": {"type": "spell", "cost": 3, "effect": "heal_all",  "val": 3, "icon": "CM"},
     "Enchanted Shield": {"type": "spell", "cost": 1, "effect": "add_shield", "val": 1, "icon": "EN"},
     "Inkwell Blast":    {"type": "spell", "cost": 2, "effect": "damage_all", "val": 1, "icon": "IB"},
-    "Tome of Silence":  {"type": "spell", "cost": 3, "effect": "silence",    "val": 0, "icon": "TS"},
+    "Tome of Silence":  {"type": "spell",  "cost": 3, "effect": "silence",    "val": 0, "icon": "TS"},
+    "Fabled Discovery": {"type": "spell",  "cost": 1, "effect": "discover",   "val": 1, "icon": "FD"},
+
+    # ---------- Secret spells (hidden reactive traps) ----------
+    "Explosive Runes":  {"type": "spell", "cost": 2, "effect": "secret", "icon": "EX",
+                         "trigger": "minion_played", "secret_effect": "damage_minion", "val": 3},
+    "Warding Sigil":    {"type": "spell", "cost": 2, "effect": "secret", "icon": "SI",
+                         "trigger": "spell_cast", "secret_effect": "armor", "val": 4},
+    "Riposte":          {"type": "spell", "cost": 2, "effect": "secret", "icon": "RO",
+                         "trigger": "attack", "secret_effect": "damage_hero", "val": 3},
 
     # ---------- New legendary minions ----------
     "Ivanhoe":          {"type": "minion", "cost": 5, "atk": 4, "hp": 5, "taunt": True, "divine_shield": True,
@@ -145,6 +159,14 @@ CARD_DB = {
                          "legendary": True, "icon": "QS"},
     "Don Quixote":      {"type": "minion", "cost": 3, "atk": 4, "hp": 2, "charge": True,
                          "legendary": True, "icon": "DQ"},
+
+    # ---------- Windfury minions ----------
+    "Zephyr Duelist":   {"type": "minion", "cost": 3, "atk": 2, "hp": 3, "windfury": True, "icon": "ZD"},
+    "Stormwing Gryphon": {"type": "minion", "cost": 5, "atk": 3, "hp": 6, "windfury": True, "icon": "SG"},
+
+    # ---------- Lifesteal minions ----------
+    "Chalice Acolyte":  {"type": "minion", "cost": 2, "atk": 2, "hp": 2, "lifesteal": True, "icon": "LC"},
+    "Crimson Reveler":  {"type": "minion", "cost": 4, "atk": 3, "hp": 4, "lifesteal": True, "icon": "VR"},
 
     # ---------- Mage class cards ----------
     "Novice Pyromancer": {"type": "minion", "cost": 1, "atk": 1, "hp": 2, "classes": ["Mage"], "icon": "NP"},
@@ -452,7 +474,7 @@ def build_curved_ai_deck(hero_class: str, max_legendaries: int = 2) -> list[str]
         candidates = list(by_cost.get(cost, []))
         random.shuffle(candidates)
         for name in candidates:
-            while try_add(name) and added < need:
+            while added < need and try_add(name):
                 added += 1
             if added >= need:
                 break
@@ -461,7 +483,7 @@ def build_curved_ai_deck(hero_class: str, max_legendaries: int = 2) -> list[str]
                 if alt < 1 or alt > 6:
                     continue
                 for name in by_cost.get(alt, []):
-                    while try_add(name) and added < need:
+                    while added < need and try_add(name):
                         added += 1
                     if added >= need:
                         break
@@ -495,13 +517,15 @@ def create_ai_opponent(
         return player
 
     ai_class = hero_class or "Mage"
+    ai_name = "AI"
     if campaign_node:
         node = get_campaign_node(campaign_node)
         if node and not boss_id:
             ai_class = node.get("ai_class", ai_class)
+            ai_name = node.get("name", ai_name)
 
     deck = build_curved_ai_deck(ai_class)
-    return create_player("AI", ai_class, deck)
+    return create_player(ai_name, ai_class, deck)
 
 
 def normalize_difficulty(difficulty: str | None) -> str:
@@ -532,7 +556,9 @@ def select_ai_move(
 
     best_score = scored[0][0]
     if best_score < 0:
-        return scored[-1][1]
+        # Every available move hurts the AI — take the least-bad one instead of
+        # the worst (scored is sorted descending, so [0] is the highest score).
+        return scored[0][1]
 
     if difficulty == "hard":
         contenders = [mv for score, mv in scored if score >= best_score - 1.5]
@@ -544,13 +570,14 @@ def select_ai_move(
 
 
 GAME_LOG: list[str] = []
-_ACTIVE_LOG: list[str] | None = None
+# Thread-local active log: the server handles concurrent requests, and a plain
+# module global would leak one game's log lines into another's.
+_ACTIVE_LOG = threading.local()
 
 
 def set_active_log(log: list[str] | None) -> None:
     """Route log_action output to a per-game log list (used by the server)."""
-    global _ACTIVE_LOG
-    _ACTIVE_LOG = log
+    _ACTIVE_LOG.value = log
 
 
 def get_spell_desc(card: dict, short: bool = False) -> str:
@@ -565,6 +592,17 @@ def get_spell_desc(card: dict, short: bool = False) -> str:
     if e == "heal_all":   return f"Heal All {v} HP"         if short else f"Restore {v} HP to all friendly characters."
     if e == "add_shield": return "Add Shield"               if short else "Give a friendly minion Divine Shield."
     if e == "silence":    return "Silence"                  if short else "Remove all text from an enemy minion."
+    if e == "discover":   return "Discover 1 of 3"          if short else "Discover a card: choose one of three to add to your hand."
+    if e == "secret":
+        trigger = card.get("trigger")
+        short_map = {"minion_played": "Trap: Minion", "spell_cast": "Trap: Spell", "attack": "Trap: Attack"}
+        long_map = {
+            "minion_played": f"Secret: When your opponent plays a minion, deal {v} damage to it.",
+            "spell_cast": f"Secret: When your opponent casts a spell, gain {v} Armor.",
+            "attack": f"Secret: When your opponent attacks, deal {v} damage to their hero.",
+        }
+        return (short_map.get(trigger, "Secret") if short
+                else long_map.get(trigger, "Secret: a hidden trap that triggers on your opponent's turn."))
     return ""
 
 
@@ -626,8 +664,9 @@ def full_card_db() -> dict[str, dict]:
 
 def log_action(msg: str) -> None:
     GAME_LOG.append(msg)
-    if _ACTIVE_LOG is not None:
-        _ACTIVE_LOG.append(msg)
+    active = getattr(_ACTIVE_LOG, "value", None)
+    if active is not None:
+        active.append(msg)
 
 
 # ---------------------------------------------------------------------------
@@ -669,6 +708,11 @@ def clamp_heal(player: dict, amount: int) -> int:
     return max(0, min(amount, cap - player["hp"]))
 
 
+def max_attacks(minion: dict) -> int:
+    """How many times a minion may attack each turn (Windfury doubles it)."""
+    return 2 if minion.get("windfury") else 1
+
+
 def create_player(name: str, hero_class: str = "Mage",
                   custom_deck: list | None = None, shuffle: bool = True) -> dict:
     if custom_deck is not None:
@@ -693,6 +737,7 @@ def create_player(name: str, hero_class: str = "Mage",
         "weapon":          None,
         "hero_can_attack": False,
         "hero_attacked_this_turn": False,
+        "secrets":         [],
     }
 
 
@@ -722,6 +767,7 @@ def start_turn(player: dict, on_event=None, *, draw: bool = True) -> None:
     player["hero_can_attack"] = bool(player["weapon"])
     for m in player["board"]:
         m["can_attack"] = True
+        m["attacks_this_turn"] = 0
         m["turns_on_board"] = m.get("turns_on_board", 0) + 1
     if draw:
         draw_card(player, on_event)
@@ -729,6 +775,9 @@ def start_turn(player: dict, on_event=None, *, draw: bool = True) -> None:
 
 def give_coin(player: dict) -> None:
     """Grant The Coin to the player going second."""
+    if len(player["hand"]) >= MAX_HAND_SIZE:
+        log_action(f"{player['name']}'s hand is full — {COIN_CARD} is burned!")
+        return
     player["hand"].append(COIN_CARD)
     log_action(f"{player['name']} receives {COIN_CARD}!")
 
@@ -753,6 +802,9 @@ def ai_choose_mulligan(player: dict) -> list[int]:
             for i, cost in enumerate(costs):
                 if cost >= 3 and i not in swap:
                     swap.append(i)
+        # Recompute the kept curve after the branch above added more swaps, so
+        # the "too greedy opener" check sees the actual remaining hand.
+        kept = [c for j, c in enumerate(costs) if j not in swap]
         # Two or more 5+ cards is too greedy for an opener.
         if sum(1 for c in kept if c >= 5) >= 2:
             for i, cost in enumerate(costs):
@@ -801,16 +853,18 @@ def do_mulligan(player: dict, swap_indices: list) -> None:
 # 3. CORE RULES & LOGIC
 # ---------------------------------------------------------------------------
 
-def damage_hero(player: dict, amount: int) -> None:
+def damage_hero(player: dict, amount: int) -> int:
+    """Apply damage to a hero; returns the amount of HP actually lost."""
     if amount <= 0:
-        return
+        return 0
     if player.get("armor", 0) > 0:
         if amount <= player["armor"]:
             player["armor"] -= amount
-            return
+            return 0
         amount -= player["armor"]
         player["armor"] = 0
     player["hp"] -= amount
+    return amount
 
 
 def get_valid_targets(opp: dict, is_attack: bool = True) -> list:
@@ -825,6 +879,11 @@ def get_legal_moves(player: dict, opp: dict) -> list:
     if player["hp"] <= 0 or opp["hp"] <= 0:
         return []
 
+    # A pending Discover locks the turn until the player picks a card.
+    pending = player.get("pending_discover")
+    if pending:
+        return [("discover", i, None) for i in range(len(pending["options"]))]
+
     moves = []
 
     for hand_idx, card_name in enumerate(player["hand"]):
@@ -835,7 +894,8 @@ def get_legal_moves(player: dict, opp: dict) -> list:
             if len(player["board"]) < MAX_BOARD_SIZE:
                 moves.append(("play", hand_idx, None))
         elif card["type"] == "spell":
-            if card["effect"] in ("heal", "draw", "damage_all", "buff_all", "heal_all", "coin"):
+            if card["effect"] in ("heal", "draw", "damage_all", "buff_all", "heal_all", "coin",
+                                  "discover", "secret"):
                 moves.append(("play", hand_idx, None))
             elif card["effect"] == "damage":
                 for t in get_valid_targets(opp, is_attack=False):
@@ -851,7 +911,7 @@ def get_legal_moves(player: dict, opp: dict) -> list:
 
     valid_targets = get_valid_targets(opp, is_attack=True)
     for bi, minion in enumerate(player["board"]):
-        if minion.get("can_attack"):
+        if minion.get("can_attack") and minion.get("atk", 0) > 0:
             for t in valid_targets:
                 moves.append(("attack", bi, t))
 
@@ -906,6 +966,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             minion["name"]       = card_name
             minion["max_hp"]     = card["hp"]
             minion["can_attack"] = card.get("charge", False)
+            minion["attacks_this_turn"] = 0
             minion["turns_on_board"] = 0
             lore = get_card_lore(card_name)
             if lore:
@@ -1032,18 +1093,64 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
                     tm["can_attack"] = False
                 for kw in MINION_TRAITS:
                     tm.pop(kw, None)
+                # Losing Windfury mid-turn revokes any unused extra attack.
+                if tm.get("attacks_this_turn", 0) >= max_attacks(tm):
+                    tm["can_attack"] = False
                 log_action(f"   [SILENCE] {tm['name']} is silenced! All effects removed.")
                 notify("blocked", opp, target, "SILENCED!")
+
+            elif card["effect"] == "discover":
+                open_discover(player)
+                notify("play", player, "discover", card_name)
+
+            elif card["effect"] == "secret":
+                if len(player.setdefault("secrets", [])) < MAX_SECRETS:
+                    player["secrets"].append({
+                        "name": card_name,
+                        "trigger": card.get("trigger"),
+                        "effect": card.get("secret_effect"),
+                        "val": card.get("val", 0),
+                        "token_name": card.get("token_name"),
+                        "token_atk": card.get("token_atk"),
+                        "token_hp": card.get("token_hp"),
+                        "token_icon": card.get("token_icon"),
+                    })
+                    log_action(f"   {player['name']} sets a secret ({card_name}).")
+                    notify("play", player, "secret", card_name)
+                else:
+                    log_action(f"   [SECRET] {player['name']} already has the maximum secrets!")
+
+        # React to the action now that it has fully resolved.
+        if card["type"] == "minion":
+            _trigger_secrets(opp, player, "minion_played",
+                             {"minion_index": len(player["board"]) - 1}, on_event)
+        elif card["type"] == "spell":
+            _trigger_secrets(opp, player, "spell_cast", {}, on_event)
+
+    # ---- DISCOVER CHOICE ----------------------------------------------------
+    elif action == "discover":
+        resolve_discover(player, idx)
 
     # ---- ATTACK -------------------------------------------------------------
     elif action == "attack":
         attacker = player["board"][idx]
-        attacker["can_attack"] = False
+        attacker["attacks_this_turn"] = attacker.get("attacks_this_turn", 0) + 1
+        attacker["can_attack"] = attacker["attacks_this_turn"] < max_attacks(attacker)
+
+        def lifesteal_heal(amount: int) -> None:
+            if not attacker.get("lifesteal") or amount <= 0:
+                return
+            amt = clamp_heal(player, amount)
+            if amt > 0:
+                player["hp"] += amt
+                log_action(f"   [LIFESTEAL] {attacker['name']} restores {amt} HP to {player['name']}.")
+                notify("heal", player, "hero", amt)
 
         if target == "hero":
-            damage_hero(opp, attacker["atk"])
+            dealt = damage_hero(opp, attacker["atk"])
             log_action(f">> {attacker['name']} attacks {opp['name']} for {attacker['atk']} damage!")
             notify("damage", opp, "hero", attacker["atk"])
+            lifesteal_heal(dealt)
         else:
             defender = opp["board"][target]
             log_action(f">> {attacker['name']} attacks {defender['name']} for {attacker['atk']} damage!")
@@ -1055,6 +1162,7 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
             else:
                 defender["hp"] -= attacker["atk"]
                 notify("damage", opp, target, attacker["atk"])
+                lifesteal_heal(attacker["atk"])
                 if attacker.get("poisonous") and attacker["atk"] > 0:
                     defender["hp"] = 0
                     log_action(f"   [POISON] Poisonous destroys {defender['name']}!")
@@ -1071,6 +1179,9 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
                     if defender.get("poisonous"):
                         attacker["hp"] = 0
                         log_action(f"   [POISON] Poisonous destroys {attacker['name']}!")
+
+        _trigger_secrets(opp, player, "attack",
+                         {"attacker_index": idx, "target": target}, on_event)
 
     # ---- HERO ATTACK --------------------------------------------------------
     elif action == "hero_attack":
@@ -1102,6 +1213,9 @@ def execute_move(player: dict, opp: dict, move: tuple, on_event=None) -> None:
         if weapon["durability"] <= 0:
             log_action(f"   {player['name']}'s {weapon['name']} breaks!")
             player["weapon"] = None
+
+        _trigger_secrets(opp, player, "attack",
+                         {"attacker_index": None, "target": target}, on_event)
 
     # ---- HERO POWER ---------------------------------------------------------
     elif action == "hero_power":
@@ -1214,6 +1328,119 @@ def check_win(p1: dict, p2: dict) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# DISCOVER
+# ---------------------------------------------------------------------------
+
+def open_discover(player: dict, pool: list[str] | None = None,
+                  count: int = DISCOVER_OPTIONS) -> list[str]:
+    """Offer a Discover choice; the turn is locked until it is resolved."""
+    if pool is None:
+        pool = cards_for_class(player["hero_class"])
+    pool = [name for name in pool if name in CARD_DB]
+    options = random.sample(pool, min(count, len(pool)))
+    player["pending_discover"] = {"options": options}
+    log_action(f"{player['name']} discovers 3 cards...")
+    return options
+
+
+def resolve_discover(player: dict, idx: int | None) -> str | None:
+    """Add the chosen Discover option to hand and clear the pending choice."""
+    pending = player.pop("pending_discover", None)
+    if not pending:
+        return None
+    options = pending["options"]
+    if not isinstance(idx, int) or not (0 <= idx < len(options)):
+        idx = 0
+    chosen = options[idx]
+    if len(player["hand"]) < MAX_HAND_SIZE:
+        player["hand"].append(chosen)
+        log_action(f"   [DISCOVER] {player['name']} chooses {chosen}.")
+    else:
+        log_action(f"   [DISCOVER] {player['name']}'s hand is full — {chosen} is lost.")
+    return chosen
+
+
+def _trigger_secrets(owner: dict, actor: dict, event: str, context: dict,
+                     on_event=None) -> list[str]:
+    """Fire any of owner's secrets that react to actor's action event."""
+    secrets = owner.get("secrets")
+    if not secrets:
+        return []
+    remaining = []
+    fired = []
+    for secret in secrets:
+        if secret.get("trigger") == event:
+            _resolve_secret(secret, owner, actor, context, on_event)
+            fired.append(secret["name"])
+        else:
+            remaining.append(secret)
+    owner["secrets"] = remaining
+    return fired
+
+
+def _resolve_secret(secret: dict, owner: dict, actor: dict, context: dict, on_event=None) -> None:
+    effect = secret.get("effect")
+    val = secret.get("val", 0)
+    name = secret["name"]
+
+    def notify(e_type, tp, ti, amt):
+        if on_event:
+            on_event(e_type, tp, ti, amt)
+
+    if effect == "damage_minion":
+        board = actor["board"]
+        idx = context.get("minion_index")
+        if idx is None or not (0 <= idx < len(board)):
+            return
+        tm = board[idx]
+        if tm.get("divine_shield") and val > 0:
+            tm["divine_shield"] = False
+            log_action(f"   [SECRET] {name} is blocked by {tm['name']}'s Divine Shield!")
+            notify("blocked", actor, idx, "BLOCKED!")
+        else:
+            tm["hp"] -= val
+            log_action(f"   [SECRET] {name} deals {val} damage to {tm['name']}!")
+            notify("damage", actor, idx, val)
+    elif effect == "armor":
+        owner["armor"] += val
+        log_action(f"   [SECRET] {name} grants {owner['name']} {val} Armor!")
+        notify("armor", owner, "hero", val)
+    elif effect == "damage_hero":
+        damage_hero(actor, val)
+        log_action(f"   [SECRET] {name} deals {val} damage to {actor['name']}!")
+        notify("damage", actor, "hero", val)
+    elif effect == "summon":
+        token = {
+            "name": secret.get("token_name", "Ward Token"),
+            "type": "minion", "cost": 0,
+            "atk": secret.get("token_atk", 2), "hp": secret.get("token_hp", 2),
+            "max_hp": secret.get("token_hp", 2),
+            "can_attack": False, "attacks_this_turn": 0, "turns_on_board": 0,
+            "icon": secret.get("token_icon", "WT"),
+        }
+        if len(owner["board"]) < MAX_BOARD_SIZE:
+            owner["board"].append(token)
+            log_action(f"   [SECRET] {name} summons a {token['atk']}/{token['hp']} {token['name']}!")
+            notify("play", owner, "hero", token["name"])
+        else:
+            log_action(f"   [SECRET] {name} fizzles — {owner['name']}'s board is full.")
+
+
+def ai_choose_discover(player: dict) -> int | None:
+    """Pick the most valuable Discover option for the AI."""
+    pending = player.get("pending_discover")
+    if not pending:
+        return None
+    best_idx, best_score = 0, float("-inf")
+    for i, name in enumerate(pending["options"]):
+        card = CARD_DB.get(name, {})
+        score = card.get("cost", 0) * 2 + card.get("atk", 0) + card.get("hp", 0)
+        if score > best_score:
+            best_score, best_idx = score, i
+    return best_idx
+
+
+# ---------------------------------------------------------------------------
 # 4. AI
 # ---------------------------------------------------------------------------
 
@@ -1231,8 +1458,9 @@ def check_immediate_lethal(p_active: dict, p_opp: dict) -> tuple[bool, int]:
     total_dmg = 0
     if not has_taunt:
         for m in p_active.get("board", []):
-            if m.get("can_attack"):
-                total_dmg += m.get("atk", 0)
+            if m.get("can_attack") and m.get("atk", 0) > 0:
+                remaining = max(1, max_attacks(m) - m.get("attacks_this_turn", 0))
+                total_dmg += m.get("atk", 0) * remaining
         if p_active.get("hero_can_attack") and p_active.get("weapon"):
             total_dmg += p_active["weapon"].get("atk", 0)
 
@@ -1294,6 +1522,8 @@ def evaluate_ai_move(p2: dict, p1: dict, move: tuple, personality: str = "balanc
         if card["type"] == "minion":
             score += 3
             if card.get("poisonous"): score += 2
+            if card.get("windfury"): score += 2 + card.get("atk", 0)
+            if card.get("lifesteal"): score += 2 + (3 if personality in ("control", "midrange") else 0)
             if card.get("charge"):
                 score += (5 if personality == "aggro" else 2)
             if card.get("taunt"):
@@ -1479,12 +1709,17 @@ def run_ai_turn(
     draw: bool = True,
     difficulty: str = "normal",
     personality: str = "balanced",
+    solo: bool = False,
 ) -> list[tuple]:
-    """Execute AI turn synchronously. Returns the list of moves made."""
+    """Execute AI turn synchronously. Returns the list of moves made.
+
+    When ``solo`` is True the opponent still draws and refreshes mana but never
+    plays a card or attacks — used by the practice sandbox's no-AI mode.
+    """
     difficulty = normalize_difficulty(difficulty)
     personality = normalize_personality(personality)
     start_turn(p2, draw=draw)
-    if check_win(p1, p2):
+    if solo or check_win(p1, p2):
         return []
     moves_made = []
     for _ in range(max_moves):
@@ -1501,4 +1736,6 @@ def run_ai_turn(
             break
         execute_move(p2, p1, best)
         moves_made.append(best)
+        if p2.get("pending_discover"):
+            resolve_discover(p2, ai_choose_discover(p2))
     return moves_made
